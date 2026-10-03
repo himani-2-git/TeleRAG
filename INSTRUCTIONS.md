@@ -219,7 +219,7 @@ Once at least one document is uploaded, simply send natural language questions:
 ## 7. Troubleshooting & Common Issues
 
 ### 1. HTTP 406 "Not Acceptable" on URL Uploads
-* **Symptom**: The bot reports a 406 Client Error when downloading a PDF from an academic or hosting server.
+* **Symptom**: The bot reports a 406 Client Error when downloading a PDF from an institutional or hosting server.
 * **Cause**: Apache Mod_Security rules block generic script user agents.
 * **Resolution**: TeleRAG automatically sends a compliant `User-Agent: TeleRAG/1.0 (PDF Document Assistant)` and `Accept: application/pdf` header. Verify that the URL directly serves a PDF file and is publicly accessible without requiring a login cookie.
 

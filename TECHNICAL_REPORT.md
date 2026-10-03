@@ -1,9 +1,7 @@
 # TeleRAG: Retrieval-Augmented Generation PDF Question-Answering System via Telegram
 
-**Academic Project Report**  
-*Course*: Natural Language Processing & Distributed Systems Engineering  
-*Original Submission Year*: 2025  
-*Maintenance & Runtime Verification*: 2026  
+**Technical Engineering Report**  
+*System Architecture, Retrieval Mechanics & Empirical Evaluation*  
 
 ---
 
@@ -16,7 +14,7 @@ Traditional Large Language Models (LLMs) suffer from knowledge cutoff dates, lac
 ## 1. Introduction & Problem Statement
 
 ### 1.1 Context
-In academic and professional environments, users frequently need to extract precise information from dense, multi-page PDF documents such as textbooks, research articles, and technical manuals. While consumer LLM interfaces allow document uploads, they often require recurring cloud subscriptions, transmit entire documents across proprietary networks without transparent chunking controls, or fail to provide per-user multi-document lifecycle management.
+In research and technical environments, users frequently need to extract precise information from dense, multi-page PDF documents such as textbooks, research articles, and technical manuals. While consumer LLM interfaces allow document uploads, they often require recurring cloud subscriptions, transmit entire documents across proprietary networks without transparent chunking controls, or fail to provide per-user multi-document lifecycle management.
 
 ### 1.2 Problem Statement
 Developing a self-contained, low-resource RAG application requires addressing four core technical challenges:

@@ -4,9 +4,9 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![RAG Architecture](https://img.shields.io/badge/RAG-Local%20Embeddings%20%2B%20OpenRouter-orange)]()
 
-**TeleRAG** is a lightweight, self-contained **Retrieval-Augmented Generation (RAG)** chatbot for Telegram. It enables users to upload local PDF files or supply public PDF URLs directly in chat, automatically extracts and chunks textual content, generates dense semantic embeddings locally using Sentence Transformers, and retrieves strictly relevant passages to answer natural language questions through an instruction-tuned Large Language Model (LLM) via OpenRouter.
+**TeleRAG** is a lightweight Telegram-based RAG assistant for grounded question answering over PDFs. Built with a self-contained, zero-external-vector-database architecture, TeleRAG enables users to upload local PDF files or supply public PDF URLs directly in chat, extracts and chunks textual content, generates dense semantic embeddings locally using Sentence Transformers, and retrieves strictly relevant passages to answer natural language queries through an instruction-tuned Large Language Model (LLM) via OpenRouter.
 
-Designed as an educational, zero-external-vector-database architecture, TeleRAG achieves complete document grounding, multi-user isolation, and robust server-side request protection without heavy cloud infrastructure.
+It achieves complete document grounding, multi-user isolation, and robust server-side request protection without heavy cloud infrastructure.
 
 ---
 
@@ -16,7 +16,7 @@ The documentation is organized into three dedicated documents:
 
 1. **[Feature & Architecture Overview (README.md)](README.md)** *(this document)*: High-level overview, feature catalog, system architecture, tech stack, and repository structure.
 2. **[Setup & Operational Guide (INSTRUCTIONS.md)](INSTRUCTIONS.md)**: Detailed step-by-step installation, virtual environment setup, Telegram BotFather & OpenRouter key configuration, `.env` guide, Telegram command reference, test execution, and troubleshooting.
-3. **[Academic Engineering Report (PROJECT_REPORT.md)](PROJECT_REPORT.md)**: Formal university-level project report covering the academic problem formulation, mathematical foundation, security threat matrix, *Think Python* real-world benchmarks, and design trade-offs.
+3. **[Technical Engineering Report (TECHNICAL_REPORT.md)](TECHNICAL_REPORT.md)**: Detailed technical report covering system architecture, retrieval design, embedding and cosine-similarity foundations, security considerations, empirical validation, limitations, and engineering trade-offs.
 
 ---
 
@@ -112,10 +112,11 @@ TeleRAG/
 ├── main.py                     # Bot entry point and lifecycle manager
 ├── requirements.txt            # Pinned dependency definitions
 ├── .env.example                # Configuration template
-├── .gitignore                  # Git exclusion rules (.env, .venv, data/, logs/)
+├── .gitignore                  # Git exclusion rules (.env, .venv, data/, logs/, output/)
 ├── INSTRUCTIONS.md             # Complete installation, configuration & user manual
-├── PROJECT_REPORT.md           # Formal academic engineering report
-├── readme.md                   # Repository features & architecture overview
+├── LICENSE                     # Standard MIT License
+├── README.md                   # Repository features & architecture overview
+├── TECHNICAL_REPORT.md         # Detailed technical report covering architecture & evaluation
 │
 ├── src/
 │   ├── config.py               # Central environment variable configuration

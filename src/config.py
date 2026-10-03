@@ -27,7 +27,7 @@ class Config:
     similarity_threshold: float = 0.3
     
     # OpenRouter Settings
-    openrouter_model: str = "meta-llama/llama-3.1-8b-instruct:free"
+    openrouter_model: str = "qwen/qwen3.8-27b:free"
     max_retries: int = 3
     retry_delay: float = 1.0
     
@@ -59,8 +59,8 @@ def get_config() -> Config:
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
         embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
         top_k_results=int(os.getenv("TOP_K_RESULTS", "5")),
-        similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.7")),
-        openrouter_model=os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.2-3b-instruct:free"),
+        similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
+        openrouter_model=os.getenv("OPENROUTER_MODEL", "qwen/qwen3.8-27b:free"),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
         retry_delay=float(os.getenv("RETRY_DELAY", "1.0")),
         database_path=os.getenv("DATABASE_PATH", "data/documents.db"),

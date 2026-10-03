@@ -30,6 +30,7 @@ wheels/
 # Data
 data/
 logs/
+output/
 
 # IDE
 .vscode/

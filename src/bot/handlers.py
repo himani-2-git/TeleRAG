@@ -4,6 +4,9 @@ import os
 import tempfile
 import requests
 import re
+import socket
+import ipaddress
+from typing import Tuple
 from urllib.parse import urlparse
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -300,6 +303,36 @@ class BotHandlers:
         
         return filename
     
+    def _is_safe_url(self, url: str) -> Tuple[bool, str]:
+        """Validate URL to protect against SSRF and unsupported schemes.
+        
+        Args:
+            url: URL string to validate
+            
+        Returns:
+            Tuple of (is_safe, error_message)
+        """
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme.lower() not in ('http', 'https'):
+                return False, "Only HTTP and HTTPS URLs are supported."
+            
+            hostname = parsed.hostname
+            if not hostname:
+                return False, "Invalid URL: missing hostname."
+            
+            # Resolve DNS and verify IP addresses are not private/loopback/link-local
+            addr_info = socket.getaddrinfo(hostname, None)
+            for addr in addr_info:
+                ip_str = addr[4][0]
+                ip = ipaddress.ip_address(ip_str)
+                if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+                    return False, "Access to private or local network resources is forbidden."
+            
+            return True, ""
+        except Exception as e:
+            return False, f"Invalid or unresolvable URL: {str(e)}"
+    
     async def _handle_url_upload(self, update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
         """Handle PDF upload from URL.
         
@@ -323,6 +356,12 @@ class BotHandlers:
             )
             return
         
+        # Validate URL for SSRF protection
+        is_safe, error_msg = self._is_safe_url(url)
+        if not is_safe:
+            await update.message.reply_text(f"❌ {error_msg}")
+            return
+        
         await update.message.reply_text("🔗 Downloading PDF from URL...")
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, 
                                           action=ChatAction.TYPING)
@@ -330,7 +369,11 @@ class BotHandlers:
         temp_file = None
         try:
             # Download file from URL
-            response = requests.get(url, timeout=30, stream=True)
+            download_headers = {
+                "User-Agent": "TeleRAG/1.0 (PDF Document Assistant)",
+                "Accept": "application/pdf, application/octet-stream;q=0.9, */*;q=0.8",
+            }
+            response = requests.get(url, headers=download_headers, timeout=30, stream=True)
             response.raise_for_status()
             
             # Check content type
@@ -342,31 +385,34 @@ class BotHandlers:
                 )
                 return
             
-            # Check file size
+            # Check declared file size
+            max_bytes = self.config.max_file_size_mb * 1024 * 1024
             content_length = response.headers.get('content-length')
             if content_length:
                 file_size = int(content_length)
-                if file_size > self.config.max_file_size_mb * 1024 * 1024:
+                if file_size > max_bytes:
                     await update.message.reply_text(
                         f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
                     )
                     return
             
-            # Save to temp file
+            # Save to temp file with streaming cap to prevent unbounded download
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            downloaded_bytes = 0
             for chunk in response.iter_content(chunk_size=8192):
-                temp_file.write(chunk)
+                if chunk:
+                    downloaded_bytes += len(chunk)
+                    if downloaded_bytes > max_bytes:
+                        temp_file.close()
+                        await update.message.reply_text(
+                            f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
+                        )
+                        return
+                    temp_file.write(chunk)
             temp_file.close()
             
-            # Get file size
+            # Get actual downloaded file size
             file_size = os.path.getsize(temp_file.name)
-            
-            # Check size again
-            if file_size > self.config.max_file_size_mb * 1024 * 1024:
-                await update.message.reply_text(
-                    f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
-                )
-                return
             
             await update.message.reply_text("📥 Processing PDF...")
             

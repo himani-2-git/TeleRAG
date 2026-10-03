@@ -3,7 +3,6 @@
 import unittest
 import tempfile
 import os
-from PyPDF2 import PdfWriter
 from src.processors.pdf_processor import PDFProcessor
 from src.processors.text_chunker import TextChunker
 

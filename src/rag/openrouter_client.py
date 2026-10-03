@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class OpenRouterClient:
     """Client for OpenRouter API."""
     
-    def __init__(self, api_key: str, model: str = "meta-llama/llama-3.2-3b-instruct:free",
+    def __init__(self, api_key: str, model: str = "qwen/qwen3.8-27b:free",
                  max_retries: int = 3, retry_delay: float = 1.0):
         """Initialize OpenRouter client.
         

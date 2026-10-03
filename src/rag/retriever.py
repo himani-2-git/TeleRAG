@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class DocumentRetriever:
     """Retrieves relevant document chunks using similarity search."""
     
-    def __init__(self, top_k: int = 5, similarity_threshold: float = 0.7):
+    def __init__(self, top_k: int = 5, similarity_threshold: float = 0.3):
         """Initialize document retriever.
         
         Args:
@@ -84,18 +84,10 @@ class DocumentRetriever:
         min_score = min(similarities) if similarities else 0
         logger.debug(f"Similarity scores - Max: {max_score:.3f}, Min: {min_score:.3f}, Threshold: {self.similarity_threshold}")
         
-        # Combine chunks with scores
+        # Combine chunks with scores that meet or exceed the threshold
         results = []
         for chunk, score in zip(chunks, similarities):
             if score >= self.similarity_threshold:
-                result = chunk.copy()
-                result['similarity_score'] = float(score)
-                results.append(result)
-        
-        # If no results meet threshold, return top results anyway
-        if not results and chunks:
-            logger.warning(f"No chunks met threshold {self.similarity_threshold}, returning top {self.top_k} anyway")
-            for chunk, score in zip(chunks, similarities):
                 result = chunk.copy()
                 result['similarity_score'] = float(score)
                 results.append(result)

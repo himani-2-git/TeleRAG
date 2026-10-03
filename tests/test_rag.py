@@ -74,6 +74,53 @@ class TestDocumentRetriever(unittest.TestCase):
         
         self.assertIn('Test content', context)
         self.assertIn('test.pdf', context)
+    
+    def test_search_similar_no_match_returns_empty(self):
+        """Test that query with no chunks meeting threshold returns empty list (no fallback)."""
+        # Query orthogonal to chunks
+        query_embedding = [1.0, 0.0, 0.0, 0.0]
+        chunks = [
+            {
+                'content': 'Unrelated content 1',
+                'embedding': [0.0, 1.0, 0.0, 0.0],  # similarity = 0.0
+                'filename': 'test.pdf'
+            },
+            {
+                'content': 'Unrelated content 2',
+                'embedding': [0.1, 0.9, 0.0, 0.0],  # similarity ~ 0.11 < 0.5 threshold
+                'filename': 'test.pdf'
+            }
+        ]
+        
+        results = self.retriever.search_similar(query_embedding, chunks)
+        self.assertEqual(results, [])
+    
+    def test_search_similar_filters_below_threshold(self):
+        """Test that chunks below threshold are filtered out and results are ranked descending."""
+        query_embedding = [1.0, 0.0, 0.0, 0.0]
+        chunks = [
+            {
+                'content': 'Low similarity chunk',
+                'embedding': [0.2, 0.8, 0.0, 0.0],  # below 0.5 threshold
+                'filename': 'test.pdf'
+            },
+            {
+                'content': 'High similarity chunk',
+                'embedding': [0.95, 0.05, 0.0, 0.0],  # well above 0.5 threshold (~0.998)
+                'filename': 'test.pdf'
+            },
+            {
+                'content': 'Moderate similarity chunk',
+                'embedding': [0.7, 0.3, 0.0, 0.0],  # above 0.5 threshold (~0.919)
+                'filename': 'test.pdf'
+            }
+        ]
+        
+        results = self.retriever.search_similar(query_embedding, chunks)
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]['content'], 'High similarity chunk')
+        self.assertEqual(results[1]['content'], 'Moderate similarity chunk')
+        self.assertGreater(results[0]['similarity_score'], results[1]['similarity_score'])
 
 class TestOpenRouterClient(unittest.TestCase):
     """Test OpenRouter client."""

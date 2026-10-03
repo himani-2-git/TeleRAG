@@ -36,6 +36,7 @@ class Database:
         """
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
         return conn
     
     def _initialize_schema(self):
@@ -116,7 +117,7 @@ class Database:
                                      chunk_count, upload_date)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (user_id, filename, file_hash, file_size, len(chunks), 
-                  datetime.now()))
+                  datetime.now().isoformat()))
             
             document_id = cursor.lastrowid
             

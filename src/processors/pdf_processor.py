@@ -88,16 +88,16 @@ class PDFProcessor:
         Returns:
             Cleaned text
         """
-        # Remove excessive whitespace
-        text = re.sub(r'\s+', ' ', text)
+        # Normalize line breaks
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
         
         # Remove special characters that might cause issues
         text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', text)
         
-        # Normalize line breaks
-        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        # Normalize horizontal whitespace (spaces/tabs) without stripping newlines
+        text = re.sub(r'[ \t]+', ' ', text)
         
-        # Remove multiple consecutive newlines
-        text = re.sub(r'\n\s*\n', '\n\n', text)
+        # Remove multiple consecutive newlines (collapse 3+ into 2)
+        text = re.sub(r'\n{3,}', '\n\n', text)
         
         return text.strip()

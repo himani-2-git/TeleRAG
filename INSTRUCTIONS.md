@@ -24,7 +24,7 @@ If your default Python is 3.13 or newer, specify your Python 3.12 binary (e.g., 
 
 ### 2.1 Clone Repository
 ```bash
-git clone https://github.com/<your-username>/TeleRAG.git
+git clone https://github.com/himani-2-git/TeleRAG.git
 cd TeleRAG
 ```
 
@@ -50,12 +50,15 @@ Isolate dependencies by creating a dedicated virtual environment:
   source .venv/bin/activate
   ```
 
-### 2.3 Install Core Dependencies
-Install the pinned dependencies from `requirements.txt`:
+### 2.3 Install Core & Dev Dependencies
+Install the pinned dependencies from `requirements.txt` (and optionally `requirements-dev.txt` for evaluation tooling):
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt
 ```
+
+> [!NOTE]
+> On the first run, the embedding model (`all-MiniLM-L6-v2`, ~90 MB) is downloaded and cached automatically from Hugging Face. This step requires an active internet connection once; subsequent runs execute completely offline on local CPU.
 
 ---
 
@@ -75,7 +78,7 @@ TeleRAG requires two external services: a Telegram Bot and an OpenRouter API key
 1. Go to [OpenRouter](https://openrouter.ai/) and register an account.
 2. Navigate to **Keys** (`openrouter.ai/keys`) and click **Create Key**.
 3. Copy your API key (format: `sk-or-v1-...`).
-4. *Note: TeleRAG defaults to the free model `qwen/qwen3.8-27b:free`, which requires zero credits.*
+4. *Note: free model names change often; pick a model marked free there and set OPENROUTER_MODEL: https://openrouter.ai/models*
 
 ### 3.3 Configure `.env`
 Copy the template configuration file:
@@ -101,7 +104,7 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 # ===================================================================
 # LLM Model Configuration
 # ===================================================================
-# Default free instruction-tuned model (262k context, 0 cost)
+# free model names change often; pick a model marked free there and set OPENROUTER_MODEL: https://openrouter.ai/models
 OPENROUTER_MODEL=qwen/qwen3.8-27b:free
 MAX_RETRIES=3
 RETRY_DELAY=1.0
@@ -109,6 +112,7 @@ RETRY_DELAY=1.0
 # ===================================================================
 # RAG Retrieval & Chunking Settings
 # ===================================================================
+RETRIEVAL_MODE=hybrid
 MAX_FILE_SIZE_MB=20
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
@@ -129,7 +133,7 @@ LOG_FILE=logs/bot.log
 
 ## 4. Verification & Testing
 
-Before launching the bot, verify your environment by running the test suite:
+Before launching the bot, verify your environment by running the unit test suite:
 
 ```bash
 python -m unittest discover tests
@@ -137,11 +141,18 @@ python -m unittest discover tests
 
 Expected output:
 ```text
-Ran 21 tests in ~8s
+Ran unit tests in ~10s
 
 OK
 ```
-This validates PDF parsing, text cleaning, chunk boundary preservation, SQLite storage operations, and cosine similarity threshold filtering without making external network calls.
+This validates SSRF defense, multi-hop redirect checks, streaming limits, per-page PDF parsing, sliding-window chunk bounds, page citations and source footers, SQLite schema migrations, BM25 indexing, RRF rank fusion, cross-encoder reranking, and cosine similarity threshold filtering without making external network calls.
+
+### 4.1 Running the Retrieval Evaluation Quality Gate
+To verify retrieval performance against the synthetic regression fixture:
+```bash
+python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golden eval/golden_ci.json --thresholds eval/thresholds.json
+```
+All quality gate assertions (`min_hit_at_5 >= 0.85`, `min_mrr >= 0.70`, `min_abstention_easy >= 0.90`) should pass.
 
 ---
 
@@ -210,8 +221,8 @@ Once at least one document is uploaded, simply send natural language questions:
 * *"Summarize chapter 3."*
 
 #### Grounding & Abstention Behavior
-* **In-Context Queries**: If relevant chunks meet the similarity threshold (`>= 0.3`), the bot constructs a grounded prompt for OpenRouter and returns a factual answer.
-* **Out-of-Context Queries**: If no chunks meet the threshold (e.g. asking *"How to bake bread?"* on a Python textbook), the bot deterministically abstains without calling the LLM:
+* **In-Context Queries**: If relevant chunks meet the similarity threshold (`>= 0.3`), the bot constructs a context prompt for OpenRouter and returns an answer citing retrieved page ranges. This relevance cutoff reduces answers not supported by the document; does not eliminate hallucination.
+* **Out-of-Context Queries**: If no chunks meet the threshold (e.g. asking *"How to bake bread?"* on a Python textbook), the bot abstains without calling the LLM:
   > *"🤔 I couldn't find relevant information in your documents to answer this question."*
 
 ---
@@ -231,7 +242,7 @@ Once at least one document is uploaded, simply send natural language questions:
 ### 3. OpenRouter HTTP 429 "Too Many Requests"
 * **Symptom**: Error in logs `429 Too Many Requests`.
 * **Cause**: Upstream provider rate limits on free-tier models during peak periods.
-* **Resolution**: TeleRAG includes automatic exponential backoff retry logic. If a model remains congested, switch `OPENROUTER_MODEL` in `.env` to another active free model (e.g. `inclusionai/ling-3.1-flash` or `nvidia/nemotron-3-ultra-550b-a55b:free`).
+* **Resolution**: TeleRAG includes automatic exponential backoff retry logic. If a model remains congested, switch `OPENROUTER_MODEL` in `.env` to another free model listed at https://openrouter.ai/models.
 
 ### 4. PDF Text Extraction Returns 0 Chunks
 * **Symptom**: *"❌ No text content could be extracted from PDF."*

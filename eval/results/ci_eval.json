@@ -1,0 +1,785 @@
+{
+  "mode": "hybrid",
+  "dataset_pdf": "ci_fixture.pdf",
+  "total_chunks": 10,
+  "total_questions": 15,
+  "answerable_questions": 12,
+  "unanswerable_questions": 3,
+  "unanswerable_easy_questions": 3,
+  "unanswerable_hard_questions": 0,
+  "strict": {
+    "hit_at_1": 0.1667,
+    "hit_at_5": 0.8333,
+    "mrr": 0.4861
+  },
+  "span": {
+    "hit_at_1": 1.0,
+    "hit_at_5": 1.0,
+    "mrr": 1.0
+  },
+  "hit_at_1": 1.0,
+  "hit_at_5": 1.0,
+  "mrr": 1.0,
+  "abstention_accuracy": 1.0,
+  "abstention_accuracy_easy": 1.0,
+  "abstention_accuracy_hard": 1.0,
+  "mean_retrieval_ms": 30.36,
+  "query_results": [
+    {
+      "id": "ci_01",
+      "question": "What is the primary technique used for high availability in distributed systems?",
+      "category": "distributed_foundations",
+      "answerable": true,
+      "expected_pages": [
+        1
+      ],
+      "retrieved_pages": [
+        1,
+        1,
+        2,
+        5,
+        3
+      ],
+      "retrieved_scores": [
+        0.6438,
+        0.62,
+        0.5058,
+        0.3967,
+        0.3923
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 1,
+          "page_end": 2,
+          "score": 0.6438
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.62
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.5058
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.3967
+        },
+        {
+          "page_start": 3,
+          "page_end": 8,
+          "score": 0.3923
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 36.5550999995321
+    },
+    {
+      "id": "ci_02",
+      "question": "What does the PACELC theorem state regarding latency and consistency?",
+      "category": "cap_pacelc",
+      "answerable": true,
+      "expected_pages": [
+        2
+      ],
+      "retrieved_pages": [
+        1,
+        2,
+        1,
+        4,
+        7
+      ],
+      "retrieved_scores": [
+        0.6236,
+        0.5548,
+        0.5215,
+        0.4825,
+        0.411
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.6236
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.5548
+        },
+        {
+          "page_start": 1,
+          "page_end": 2,
+          "score": 0.5215
+        },
+        {
+          "page_start": 4,
+          "page_end": 8,
+          "score": 0.4825
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.411
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 28.696599998511374
+    },
+    {
+      "id": "ci_03",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "category": "paxos",
+      "answerable": true,
+      "expected_pages": [
+        3
+      ],
+      "retrieved_pages": [
+        2,
+        3,
+        5,
+        7,
+        6
+      ],
+      "retrieved_scores": [
+        0.6466,
+        0.5671,
+        0.4358,
+        0.4469,
+        0.5295
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.6466
+        },
+        {
+          "page_start": 3,
+          "page_end": 8,
+          "score": 0.5671
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.4358
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.4469
+        },
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.5295
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 30.13870000722818
+    },
+    {
+      "id": "ci_04",
+      "question": "How does Multi-Paxos optimize basic Paxos for recurring log entries?",
+      "category": "paxos",
+      "answerable": true,
+      "expected_pages": [
+        3
+      ],
+      "retrieved_pages": [
+        2,
+        3,
+        1,
+        7,
+        4
+      ],
+      "retrieved_scores": [
+        0.5184,
+        0.5158,
+        0.3137,
+        0.3054,
+        0.0
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.5184
+        },
+        {
+          "page_start": 3,
+          "page_end": 8,
+          "score": 0.5158
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.3137
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.3054
+        },
+        {
+          "page_start": 4,
+          "page_end": 8,
+          "score": 0.0
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 32.489400007762015
+    },
+    {
+      "id": "ci_05",
+      "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+      "category": "raft",
+      "answerable": true,
+      "expected_pages": [
+        4
+      ],
+      "retrieved_pages": [
+        3,
+        6,
+        5,
+        2,
+        1
+      ],
+      "retrieved_scores": [
+        0.6753,
+        0.4438,
+        0.392,
+        0.5056,
+        0.3391
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 3,
+          "page_end": 8,
+          "score": 0.6753
+        },
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.4438
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.392
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.5056
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.3391
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 33.02649999386631
+    },
+    {
+      "id": "ci_06",
+      "question": "What RPCs are used by the Raft leader to replicate log entries across followers?",
+      "category": "raft",
+      "answerable": true,
+      "expected_pages": [
+        4
+      ],
+      "retrieved_pages": [
+        3,
+        4,
+        6,
+        7,
+        5
+      ],
+      "retrieved_scores": [
+        0.6389,
+        0.4571,
+        0.4058,
+        0.3787,
+        0.3212
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 3,
+          "page_end": 8,
+          "score": 0.6389
+        },
+        {
+          "page_start": 4,
+          "page_end": 8,
+          "score": 0.4571
+        },
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.4058
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.3787
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.3212
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 28.445899981306866
+    },
+    {
+      "id": "ci_07",
+      "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+      "category": "logical_clocks",
+      "answerable": true,
+      "expected_pages": [
+        5
+      ],
+      "retrieved_pages": [
+        4,
+        5,
+        2,
+        1,
+        7
+      ],
+      "retrieved_scores": [
+        0.7195,
+        0.3804,
+        0.3362,
+        0.3085,
+        0.3565
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 4,
+          "page_end": 8,
+          "score": 0.7195
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.3804
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.3362
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.3085
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.3565
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 26.412000006530434
+    },
+    {
+      "id": "ci_08",
+      "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+      "category": "byzantine",
+      "answerable": true,
+      "expected_pages": [
+        6
+      ],
+      "retrieved_pages": [
+        5,
+        1,
+        1,
+        2,
+        7
+      ],
+      "retrieved_scores": [
+        0.6483,
+        0.5229,
+        0.4403,
+        0.4664,
+        0.3978
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.6483
+        },
+        {
+          "page_start": 1,
+          "page_end": 2,
+          "score": 0.5229
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.4403
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.4664
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.3978
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 31.79239999735728
+    },
+    {
+      "id": "ci_09",
+      "question": "What are the three operational phases of Practical Byzantine Fault Tolerance (PBFT)?",
+      "category": "byzantine",
+      "answerable": true,
+      "expected_pages": [
+        6
+      ],
+      "retrieved_pages": [
+        5,
+        1,
+        6,
+        1,
+        2
+      ],
+      "retrieved_scores": [
+        0.7987,
+        0.4609,
+        0.5495,
+        0.3753,
+        0.4233
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.7987
+        },
+        {
+          "page_start": 1,
+          "page_end": 2,
+          "score": 0.4609
+        },
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.5495
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.3753
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.4233
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.3333333333333333,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 27.918899984797463
+    },
+    {
+      "id": "ci_10",
+      "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+      "category": "distributed_transactions",
+      "answerable": true,
+      "expected_pages": [
+        7
+      ],
+      "retrieved_pages": [
+        6,
+        7,
+        2,
+        5,
+        3
+      ],
+      "retrieved_scores": [
+        0.66,
+        0.5407,
+        0.4045,
+        0.3883,
+        0.3385
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.66
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.5407
+        },
+        {
+          "page_start": 2,
+          "page_end": 8,
+          "score": 0.4045
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.3883
+        },
+        {
+          "page_start": 3,
+          "page_end": 8,
+          "score": 0.3385
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 27.758799988077953
+    },
+    {
+      "id": "ci_11",
+      "question": "What mathematical properties of the merge operator guarantee convergence in state-based CRDTs?",
+      "category": "crdts",
+      "answerable": true,
+      "expected_pages": [
+        8
+      ],
+      "retrieved_pages": [
+        8,
+        7,
+        1,
+        1,
+        5
+      ],
+      "retrieved_scores": [
+        0.7768,
+        0.5417,
+        0.3321,
+        0.3314,
+        0.0
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 8,
+          "page_end": 8,
+          "score": 0.7768
+        },
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.5417
+        },
+        {
+          "page_start": 1,
+          "page_end": 8,
+          "score": 0.3321
+        },
+        {
+          "page_start": 1,
+          "page_end": 2,
+          "score": 0.3314
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.0
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 33.385700022336096
+    },
+    {
+      "id": "ci_12",
+      "question": "What are common examples of conflict-free replicated data types such as PN-Counters and OR-Sets?",
+      "category": "crdts",
+      "answerable": true,
+      "expected_pages": [
+        8
+      ],
+      "retrieved_pages": [
+        7,
+        8,
+        6,
+        5,
+        4
+      ],
+      "retrieved_scores": [
+        0.5787,
+        0.4378,
+        0.4064,
+        0.3398,
+        0.3802
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 7,
+          "page_end": 8,
+          "score": 0.5787
+        },
+        {
+          "page_start": 8,
+          "page_end": 8,
+          "score": 0.4378
+        },
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.4064
+        },
+        {
+          "page_start": 5,
+          "page_end": 6,
+          "score": 0.3398
+        },
+        {
+          "page_start": 4,
+          "page_end": 8,
+          "score": 0.3802
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 32.889499998418614
+    },
+    {
+      "id": "ci_u01",
+      "question": "How do plants convert sunlight into chemical energy during the light-dependent reactions of photosynthesis?",
+      "category": "unanswerable",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 29.74470000481233
+    },
+    {
+      "id": "ci_u02",
+      "question": "What are the culinary techniques for making a classical French hollandaise emulsion sauce?",
+      "category": "unanswerable",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 29.595999978482723
+    },
+    {
+      "id": "ci_u03",
+      "question": "How do pneumatic disc brakes function on heavy commercial freight trucks?",
+      "category": "unanswerable",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 26.55189999495633
+    }
+  ]
+}

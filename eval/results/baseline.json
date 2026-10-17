@@ -1,0 +1,3661 @@
+{
+  "mode": "dense",
+  "dataset_pdf": "book.pdf",
+  "total_chunks": 582,
+  "total_questions": 70,
+  "answerable_questions": 50,
+  "unanswerable_questions": 20,
+  "unanswerable_easy_questions": 10,
+  "unanswerable_hard_questions": 10,
+  "strict": {
+    "hit_at_1": 0.46,
+    "hit_at_5": 0.9,
+    "mrr": 0.6243
+  },
+  "span": {
+    "hit_at_1": 0.66,
+    "hit_at_5": 1.0,
+    "mrr": 0.7897
+  },
+  "hit_at_1": 0.66,
+  "hit_at_5": 1.0,
+  "mrr": 0.7897,
+  "abstention_accuracy": 0.5,
+  "abstention_accuracy_easy": 1.0,
+  "abstention_accuracy_hard": 0.0,
+  "mean_retrieval_ms": 56.92,
+  "query_results": [
+    {
+      "id": "q01",
+      "question": "What is the difference between a high-level programming language like Python and a low-level language?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "expected_pages": [
+        28
+      ],
+      "retrieved_pages": [
+        28,
+        24,
+        24,
+        24,
+        6
+      ],
+      "retrieved_scores": [
+        0.6122,
+        0.5613,
+        0.4908,
+        0.4907,
+        0.4873
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 28,
+          "page_end": 29,
+          "score": 0.6122
+        },
+        {
+          "page_start": 24,
+          "page_end": 24,
+          "score": 0.5613
+        },
+        {
+          "page_start": 24,
+          "page_end": 24,
+          "score": 0.4908
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.4907
+        },
+        {
+          "page_start": 6,
+          "page_end": 7,
+          "score": 0.4873
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 55.04169999039732
+    },
+    {
+      "id": "q02",
+      "question": "What is the role of the Python interpreter and how does the prompt indicate it is ready for code?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "expected_pages": [
+        24
+      ],
+      "retrieved_pages": [
+        28,
+        24,
+        33,
+        32,
+        24
+      ],
+      "retrieved_scores": [
+        0.6446,
+        0.6437,
+        0.5851,
+        0.5697,
+        0.5688
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 28,
+          "page_end": 29,
+          "score": 0.6446
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.6437
+        },
+        {
+          "page_start": 33,
+          "page_end": 33,
+          "score": 0.5851
+        },
+        {
+          "page_start": 32,
+          "page_end": 33,
+          "score": 0.5697
+        },
+        {
+          "page_start": 24,
+          "page_end": 24,
+          "score": 0.5688
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 55.369800014887005
+    },
+    {
+      "id": "q03",
+      "question": "What arithmetic operators are provided in Python and what does the ** operator compute?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "expected_pages": [
+        25
+      ],
+      "retrieved_pages": [
+        25,
+        25,
+        33,
+        13,
+        24
+      ],
+      "retrieved_scores": [
+        0.6201,
+        0.5964,
+        0.5628,
+        0.5612,
+        0.5395
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 25,
+          "page_end": 25,
+          "score": 0.6201
+        },
+        {
+          "page_start": 25,
+          "page_end": 26,
+          "score": 0.5964
+        },
+        {
+          "page_start": 33,
+          "page_end": 34,
+          "score": 0.5628
+        },
+        {
+          "page_start": 13,
+          "page_end": 13,
+          "score": 0.5612
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.5395
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 53.46219998318702
+    },
+    {
+      "id": "q04",
+      "question": "What is the difference between syntax errors, runtime errors, and semantic errors in Python?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "expected_pages": [
+        215
+      ],
+      "retrieved_pages": [
+        35,
+        214,
+        68,
+        36,
+        215
+      ],
+      "retrieved_scores": [
+        0.6745,
+        0.6048,
+        0.5828,
+        0.5517,
+        0.5418
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 35,
+          "page_end": 35,
+          "score": 0.6745
+        },
+        {
+          "page_start": 214,
+          "page_end": 215,
+          "score": 0.6048
+        },
+        {
+          "page_start": 68,
+          "page_end": 68,
+          "score": 0.5828
+        },
+        {
+          "page_start": 36,
+          "page_end": 37,
+          "score": 0.5517
+        },
+        {
+          "page_start": 215,
+          "page_end": 215,
+          "score": 0.5418
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.2,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 58.750700001837686
+    },
+    {
+      "id": "q05",
+      "question": "What happens when you use an illegal variable name such as a Python keyword like class or yield?",
+      "category": "ch02_variables",
+      "answerable": true,
+      "expected_pages": [
+        32
+      ],
+      "retrieved_pages": [
+        31,
+        32,
+        37,
+        45,
+        26
+      ],
+      "retrieved_scores": [
+        0.6676,
+        0.6096,
+        0.5116,
+        0.4996,
+        0.4981
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 31,
+          "page_end": 32,
+          "score": 0.6676
+        },
+        {
+          "page_start": 32,
+          "page_end": 32,
+          "score": 0.6096
+        },
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.5116
+        },
+        {
+          "page_start": 45,
+          "page_end": 46,
+          "score": 0.4996
+        },
+        {
+          "page_start": 26,
+          "page_end": 26,
+          "score": 0.4981
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 52.9996000113897
+    },
+    {
+      "id": "q06",
+      "question": "How does the modulus operator % work in Python and what does it compute?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "expected_pages": [
+        61
+      ],
+      "retrieved_pages": [
+        61,
+        25,
+        139,
+        61,
+        25
+      ],
+      "retrieved_scores": [
+        0.662,
+        0.557,
+        0.5258,
+        0.5226,
+        0.5211
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 61,
+          "page_end": 62,
+          "score": 0.662
+        },
+        {
+          "page_start": 25,
+          "page_end": 25,
+          "score": 0.557
+        },
+        {
+          "page_start": 139,
+          "page_end": 139,
+          "score": 0.5258
+        },
+        {
+          "page_start": 61,
+          "page_end": 62,
+          "score": 0.5226
+        },
+        {
+          "page_start": 25,
+          "page_end": 26,
+          "score": 0.5211
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 59.61489997571334
+    },
+    {
+      "id": "q07",
+      "question": "What is the order of operations followed by Python expressions (PEMDAS)?",
+      "category": "ch02_variables",
+      "answerable": true,
+      "expected_pages": [
+        34,
+        35
+      ],
+      "retrieved_pages": [
+        33,
+        13,
+        34,
+        24,
+        25
+      ],
+      "retrieved_scores": [
+        0.5616,
+        0.5195,
+        0.5011,
+        0.4995,
+        0.4958
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 33,
+          "page_end": 34,
+          "score": 0.5616
+        },
+        {
+          "page_start": 13,
+          "page_end": 13,
+          "score": 0.5195
+        },
+        {
+          "page_start": 34,
+          "page_end": 34,
+          "score": 0.5011
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.4995
+        },
+        {
+          "page_start": 25,
+          "page_end": 25,
+          "score": 0.4958
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.3333333333333333,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 58.21059999288991
+    },
+    {
+      "id": "q08",
+      "question": "How does string concatenation using the + operator and string repetition using the * operator work in Python?",
+      "category": "ch02_variables",
+      "answerable": true,
+      "expected_pages": [
+        34
+      ],
+      "retrieved_pages": [
+        34,
+        117,
+        34,
+        33,
+        24
+      ],
+      "retrieved_scores": [
+        0.5458,
+        0.5238,
+        0.5085,
+        0.499,
+        0.497
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 34,
+          "page_end": 34,
+          "score": 0.5458
+        },
+        {
+          "page_start": 117,
+          "page_end": 118,
+          "score": 0.5238
+        },
+        {
+          "page_start": 34,
+          "page_end": 35,
+          "score": 0.5085
+        },
+        {
+          "page_start": 33,
+          "page_end": 34,
+          "score": 0.499
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.497
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 64.72880000364967
+    },
+    {
+      "id": "q09",
+      "question": "What built-in functions in Python convert values from one type to int, float, or str?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "expected_pages": [
+        39
+      ],
+      "retrieved_pages": [
+        39,
+        25,
+        29,
+        37,
+        26
+      ],
+      "retrieved_scores": [
+        0.7463,
+        0.6542,
+        0.6045,
+        0.5846,
+        0.5677
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 39,
+          "page_end": 40,
+          "score": 0.7463
+        },
+        {
+          "page_start": 25,
+          "page_end": 26,
+          "score": 0.6542
+        },
+        {
+          "page_start": 29,
+          "page_end": 29,
+          "score": 0.6045
+        },
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.5846
+        },
+        {
+          "page_start": 26,
+          "page_end": 26,
+          "score": 0.5677
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 79.44169998518191
+    },
+    {
+      "id": "q10",
+      "question": "How do you import and access trigonometric or mathematical functions from the Python math module?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "expected_pages": [
+        40,
+        41
+      ],
+      "retrieved_pages": [
+        40,
+        39,
+        165,
+        166,
+        166
+      ],
+      "retrieved_scores": [
+        0.5898,
+        0.5468,
+        0.5026,
+        0.4731,
+        0.4648
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 40,
+          "page_end": 40,
+          "score": 0.5898
+        },
+        {
+          "page_start": 39,
+          "page_end": 40,
+          "score": 0.5468
+        },
+        {
+          "page_start": 165,
+          "page_end": 166,
+          "score": 0.5026
+        },
+        {
+          "page_start": 166,
+          "page_end": 166,
+          "score": 0.4731
+        },
+        {
+          "page_start": 166,
+          "page_end": 166,
+          "score": 0.4648
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 110.83859999780543
+    },
+    {
+      "id": "q11",
+      "question": "What is the difference between a parameter and an argument when defining and calling functions in Python?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "expected_pages": [
+        43,
+        44
+      ],
+      "retrieved_pages": [
+        37,
+        43,
+        183,
+        44,
+        48
+      ],
+      "retrieved_scores": [
+        0.685,
+        0.5713,
+        0.5583,
+        0.5358,
+        0.5353
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.685
+        },
+        {
+          "page_start": 43,
+          "page_end": 43,
+          "score": 0.5713
+        },
+        {
+          "page_start": 183,
+          "page_end": 184,
+          "score": 0.5583
+        },
+        {
+          "page_start": 44,
+          "page_end": 44,
+          "score": 0.5358
+        },
+        {
+          "page_start": 48,
+          "page_end": 49,
+          "score": 0.5353
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 62.322900019353256
+    },
+    {
+      "id": "q12",
+      "question": "What is a stack diagram and how does it represent function calls and local variables?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "expected_pages": [
+        45,
+        46
+      ],
+      "retrieved_pages": [
+        66,
+        45,
+        66,
+        14,
+        48
+      ],
+      "retrieved_scores": [
+        0.6428,
+        0.6352,
+        0.584,
+        0.5752,
+        0.553
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 66,
+          "page_end": 66,
+          "score": 0.6428
+        },
+        {
+          "page_start": 45,
+          "page_end": 45,
+          "score": 0.6352
+        },
+        {
+          "page_start": 66,
+          "page_end": 66,
+          "score": 0.584
+        },
+        {
+          "page_start": 14,
+          "page_end": 14,
+          "score": 0.5752
+        },
+        {
+          "page_start": 48,
+          "page_end": 48,
+          "score": 0.553
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 62.83470001653768
+    },
+    {
+      "id": "q13",
+      "question": "What is encapsulation in the context of writing reusable helper functions?",
+      "category": "ch04_interface",
+      "answerable": true,
+      "expected_pages": [
+        57,
+        58,
+        54,
+        55
+      ],
+      "retrieved_pages": [
+        183,
+        48,
+        200,
+        58,
+        57
+      ],
+      "retrieved_scores": [
+        0.4897,
+        0.4238,
+        0.4193,
+        0.4142,
+        0.4093
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 183,
+          "page_end": 184,
+          "score": 0.4897
+        },
+        {
+          "page_start": 48,
+          "page_end": 48,
+          "score": 0.4238
+        },
+        {
+          "page_start": 200,
+          "page_end": 201,
+          "score": 0.4193
+        },
+        {
+          "page_start": 58,
+          "page_end": 59,
+          "score": 0.4142
+        },
+        {
+          "page_start": 57,
+          "page_end": 57,
+          "score": 0.4093
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.25,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.25,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.25,
+      "latency_ms": 60.91289999312721
+    },
+    {
+      "id": "q14",
+      "question": "What is generalization and how does adding parameters make a function more general?",
+      "category": "ch04_interface",
+      "answerable": true,
+      "expected_pages": [
+        57,
+        58,
+        54,
+        55
+      ],
+      "retrieved_pages": [
+        47,
+        37,
+        183,
+        58,
+        43
+      ],
+      "retrieved_scores": [
+        0.4665,
+        0.4534,
+        0.4386,
+        0.411,
+        0.4015
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 47,
+          "page_end": 48,
+          "score": 0.4665
+        },
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.4534
+        },
+        {
+          "page_start": 183,
+          "page_end": 184,
+          "score": 0.4386
+        },
+        {
+          "page_start": 58,
+          "page_end": 59,
+          "score": 0.411
+        },
+        {
+          "page_start": 43,
+          "page_end": 44,
+          "score": 0.4015
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.25,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.25,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.25,
+      "latency_ms": 62.22029999480583
+    },
+    {
+      "id": "q15",
+      "question": "What is a docstring and how is it used to explain the interface and contract of a Python function?",
+      "category": "ch04_interface",
+      "answerable": true,
+      "expected_pages": [
+        58,
+        59
+      ],
+      "retrieved_pages": [
+        57,
+        37,
+        58,
+        29,
+        41
+      ],
+      "retrieved_scores": [
+        0.5884,
+        0.5857,
+        0.5382,
+        0.5224,
+        0.5208
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 57,
+          "page_end": 57,
+          "score": 0.5884
+        },
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.5857
+        },
+        {
+          "page_start": 58,
+          "page_end": 59,
+          "score": 0.5382
+        },
+        {
+          "page_start": 29,
+          "page_end": 29,
+          "score": 0.5224
+        },
+        {
+          "page_start": 41,
+          "page_end": 42,
+          "score": 0.5208
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.3333333333333333,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.3333333333333333,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.3333333333333333,
+      "latency_ms": 64.9690999998711
+    },
+    {
+      "id": "q16",
+      "question": "How does floor division // differ from standard division / in Python 3?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "expected_pages": [
+        61
+      ],
+      "retrieved_pages": [
+        11,
+        11,
+        61,
+        139,
+        68
+      ],
+      "retrieved_scores": [
+        0.615,
+        0.6047,
+        0.5829,
+        0.5015,
+        0.4695
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 11,
+          "page_end": 13,
+          "score": 0.615
+        },
+        {
+          "page_start": 11,
+          "page_end": 11,
+          "score": 0.6047
+        },
+        {
+          "page_start": 61,
+          "page_end": 62,
+          "score": 0.5829
+        },
+        {
+          "page_start": 139,
+          "page_end": 139,
+          "score": 0.5015
+        },
+        {
+          "page_start": 68,
+          "page_end": 69,
+          "score": 0.4695
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.3333333333333333,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.3333333333333333,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.3333333333333333,
+      "latency_ms": 70.86189999245107
+    },
+    {
+      "id": "q17",
+      "question": "What are boolean expressions and the comparison operators ==, !=, >, <, >=, <= in Python?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "expected_pages": [
+        62
+      ],
+      "retrieved_pages": [
+        62,
+        62,
+        69,
+        85,
+        64
+      ],
+      "retrieved_scores": [
+        0.7964,
+        0.6921,
+        0.6345,
+        0.5672,
+        0.547
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 62,
+          "page_end": 62,
+          "score": 0.7964
+        },
+        {
+          "page_start": 62,
+          "page_end": 63,
+          "score": 0.6921
+        },
+        {
+          "page_start": 69,
+          "page_end": 69,
+          "score": 0.6345
+        },
+        {
+          "page_start": 85,
+          "page_end": 86,
+          "score": 0.5672
+        },
+        {
+          "page_start": 64,
+          "page_end": 64,
+          "score": 0.547
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 91.3373000221327
+    },
+    {
+      "id": "q18",
+      "question": "What are chained conditionals using elif and when should they be used instead of nested conditionals?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "expected_pages": [
+        64,
+        63
+      ],
+      "retrieved_pages": [
+        64,
+        63,
+        69,
+        14,
+        205
+      ],
+      "retrieved_scores": [
+        0.5829,
+        0.5829,
+        0.4672,
+        0.4562,
+        0.4536
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 64,
+          "page_end": 64,
+          "score": 0.5829
+        },
+        {
+          "page_start": 63,
+          "page_end": 64,
+          "score": 0.5829
+        },
+        {
+          "page_start": 69,
+          "page_end": 69,
+          "score": 0.4672
+        },
+        {
+          "page_start": 14,
+          "page_end": 15,
+          "score": 0.4562
+        },
+        {
+          "page_start": 205,
+          "page_end": 206,
+          "score": 0.4536
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 58.76980000175536
+    },
+    {
+      "id": "q19",
+      "question": "What happens if a recursive function has no base case or never reaches it in Python?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "expected_pages": [
+        66,
+        67
+      ],
+      "retrieved_pages": [
+        66,
+        66,
+        67,
+        79,
+        218
+      ],
+      "retrieved_scores": [
+        0.6783,
+        0.5727,
+        0.5074,
+        0.5038,
+        0.5022
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 66,
+          "page_end": 67,
+          "score": 0.6783
+        },
+        {
+          "page_start": 66,
+          "page_end": 66,
+          "score": 0.5727
+        },
+        {
+          "page_start": 67,
+          "page_end": 67,
+          "score": 0.5074
+        },
+        {
+          "page_start": 79,
+          "page_end": 80,
+          "score": 0.5038
+        },
+        {
+          "page_start": 218,
+          "page_end": 218,
+          "score": 0.5022
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 53.97030001040548
+    },
+    {
+      "id": "q20",
+      "question": "How does the built-in input function prompt a user for keyboard input in Python?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "expected_pages": [
+        67,
+        68
+      ],
+      "retrieved_pages": [
+        67,
+        67,
+        24,
+        43,
+        37
+      ],
+      "retrieved_scores": [
+        0.6175,
+        0.5972,
+        0.5191,
+        0.4873,
+        0.4864
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 67,
+          "page_end": 68,
+          "score": 0.6175
+        },
+        {
+          "page_start": 67,
+          "page_end": 67,
+          "score": 0.5972
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.5191
+        },
+        {
+          "page_start": 43,
+          "page_end": 43,
+          "score": 0.4873
+        },
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.4864
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 49.51689997687936
+    },
+    {
+      "id": "q21",
+      "question": "What is a fruitful function and what does a function return if there is no return statement?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "expected_pages": [
+        73,
+        74
+      ],
+      "retrieved_pages": [
+        71,
+        73,
+        73,
+        46,
+        81
+      ],
+      "retrieved_scores": [
+        0.5462,
+        0.5389,
+        0.5022,
+        0.4956,
+        0.4893
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 71,
+          "page_end": 73,
+          "score": 0.5462
+        },
+        {
+          "page_start": 73,
+          "page_end": 74,
+          "score": 0.5389
+        },
+        {
+          "page_start": 73,
+          "page_end": 74,
+          "score": 0.5022
+        },
+        {
+          "page_start": 46,
+          "page_end": 46,
+          "score": 0.4956
+        },
+        {
+          "page_start": 81,
+          "page_end": 82,
+          "score": 0.4893
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 60.568899993086234
+    },
+    {
+      "id": "q22",
+      "question": "What is dead code in the context of statements following a return in a function?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "expected_pages": [
+        74
+      ],
+      "retrieved_pages": [
+        73,
+        65,
+        73,
+        63,
+        81
+      ],
+      "retrieved_scores": [
+        0.5479,
+        0.5249,
+        0.5094,
+        0.4971,
+        0.491
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 73,
+          "page_end": 74,
+          "score": 0.5479
+        },
+        {
+          "page_start": 65,
+          "page_end": 65,
+          "score": 0.5249
+        },
+        {
+          "page_start": 73,
+          "page_end": 74,
+          "score": 0.5094
+        },
+        {
+          "page_start": 63,
+          "page_end": 63,
+          "score": 0.4971
+        },
+        {
+          "page_start": 81,
+          "page_end": 81,
+          "score": 0.491
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 58.8984000205528
+    },
+    {
+      "id": "q23",
+      "question": "What is incremental development and how does scaffolding help debug programs?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "expected_pages": [
+        75,
+        76
+      ],
+      "retrieved_pages": [
+        47,
+        82,
+        47,
+        75,
+        57
+      ],
+      "retrieved_scores": [
+        0.569,
+        0.5606,
+        0.5299,
+        0.5181,
+        0.4708
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 47,
+          "page_end": 47,
+          "score": 0.569
+        },
+        {
+          "page_start": 82,
+          "page_end": 82,
+          "score": 0.5606
+        },
+        {
+          "page_start": 47,
+          "page_end": 47,
+          "score": 0.5299
+        },
+        {
+          "page_start": 75,
+          "page_end": 76,
+          "score": 0.5181
+        },
+        {
+          "page_start": 57,
+          "page_end": 57,
+          "score": 0.4708
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.25,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.25,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.25,
+      "latency_ms": 58.221999992383644
+    },
+    {
+      "id": "q24",
+      "question": "What is a boolean function and how can it be used directly in conditional statements?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "expected_pages": [
+        76,
+        77
+      ],
+      "retrieved_pages": [
+        69,
+        62,
+        63,
+        64,
+        77
+      ],
+      "retrieved_scores": [
+        0.6127,
+        0.586,
+        0.5445,
+        0.5337,
+        0.5328
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 69,
+          "page_end": 69,
+          "score": 0.6127
+        },
+        {
+          "page_start": 62,
+          "page_end": 63,
+          "score": 0.586
+        },
+        {
+          "page_start": 63,
+          "page_end": 63,
+          "score": 0.5445
+        },
+        {
+          "page_start": 64,
+          "page_end": 64,
+          "score": 0.5337
+        },
+        {
+          "page_start": 77,
+          "page_end": 77,
+          "score": 0.5328
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.2,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.2,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.2,
+      "latency_ms": 57.61819999315776
+    },
+    {
+      "id": "q25",
+      "question": "How can you use isinstance to verify argument types and guard against invalid inputs in a factorial function?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "expected_pages": [
+        81,
+        82
+      ],
+      "retrieved_pages": [
+        80,
+        80,
+        78,
+        80,
+        205
+      ],
+      "retrieved_scores": [
+        0.5176,
+        0.5087,
+        0.4773,
+        0.4668,
+        0.4533
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 80,
+          "page_end": 81,
+          "score": 0.5176
+        },
+        {
+          "page_start": 80,
+          "page_end": 81,
+          "score": 0.5087
+        },
+        {
+          "page_start": 78,
+          "page_end": 79,
+          "score": 0.4773
+        },
+        {
+          "page_start": 80,
+          "page_end": 80,
+          "score": 0.4668
+        },
+        {
+          "page_start": 205,
+          "page_end": 206,
+          "score": 0.4533
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 58.91180000617169
+    },
+    {
+      "id": "q26",
+      "question": "How does variable reassignment differ from mathematical equality in Python?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "expected_pages": [
+        85,
+        86
+      ],
+      "retrieved_pages": [
+        85,
+        85,
+        86,
+        138,
+        33
+      ],
+      "retrieved_scores": [
+        0.6907,
+        0.6525,
+        0.5238,
+        0.504,
+        0.4956
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 85,
+          "page_end": 86,
+          "score": 0.6907
+        },
+        {
+          "page_start": 85,
+          "page_end": 86,
+          "score": 0.6525
+        },
+        {
+          "page_start": 86,
+          "page_end": 86,
+          "score": 0.5238
+        },
+        {
+          "page_start": 138,
+          "page_end": 139,
+          "score": 0.504
+        },
+        {
+          "page_start": 33,
+          "page_end": 34,
+          "score": 0.4956
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 53.7968999997247
+    },
+    {
+      "id": "q27",
+      "question": "How does the while statement implement indefinite iteration in Python?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "expected_pages": [
+        86,
+        87
+      ],
+      "retrieved_pages": [
+        86,
+        86,
+        33,
+        43,
+        113
+      ],
+      "retrieved_scores": [
+        0.5571,
+        0.5555,
+        0.539,
+        0.5215,
+        0.5158
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 86,
+          "page_end": 86,
+          "score": 0.5571
+        },
+        {
+          "page_start": 86,
+          "page_end": 87,
+          "score": 0.5555
+        },
+        {
+          "page_start": 33,
+          "page_end": 34,
+          "score": 0.539
+        },
+        {
+          "page_start": 43,
+          "page_end": 43,
+          "score": 0.5215
+        },
+        {
+          "page_start": 113,
+          "page_end": 113,
+          "score": 0.5158
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 57.81100000604056
+    },
+    {
+      "id": "q28",
+      "question": "How does the break statement allow you to exit from a loop prematurely?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "expected_pages": [
+        88
+      ],
+      "retrieved_pages": [
+        88,
+        87,
+        58,
+        87,
+        217
+      ],
+      "retrieved_scores": [
+        0.6443,
+        0.5809,
+        0.4955,
+        0.4852,
+        0.4702
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 88,
+          "page_end": 88,
+          "score": 0.6443
+        },
+        {
+          "page_start": 87,
+          "page_end": 88,
+          "score": 0.5809
+        },
+        {
+          "page_start": 58,
+          "page_end": 58,
+          "score": 0.4955
+        },
+        {
+          "page_start": 87,
+          "page_end": 87,
+          "score": 0.4852
+        },
+        {
+          "page_start": 217,
+          "page_end": 218,
+          "score": 0.4702
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 55.76650000875816
+    },
+    {
+      "id": "q29",
+      "question": "How does Newton's method compute square roots iteratively in Python?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "expected_pages": [
+        88,
+        89
+      ],
+      "retrieved_pages": [
+        88,
+        46,
+        90,
+        89,
+        88
+      ],
+      "retrieved_scores": [
+        0.6133,
+        0.5152,
+        0.5101,
+        0.4955,
+        0.4804
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 88,
+          "page_end": 89,
+          "score": 0.6133
+        },
+        {
+          "page_start": 46,
+          "page_end": 46,
+          "score": 0.5152
+        },
+        {
+          "page_start": 90,
+          "page_end": 91,
+          "score": 0.5101
+        },
+        {
+          "page_start": 89,
+          "page_end": 90,
+          "score": 0.4955
+        },
+        {
+          "page_start": 88,
+          "page_end": 88,
+          "score": 0.4804
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 61.188099993159994
+    },
+    {
+      "id": "q30",
+      "question": "How do slice indices work on Python strings, and what does fruit[0:5] or fruit[:] return?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "expected_pages": [
+        95
+      ],
+      "retrieved_pages": [
+        93,
+        95,
+        94,
+        92,
+        113
+      ],
+      "retrieved_scores": [
+        0.6103,
+        0.5958,
+        0.5781,
+        0.5754,
+        0.5655
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 93,
+          "page_end": 94,
+          "score": 0.6103
+        },
+        {
+          "page_start": 95,
+          "page_end": 96,
+          "score": 0.5958
+        },
+        {
+          "page_start": 94,
+          "page_end": 94,
+          "score": 0.5781
+        },
+        {
+          "page_start": 92,
+          "page_end": 93,
+          "score": 0.5754
+        },
+        {
+          "page_start": 113,
+          "page_end": 114,
+          "score": 0.5655
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 58.33840000559576
+    },
+    {
+      "id": "q31",
+      "question": "Why are Python strings immutable, and what error happens if you try to modify a character directly?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "expected_pages": [
+        96
+      ],
+      "retrieved_pages": [
+        96,
+        96,
+        92,
+        118,
+        120
+      ],
+      "retrieved_scores": [
+        0.5951,
+        0.5363,
+        0.5205,
+        0.5159,
+        0.4627
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 96,
+          "page_end": 96,
+          "score": 0.5951
+        },
+        {
+          "page_start": 96,
+          "page_end": 97,
+          "score": 0.5363
+        },
+        {
+          "page_start": 92,
+          "page_end": 93,
+          "score": 0.5205
+        },
+        {
+          "page_start": 118,
+          "page_end": 119,
+          "score": 0.5159
+        },
+        {
+          "page_start": 120,
+          "page_end": 121,
+          "score": 0.4627
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 55.629100010264665
+    },
+    {
+      "id": "q32",
+      "question": "How does the find method work on Python strings to locate substring positions?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "expected_pages": [
+        97,
+        98
+      ],
+      "retrieved_pages": [
+        101,
+        96,
+        98,
+        227,
+        123
+      ],
+      "retrieved_scores": [
+        0.5706,
+        0.5464,
+        0.5449,
+        0.4935,
+        0.467
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 101,
+          "page_end": 101,
+          "score": 0.5706
+        },
+        {
+          "page_start": 96,
+          "page_end": 97,
+          "score": 0.5464
+        },
+        {
+          "page_start": 98,
+          "page_end": 98,
+          "score": 0.5449
+        },
+        {
+          "page_start": 227,
+          "page_end": 228,
+          "score": 0.4935
+        },
+        {
+          "page_start": 123,
+          "page_end": 123,
+          "score": 0.467
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.3333333333333333,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 57.23700000089593
+    },
+    {
+      "id": "q33",
+      "question": "How does the in operator check whether a character or substring appears inside a string in Python?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "expected_pages": [
+        98
+      ],
+      "retrieved_pages": [
+        92,
+        96,
+        98,
+        97,
+        109
+      ],
+      "retrieved_scores": [
+        0.5453,
+        0.5291,
+        0.5182,
+        0.5123,
+        0.4918
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 92,
+          "page_end": 93,
+          "score": 0.5453
+        },
+        {
+          "page_start": 96,
+          "page_end": 97,
+          "score": 0.5291
+        },
+        {
+          "page_start": 98,
+          "page_end": 99,
+          "score": 0.5182
+        },
+        {
+          "page_start": 97,
+          "page_end": 97,
+          "score": 0.5123
+        },
+        {
+          "page_start": 109,
+          "page_end": 109,
+          "score": 0.4918
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.3333333333333333,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.3333333333333333,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.3333333333333333,
+      "latency_ms": 51.566600013757125
+    },
+    {
+      "id": "q34",
+      "question": "What is the difference between strings and lists regarding mutability in Python?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "expected_pages": [
+        112
+      ],
+      "retrieved_pages": [
+        111,
+        117,
+        117,
+        206,
+        120
+      ],
+      "retrieved_scores": [
+        0.6174,
+        0.567,
+        0.5525,
+        0.5472,
+        0.5348
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 111,
+          "page_end": 112,
+          "score": 0.6174
+        },
+        {
+          "page_start": 117,
+          "page_end": 118,
+          "score": 0.567
+        },
+        {
+          "page_start": 117,
+          "page_end": 118,
+          "score": 0.5525
+        },
+        {
+          "page_start": 206,
+          "page_end": 207,
+          "score": 0.5472
+        },
+        {
+          "page_start": 120,
+          "page_end": 121,
+          "score": 0.5348
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 50.34000001614913
+    },
+    {
+      "id": "q35",
+      "question": "What is the difference between the append and extend methods on a Python list?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "expected_pages": [
+        114
+      ],
+      "retrieved_pages": [
+        114,
+        197,
+        115,
+        119,
+        211
+      ],
+      "retrieved_scores": [
+        0.5708,
+        0.4838,
+        0.4838,
+        0.479,
+        0.4746
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 114,
+          "page_end": 115,
+          "score": 0.5708
+        },
+        {
+          "page_start": 197,
+          "page_end": 198,
+          "score": 0.4838
+        },
+        {
+          "page_start": 115,
+          "page_end": 116,
+          "score": 0.4838
+        },
+        {
+          "page_start": 119,
+          "page_end": 120,
+          "score": 0.479
+        },
+        {
+          "page_start": 211,
+          "page_end": 211,
+          "score": 0.4746
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 51.43369999132119
+    },
+    {
+      "id": "q36",
+      "question": "How do map, filter, and reduce patterns operate on sequences in Python?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "expected_pages": [
+        115,
+        116
+      ],
+      "retrieved_pages": [
+        141,
+        122,
+        114,
+        100,
+        143
+      ],
+      "retrieved_scores": [
+        0.5706,
+        0.5228,
+        0.5032,
+        0.4997,
+        0.4876
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 141,
+          "page_end": 142,
+          "score": 0.5706
+        },
+        {
+          "page_start": 122,
+          "page_end": 122,
+          "score": 0.5228
+        },
+        {
+          "page_start": 114,
+          "page_end": 115,
+          "score": 0.5032
+        },
+        {
+          "page_start": 100,
+          "page_end": 101,
+          "score": 0.4997
+        },
+        {
+          "page_start": 143,
+          "page_end": 144,
+          "score": 0.4876
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.3333333333333333,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.3333333333333333,
+      "latency_ms": 53.271999990101904
+    },
+    {
+      "id": "q37",
+      "question": "How do pop, del, and remove differ when removing elements from a list in Python?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "expected_pages": [
+        116,
+        117
+      ],
+      "retrieved_pages": [
+        116,
+        115,
+        120,
+        121,
+        119
+      ],
+      "retrieved_scores": [
+        0.6648,
+        0.6374,
+        0.5599,
+        0.5307,
+        0.4994
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 116,
+          "page_end": 117,
+          "score": 0.6648
+        },
+        {
+          "page_start": 115,
+          "page_end": 116,
+          "score": 0.6374
+        },
+        {
+          "page_start": 120,
+          "page_end": 120,
+          "score": 0.5599
+        },
+        {
+          "page_start": 121,
+          "page_end": 121,
+          "score": 0.5307
+        },
+        {
+          "page_start": 119,
+          "page_end": 120,
+          "score": 0.4994
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 52.4157999898307
+    },
+    {
+      "id": "q38",
+      "question": "What is aliasing in Python lists and why can modifying an aliased list cause unexpected side effects?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "expected_pages": [
+        119
+      ],
+      "retrieved_pages": [
+        118,
+        118,
+        120,
+        130,
+        173
+      ],
+      "retrieved_scores": [
+        0.6704,
+        0.5364,
+        0.4439,
+        0.4354,
+        0.4325
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 118,
+          "page_end": 119,
+          "score": 0.6704
+        },
+        {
+          "page_start": 118,
+          "page_end": 119,
+          "score": 0.5364
+        },
+        {
+          "page_start": 120,
+          "page_end": 120,
+          "score": 0.4439
+        },
+        {
+          "page_start": 130,
+          "page_end": 130,
+          "score": 0.4354
+        },
+        {
+          "page_start": 173,
+          "page_end": 174,
+          "score": 0.4325
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": false,
+      "strict_rr": 0.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 48.01420000148937
+    },
+    {
+      "id": "q39",
+      "question": "How does a Python dictionary implement key-value pairs and what is the in operator checking on dictionaries?",
+      "category": "ch11_dictionaries",
+      "answerable": true,
+      "expected_pages": [
+        125,
+        126
+      ],
+      "retrieved_pages": [
+        134,
+        125,
+        142,
+        227,
+        126
+      ],
+      "retrieved_scores": [
+        0.6632,
+        0.6477,
+        0.6376,
+        0.6347,
+        0.5929
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 134,
+          "page_end": 134,
+          "score": 0.6632
+        },
+        {
+          "page_start": 125,
+          "page_end": 125,
+          "score": 0.6477
+        },
+        {
+          "page_start": 142,
+          "page_end": 142,
+          "score": 0.6376
+        },
+        {
+          "page_start": 227,
+          "page_end": 228,
+          "score": 0.6347
+        },
+        {
+          "page_start": 126,
+          "page_end": 127,
+          "score": 0.5929
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 53.52489999495447
+    },
+    {
+      "id": "q40",
+      "question": "How can a dictionary be used as a collection of counters with the get method in Python?",
+      "category": "ch11_dictionaries",
+      "answerable": true,
+      "expected_pages": [
+        128,
+        127
+      ],
+      "retrieved_pages": [
+        126,
+        210,
+        209,
+        209,
+        127
+      ],
+      "retrieved_scores": [
+        0.7008,
+        0.6366,
+        0.6117,
+        0.5543,
+        0.5346
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 126,
+          "page_end": 127,
+          "score": 0.7008
+        },
+        {
+          "page_start": 210,
+          "page_end": 210,
+          "score": 0.6366
+        },
+        {
+          "page_start": 209,
+          "page_end": 210,
+          "score": 0.6117
+        },
+        {
+          "page_start": 209,
+          "page_end": 210,
+          "score": 0.5543
+        },
+        {
+          "page_start": 127,
+          "page_end": 127,
+          "score": 0.5346
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.2,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 54.42970001604408
+    },
+    {
+      "id": "q41",
+      "question": "What is memoization and how can a dictionary memo speed up recursive calculations like Fibonacci?",
+      "category": "ch11_dictionaries",
+      "answerable": true,
+      "expected_pages": [
+        131,
+        132
+      ],
+      "retrieved_pages": [
+        131,
+        131,
+        134,
+        226,
+        130
+      ],
+      "retrieved_scores": [
+        0.5609,
+        0.5586,
+        0.4912,
+        0.4764,
+        0.4701
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 131,
+          "page_end": 132,
+          "score": 0.5609
+        },
+        {
+          "page_start": 131,
+          "page_end": 131,
+          "score": 0.5586
+        },
+        {
+          "page_start": 134,
+          "page_end": 135,
+          "score": 0.4912
+        },
+        {
+          "page_start": 226,
+          "page_end": 226,
+          "score": 0.4764
+        },
+        {
+          "page_start": 130,
+          "page_end": 131,
+          "score": 0.4701
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 52.143000008072704
+    },
+    {
+      "id": "q42",
+      "question": "What is tuple assignment in Python and how does it allow swapping two variables without a temporary variable?",
+      "category": "ch12_tuples",
+      "answerable": true,
+      "expected_pages": [
+        138,
+        139
+      ],
+      "retrieved_pages": [
+        138,
+        137,
+        143,
+        137,
+        85
+      ],
+      "retrieved_scores": [
+        0.7027,
+        0.6172,
+        0.5531,
+        0.552,
+        0.5402
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 138,
+          "page_end": 139,
+          "score": 0.7027
+        },
+        {
+          "page_start": 137,
+          "page_end": 138,
+          "score": 0.6172
+        },
+        {
+          "page_start": 143,
+          "page_end": 144,
+          "score": 0.5531
+        },
+        {
+          "page_start": 137,
+          "page_end": 138,
+          "score": 0.552
+        },
+        {
+          "page_start": 85,
+          "page_end": 86,
+          "score": 0.5402
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 58.552400005282834
+    },
+    {
+      "id": "q43",
+      "question": "How does the gather parameter *args work to accept a variable number of arguments into a tuple?",
+      "category": "ch12_tuples",
+      "answerable": true,
+      "expected_pages": [
+        140
+      ],
+      "retrieved_pages": [
+        139,
+        140,
+        212,
+        137,
+        144
+      ],
+      "retrieved_scores": [
+        0.6608,
+        0.6277,
+        0.5929,
+        0.4921,
+        0.4911
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 139,
+          "page_end": 140,
+          "score": 0.6608
+        },
+        {
+          "page_start": 140,
+          "page_end": 140,
+          "score": 0.6277
+        },
+        {
+          "page_start": 212,
+          "page_end": 213,
+          "score": 0.5929
+        },
+        {
+          "page_start": 137,
+          "page_end": 138,
+          "score": 0.4921
+        },
+        {
+          "page_start": 144,
+          "page_end": 145,
+          "score": 0.4911
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 50.483400002121925
+    },
+    {
+      "id": "q44",
+      "question": "How does the zip function combine two or more sequences into a list or iterator of tuples?",
+      "category": "ch12_tuples",
+      "answerable": true,
+      "expected_pages": [
+        141,
+        142
+      ],
+      "retrieved_pages": [
+        140,
+        141,
+        141,
+        140,
+        143
+      ],
+      "retrieved_scores": [
+        0.7689,
+        0.5912,
+        0.5821,
+        0.5495,
+        0.5415
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 140,
+          "page_end": 141,
+          "score": 0.7689
+        },
+        {
+          "page_start": 141,
+          "page_end": 142,
+          "score": 0.5912
+        },
+        {
+          "page_start": 141,
+          "page_end": 141,
+          "score": 0.5821
+        },
+        {
+          "page_start": 140,
+          "page_end": 140,
+          "score": 0.5495
+        },
+        {
+          "page_start": 143,
+          "page_end": 144,
+          "score": 0.5415
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 55.66390001331456
+    },
+    {
+      "id": "q45",
+      "question": "How does the dbm module work in Python to create and store persistent key-value databases on disk?",
+      "category": "ch14_files",
+      "answerable": true,
+      "expected_pages": [
+        163
+      ],
+      "retrieved_pages": [
+        163,
+        163,
+        162,
+        134,
+        167
+      ],
+      "retrieved_scores": [
+        0.6954,
+        0.5336,
+        0.4176,
+        0.3957,
+        0.3667
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 163,
+          "page_end": 163,
+          "score": 0.6954
+        },
+        {
+          "page_start": 163,
+          "page_end": 164,
+          "score": 0.5336
+        },
+        {
+          "page_start": 162,
+          "page_end": 163,
+          "score": 0.4176
+        },
+        {
+          "page_start": 134,
+          "page_end": 134,
+          "score": 0.3957
+        },
+        {
+          "page_start": 167,
+          "page_end": 167,
+          "score": 0.3667
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 59.651700023096055
+    },
+    {
+      "id": "q46",
+      "question": "What does the pickle module do to serialize and deserialize arbitrary Python objects into strings or bytes?",
+      "category": "ch14_files",
+      "answerable": true,
+      "expected_pages": [
+        164
+      ],
+      "retrieved_pages": [
+        164,
+        163,
+        163,
+        164,
+        167
+      ],
+      "retrieved_scores": [
+        0.6897,
+        0.4805,
+        0.4589,
+        0.4359,
+        0.4062
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 164,
+          "page_end": 164,
+          "score": 0.6897
+        },
+        {
+          "page_start": 163,
+          "page_end": 163,
+          "score": 0.4805
+        },
+        {
+          "page_start": 163,
+          "page_end": 164,
+          "score": 0.4589
+        },
+        {
+          "page_start": 164,
+          "page_end": 164,
+          "score": 0.4359
+        },
+        {
+          "page_start": 167,
+          "page_end": 167,
+          "score": 0.4062
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 58.12910001259297
+    },
+    {
+      "id": "q47",
+      "question": "What is a programmer-defined type or class in Python and how do you instantiate an object from it?",
+      "category": "ch15_classes",
+      "answerable": true,
+      "expected_pages": [
+        169,
+        170
+      ],
+      "retrieved_pages": [
+        169,
+        169,
+        170,
+        183,
+        175
+      ],
+      "retrieved_scores": [
+        0.657,
+        0.65,
+        0.6385,
+        0.5942,
+        0.5909
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 169,
+          "page_end": 169,
+          "score": 0.657
+        },
+        {
+          "page_start": 169,
+          "page_end": 170,
+          "score": 0.65
+        },
+        {
+          "page_start": 170,
+          "page_end": 170,
+          "score": 0.6385
+        },
+        {
+          "page_start": 183,
+          "page_end": 184,
+          "score": 0.5942
+        },
+        {
+          "page_start": 175,
+          "page_end": 175,
+          "score": 0.5909
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 53.316300007281825
+    },
+    {
+      "id": "q48",
+      "question": "What is the difference between shallow copy and deep copy when copying objects with the copy module?",
+      "category": "ch15_classes",
+      "answerable": true,
+      "expected_pages": [
+        174,
+        175
+      ],
+      "retrieved_pages": [
+        174,
+        173,
+        174,
+        175
+      ],
+      "retrieved_scores": [
+        0.467,
+        0.466,
+        0.4051,
+        0.3466
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 174,
+          "page_end": 175,
+          "score": 0.467
+        },
+        {
+          "page_start": 173,
+          "page_end": 174,
+          "score": 0.466
+        },
+        {
+          "page_start": 174,
+          "page_end": 174,
+          "score": 0.4051
+        },
+        {
+          "page_start": 175,
+          "page_end": 175,
+          "score": 0.3466
+        }
+      ],
+      "strict_hit1": true,
+      "strict_hit5": true,
+      "strict_rr": 1.0,
+      "span_hit1": true,
+      "span_hit5": true,
+      "span_rr": 1.0,
+      "hit1": true,
+      "hit5": true,
+      "rr": 1.0,
+      "latency_ms": 51.06070000329055
+    },
+    {
+      "id": "q49",
+      "question": "What is the difference between a pure function and a modifier method on an object?",
+      "category": "ch16_functions_methods",
+      "answerable": true,
+      "expected_pages": [
+        178,
+        179
+      ],
+      "retrieved_pages": [
+        181,
+        179,
+        47,
+        183,
+        178
+      ],
+      "retrieved_scores": [
+        0.5522,
+        0.4525,
+        0.3914,
+        0.374,
+        0.3612
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 181,
+          "page_end": 182,
+          "score": 0.5522
+        },
+        {
+          "page_start": 179,
+          "page_end": 180,
+          "score": 0.4525
+        },
+        {
+          "page_start": 47,
+          "page_end": 48,
+          "score": 0.3914
+        },
+        {
+          "page_start": 183,
+          "page_end": 184,
+          "score": 0.374
+        },
+        {
+          "page_start": 178,
+          "page_end": 178,
+          "score": 0.3612
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.5,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.5,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.5,
+      "latency_ms": 56.141699984436855
+    },
+    {
+      "id": "q50",
+      "question": "What is polymorphism in Python and how does it allow functions to work with arguments of different types?",
+      "category": "ch17_methods",
+      "answerable": true,
+      "expected_pages": [
+        189,
+        190
+      ],
+      "retrieved_pages": [
+        37,
+        183,
+        169,
+        191,
+        190
+      ],
+      "retrieved_scores": [
+        0.6362,
+        0.5535,
+        0.5513,
+        0.5508,
+        0.5381
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 37,
+          "page_end": 39,
+          "score": 0.6362
+        },
+        {
+          "page_start": 183,
+          "page_end": 184,
+          "score": 0.5535
+        },
+        {
+          "page_start": 169,
+          "page_end": 169,
+          "score": 0.5513
+        },
+        {
+          "page_start": 191,
+          "page_end": 192,
+          "score": 0.5508
+        },
+        {
+          "page_start": 190,
+          "page_end": 190,
+          "score": 0.5381
+        }
+      ],
+      "strict_hit1": false,
+      "strict_hit5": true,
+      "strict_rr": 0.2,
+      "span_hit1": false,
+      "span_hit5": true,
+      "span_rr": 0.2,
+      "hit1": false,
+      "hit5": true,
+      "rr": 0.2,
+      "latency_ms": 49.52259999117814
+    },
+    {
+      "id": "u01",
+      "question": "What is the recommended recipe and starter feeding ratio for baking sourdough bread?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 43.044399993959814
+    },
+    {
+      "id": "u02",
+      "question": "How do quantum computers use superconducting qubits and superposition for quantum supremacy?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 53.984700003638864
+    },
+    {
+      "id": "u03",
+      "question": "What are the common symptoms of a blown head gasket in an automobile combustion engine?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 64.17749999673106
+    },
+    {
+      "id": "u04",
+      "question": "How do you prune panicle hydrangeas in late winter to encourage optimal summer blooming?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 54.14719998952933
+    },
+    {
+      "id": "u05",
+      "question": "What were the major military campaigns of Hannibal Barca during the Second Punic War?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 51.8461000174284
+    },
+    {
+      "id": "u06",
+      "question": "How do high-bypass turbofan jet engines compress air and generate thrust in commercial aviation?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 51.772400009213015
+    },
+    {
+      "id": "u07",
+      "question": "What is the standard procedure for pre-infusion and brewing espresso using an E61 group head?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 55.362500017508864
+    },
+    {
+      "id": "u08",
+      "question": "How do central banks adjust monetary policy using repo rates to target headline inflation?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 53.69189998600632
+    },
+    {
+      "id": "u09",
+      "question": "What soil pH and organic fertilizer requirements are needed to grow highbush blueberries?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 50.95720000099391
+    },
+    {
+      "id": "u10",
+      "question": "How do lithium-ion battery management systems perform passive cell balancing during high-voltage charging?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [],
+      "retrieved_scores": [],
+      "retrieved_chunks": [],
+      "abstained": true,
+      "latency_ms": 50.60089999460615
+    },
+    {
+      "id": "u11",
+      "question": "How do you define an asynchronous coroutine using async def and await in Python's asyncio event loop?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        45,
+        188,
+        86
+      ],
+      "retrieved_scores": [
+        0.3545,
+        0.3342,
+        0.3334
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 45,
+          "page_end": 46,
+          "score": 0.3545
+        },
+        {
+          "page_start": 188,
+          "page_end": 189,
+          "score": 0.3342
+        },
+        {
+          "page_start": 86,
+          "page_end": 87,
+          "score": 0.3334
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 46.817800001008436
+    },
+    {
+      "id": "u12",
+      "question": "How does the dataclass decorator automatically generate __init__ and __repr__ methods in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        187,
+        170,
+        202,
+        186,
+        212
+      ],
+      "retrieved_scores": [
+        0.4816,
+        0.4578,
+        0.4473,
+        0.4366,
+        0.4136
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 187,
+          "page_end": 187,
+          "score": 0.4816
+        },
+        {
+          "page_start": 170,
+          "page_end": 170,
+          "score": 0.4578
+        },
+        {
+          "page_start": 202,
+          "page_end": 202,
+          "score": 0.4473
+        },
+        {
+          "page_start": 186,
+          "page_end": 186,
+          "score": 0.4366
+        },
+        {
+          "page_start": 212,
+          "page_end": 212,
+          "score": 0.4136
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 52.67939998884685
+    },
+    {
+      "id": "u13",
+      "question": "How does structural pattern matching work using match and case statements in Python 3.10?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        141,
+        146,
+        102,
+        99,
+        99
+      ],
+      "retrieved_scores": [
+        0.4682,
+        0.4642,
+        0.4436,
+        0.3948,
+        0.3916
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 141,
+          "page_end": 142,
+          "score": 0.4682
+        },
+        {
+          "page_start": 146,
+          "page_end": 147,
+          "score": 0.4642
+        },
+        {
+          "page_start": 102,
+          "page_end": 102,
+          "score": 0.4436
+        },
+        {
+          "page_start": 99,
+          "page_end": 100,
+          "score": 0.3948
+        },
+        {
+          "page_start": 99,
+          "page_end": 99,
+          "score": 0.3916
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 49.8383000085596
+    },
+    {
+      "id": "u14",
+      "question": "How do you define static type hints using the typing module with Union, Optional, and TypedDict in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        123,
+        169,
+        29,
+        210,
+        144
+      ],
+      "retrieved_scores": [
+        0.4295,
+        0.4232,
+        0.4196,
+        0.4014,
+        0.3901
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 123,
+          "page_end": 125,
+          "score": 0.4295
+        },
+        {
+          "page_start": 169,
+          "page_end": 169,
+          "score": 0.4232
+        },
+        {
+          "page_start": 29,
+          "page_end": 29,
+          "score": 0.4196
+        },
+        {
+          "page_start": 210,
+          "page_end": 211,
+          "score": 0.4014
+        },
+        {
+          "page_start": 144,
+          "page_end": 144,
+          "score": 0.3901
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 53.76189999515191
+    },
+    {
+      "id": "u15",
+      "question": "How does the walrus operator := work for assignment expressions inside while conditions in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        33,
+        85,
+        85,
+        113,
+        24
+      ],
+      "retrieved_scores": [
+        0.532,
+        0.5191,
+        0.5057,
+        0.4745,
+        0.4648
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 33,
+          "page_end": 34,
+          "score": 0.532
+        },
+        {
+          "page_start": 85,
+          "page_end": 86,
+          "score": 0.5191
+        },
+        {
+          "page_start": 85,
+          "page_end": 86,
+          "score": 0.5057
+        },
+        {
+          "page_start": 113,
+          "page_end": 113,
+          "score": 0.4745
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.4648
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 50.56750000221655
+    },
+    {
+      "id": "u16",
+      "question": "How does the Global Interpreter Lock (GIL) prevent multi-threaded CPython programs from executing bytecodes in parallel on multiple CPU cores?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        45,
+        45,
+        28,
+        24,
+        201
+      ],
+      "retrieved_scores": [
+        0.3374,
+        0.3366,
+        0.334,
+        0.3319,
+        0.3232
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 45,
+          "page_end": 46,
+          "score": 0.3374
+        },
+        {
+          "page_start": 45,
+          "page_end": 45,
+          "score": 0.3366
+        },
+        {
+          "page_start": 28,
+          "page_end": 29,
+          "score": 0.334
+        },
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.3319
+        },
+        {
+          "page_start": 201,
+          "page_end": 202,
+          "score": 0.3232
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 50.86079999455251
+    },
+    {
+      "id": "u17",
+      "question": "What is a metaclass in Python and how does __init_subclass__ customize class creation?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        170,
+        26,
+        186,
+        200,
+        202
+      ],
+      "retrieved_scores": [
+        0.5301,
+        0.476,
+        0.4758,
+        0.4418,
+        0.4402
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 170,
+          "page_end": 170,
+          "score": 0.5301
+        },
+        {
+          "page_start": 26,
+          "page_end": 26,
+          "score": 0.476
+        },
+        {
+          "page_start": 186,
+          "page_end": 186,
+          "score": 0.4758
+        },
+        {
+          "page_start": 200,
+          "page_end": 201,
+          "score": 0.4418
+        },
+        {
+          "page_start": 202,
+          "page_end": 202,
+          "score": 0.4402
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 52.4503999913577
+    },
+    {
+      "id": "u18",
+      "question": "How can C extensions be compiled and bound to Python using Cython, CFFI, or ctypes?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        24,
+        11,
+        164,
+        24,
+        218
+      ],
+      "retrieved_scores": [
+        0.4012,
+        0.3816,
+        0.3745,
+        0.3696,
+        0.3689
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 24,
+          "page_end": 25,
+          "score": 0.4012
+        },
+        {
+          "page_start": 11,
+          "page_end": 13,
+          "score": 0.3816
+        },
+        {
+          "page_start": 164,
+          "page_end": 165,
+          "score": 0.3745
+        },
+        {
+          "page_start": 24,
+          "page_end": 24,
+          "score": 0.3696
+        },
+        {
+          "page_start": 218,
+          "page_end": 218,
+          "score": 0.3689
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 54.54410001402721
+    },
+    {
+      "id": "u19",
+      "question": "How does the Python descriptor protocol implement property getters and setters using __get__ and __set__?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        190,
+        170,
+        134,
+        170,
+        202
+      ],
+      "retrieved_scores": [
+        0.4746,
+        0.4486,
+        0.4302,
+        0.4276,
+        0.4134
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 190,
+          "page_end": 191,
+          "score": 0.4746
+        },
+        {
+          "page_start": 170,
+          "page_end": 170,
+          "score": 0.4486
+        },
+        {
+          "page_start": 134,
+          "page_end": 134,
+          "score": 0.4302
+        },
+        {
+          "page_start": 170,
+          "page_end": 170,
+          "score": 0.4276
+        },
+        {
+          "page_start": 202,
+          "page_end": 202,
+          "score": 0.4134
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 52.45359998662025
+    },
+    {
+      "id": "u20",
+      "question": "How do abstract base classes enforce method implementation using abc.ABC and the @abstractmethod decorator in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "expected_pages": [],
+      "retrieved_pages": [
+        200,
+        187,
+        197,
+        183,
+        182
+      ],
+      "retrieved_scores": [
+        0.5316,
+        0.4366,
+        0.4215,
+        0.4148,
+        0.4132
+      ],
+      "retrieved_chunks": [
+        {
+          "page_start": 200,
+          "page_end": 201,
+          "score": 0.5316
+        },
+        {
+          "page_start": 187,
+          "page_end": 187,
+          "score": 0.4366
+        },
+        {
+          "page_start": 197,
+          "page_end": 198,
+          "score": 0.4215
+        },
+        {
+          "page_start": 183,
+          "page_end": 183,
+          "score": 0.4148
+        },
+        {
+          "page_start": 182,
+          "page_end": 183,
+          "score": 0.4132
+        }
+      ],
+      "abstained": false,
+      "latency_ms": 51.212400023359805
+    }
+  ]
+}

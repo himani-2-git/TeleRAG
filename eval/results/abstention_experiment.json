@@ -1,0 +1,684 @@
+{
+  "dev_set_size": 35,
+  "test_set_size": 35,
+  "chosen_cross_encoder_threshold": -2.8,
+  "dev_metrics": {
+    "cosine_gate": {
+      "answerable_recall": 1.0,
+      "easy_abstention": 1.0,
+      "hard_abstention": 0.0
+    },
+    "cross_encoder_gate": {
+      "threshold": -2.8,
+      "answerable_recall": 1.0,
+      "easy_abstention": 1.0,
+      "hard_abstention": 1.0
+    }
+  },
+  "test_metrics": {
+    "cosine_gate": {
+      "answerable_recall": 1.0,
+      "answerable_retained": 25,
+      "answerable_total": 25,
+      "easy_abstention": 1.0,
+      "easy_abstained": 5,
+      "easy_total": 5,
+      "hard_abstention": 0.0,
+      "hard_abstained": 0,
+      "hard_total": 5
+    },
+    "cross_encoder_gate": {
+      "threshold": -2.8,
+      "answerable_recall": 1.0,
+      "answerable_retained": 25,
+      "answerable_total": 25,
+      "easy_abstention": 1.0,
+      "easy_abstained": 5,
+      "easy_total": 5,
+      "hard_abstention": 0.4,
+      "hard_abstained": 2,
+      "hard_total": 5
+    }
+  },
+  "recall_drop_on_test": 0.0,
+  "reranker_wins": true,
+  "selected_default_gate": "cross_encoder",
+  "limitations": [
+    "Small test sample size (N=35 total, N=5 hard unanswerable queries).",
+    "The threshold T=-2.80 tuned on DEV may be overfit to the dev sample.",
+    "Cross-encoder scoring on CPU adds ~2s query latency.",
+    "Threshold tuned on single textbook domain (Think Python 2e) may exhibit domain shift on other corpora."
+  ],
+  "query_details": [
+    {
+      "id": "q01",
+      "question": "What is the difference between a high-level programming language like Python and a low-level language?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6122,
+      "top1_rerank_score": 7.545
+    },
+    {
+      "id": "q02",
+      "question": "What is the role of the Python interpreter and how does the prompt indicate it is ready for code?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6446,
+      "top1_rerank_score": 4.2992
+    },
+    {
+      "id": "q03",
+      "question": "What arithmetic operators are provided in Python and what does the ** operator compute?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6201,
+      "top1_rerank_score": 7.3746
+    },
+    {
+      "id": "q04",
+      "question": "What is the difference between syntax errors, runtime errors, and semantic errors in Python?",
+      "category": "ch01_basics",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6745,
+      "top1_rerank_score": 6.8543
+    },
+    {
+      "id": "q05",
+      "question": "What happens when you use an illegal variable name such as a Python keyword like class or yield?",
+      "category": "ch02_variables",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6676,
+      "top1_rerank_score": 5.3077
+    },
+    {
+      "id": "q06",
+      "question": "How does the modulus operator % work in Python and what does it compute?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.662,
+      "top1_rerank_score": 5.0952
+    },
+    {
+      "id": "q07",
+      "question": "What is the order of operations followed by Python expressions (PEMDAS)?",
+      "category": "ch02_variables",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5616,
+      "top1_rerank_score": 4.544
+    },
+    {
+      "id": "q08",
+      "question": "How does string concatenation using the + operator and string repetition using the * operator work in Python?",
+      "category": "ch02_variables",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5458,
+      "top1_rerank_score": 5.4487
+    },
+    {
+      "id": "q09",
+      "question": "What built-in functions in Python convert values from one type to int, float, or str?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.7463,
+      "top1_rerank_score": 6.2169
+    },
+    {
+      "id": "q10",
+      "question": "How do you import and access trigonometric or mathematical functions from the Python math module?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5898,
+      "top1_rerank_score": 5.466
+    },
+    {
+      "id": "q11",
+      "question": "What is the difference between a parameter and an argument when defining and calling functions in Python?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.685,
+      "top1_rerank_score": 4.6632
+    },
+    {
+      "id": "q12",
+      "question": "What is a stack diagram and how does it represent function calls and local variables?",
+      "category": "ch03_functions",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6428,
+      "top1_rerank_score": 5.8879
+    },
+    {
+      "id": "q13",
+      "question": "What is encapsulation in the context of writing reusable helper functions?",
+      "category": "ch04_interface",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.4897,
+      "top1_rerank_score": 0.4264
+    },
+    {
+      "id": "q14",
+      "question": "What is generalization and how does adding parameters make a function more general?",
+      "category": "ch04_interface",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.4665,
+      "top1_rerank_score": 4.7322
+    },
+    {
+      "id": "q15",
+      "question": "What is a docstring and how is it used to explain the interface and contract of a Python function?",
+      "category": "ch04_interface",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5884,
+      "top1_rerank_score": 1.914
+    },
+    {
+      "id": "q16",
+      "question": "How does floor division // differ from standard division / in Python 3?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.615,
+      "top1_rerank_score": 1.9246
+    },
+    {
+      "id": "q17",
+      "question": "What are boolean expressions and the comparison operators ==, !=, >, <, >=, <= in Python?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.7964,
+      "top1_rerank_score": 4.7484
+    },
+    {
+      "id": "q18",
+      "question": "What are chained conditionals using elif and when should they be used instead of nested conditionals?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5829,
+      "top1_rerank_score": 3.5897
+    },
+    {
+      "id": "q19",
+      "question": "What happens if a recursive function has no base case or never reaches it in Python?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6783,
+      "top1_rerank_score": 7.189
+    },
+    {
+      "id": "q20",
+      "question": "How does the built-in input function prompt a user for keyboard input in Python?",
+      "category": "ch05_conditionals",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6175,
+      "top1_rerank_score": 4.1227
+    },
+    {
+      "id": "q21",
+      "question": "What is a fruitful function and what does a function return if there is no return statement?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5462,
+      "top1_rerank_score": 6.811
+    },
+    {
+      "id": "q22",
+      "question": "What is dead code in the context of statements following a return in a function?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5479,
+      "top1_rerank_score": 1.3378
+    },
+    {
+      "id": "q23",
+      "question": "What is incremental development and how does scaffolding help debug programs?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.569,
+      "top1_rerank_score": 5.486
+    },
+    {
+      "id": "q24",
+      "question": "What is a boolean function and how can it be used directly in conditional statements?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6127,
+      "top1_rerank_score": 4.7813
+    },
+    {
+      "id": "q25",
+      "question": "How can you use isinstance to verify argument types and guard against invalid inputs in a factorial function?",
+      "category": "ch06_fruitful",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5176,
+      "top1_rerank_score": 4.3804
+    },
+    {
+      "id": "q26",
+      "question": "How does variable reassignment differ from mathematical equality in Python?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6907,
+      "top1_rerank_score": 3.9807
+    },
+    {
+      "id": "q27",
+      "question": "How does the while statement implement indefinite iteration in Python?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5571,
+      "top1_rerank_score": 3.6184
+    },
+    {
+      "id": "q28",
+      "question": "How does the break statement allow you to exit from a loop prematurely?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6443,
+      "top1_rerank_score": 3.2953
+    },
+    {
+      "id": "q29",
+      "question": "How does Newton's method compute square roots iteratively in Python?",
+      "category": "ch07_iteration",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6133,
+      "top1_rerank_score": 4.699
+    },
+    {
+      "id": "q30",
+      "question": "How do slice indices work on Python strings, and what does fruit[0:5] or fruit[:] return?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6103,
+      "top1_rerank_score": 5.2309
+    },
+    {
+      "id": "q31",
+      "question": "Why are Python strings immutable, and what error happens if you try to modify a character directly?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5951,
+      "top1_rerank_score": 3.472
+    },
+    {
+      "id": "q32",
+      "question": "How does the find method work on Python strings to locate substring positions?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5706,
+      "top1_rerank_score": 0.9028
+    },
+    {
+      "id": "q33",
+      "question": "How does the in operator check whether a character or substring appears inside a string in Python?",
+      "category": "ch08_strings",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5453,
+      "top1_rerank_score": 2.2437
+    },
+    {
+      "id": "q34",
+      "question": "What is the difference between strings and lists regarding mutability in Python?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6174,
+      "top1_rerank_score": -0.2317
+    },
+    {
+      "id": "q35",
+      "question": "What is the difference between the append and extend methods on a Python list?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5708,
+      "top1_rerank_score": 3.5613
+    },
+    {
+      "id": "q36",
+      "question": "How do map, filter, and reduce patterns operate on sequences in Python?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5706,
+      "top1_rerank_score": 4.3849
+    },
+    {
+      "id": "q37",
+      "question": "How do pop, del, and remove differ when removing elements from a list in Python?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6648,
+      "top1_rerank_score": 4.9102
+    },
+    {
+      "id": "q38",
+      "question": "What is aliasing in Python lists and why can modifying an aliased list cause unexpected side effects?",
+      "category": "ch10_lists",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6704,
+      "top1_rerank_score": 1.8012
+    },
+    {
+      "id": "q39",
+      "question": "How does a Python dictionary implement key-value pairs and what is the in operator checking on dictionaries?",
+      "category": "ch11_dictionaries",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6632,
+      "top1_rerank_score": 5.3213
+    },
+    {
+      "id": "q40",
+      "question": "How can a dictionary be used as a collection of counters with the get method in Python?",
+      "category": "ch11_dictionaries",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.7008,
+      "top1_rerank_score": 5.8158
+    },
+    {
+      "id": "q41",
+      "question": "What is memoization and how can a dictionary memo speed up recursive calculations like Fibonacci?",
+      "category": "ch11_dictionaries",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.5609,
+      "top1_rerank_score": 0.4008
+    },
+    {
+      "id": "q42",
+      "question": "What is tuple assignment in Python and how does it allow swapping two variables without a temporary variable?",
+      "category": "ch12_tuples",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.7027,
+      "top1_rerank_score": 5.6037
+    },
+    {
+      "id": "q43",
+      "question": "How does the gather parameter *args work to accept a variable number of arguments into a tuple?",
+      "category": "ch12_tuples",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6608,
+      "top1_rerank_score": 6.0091
+    },
+    {
+      "id": "q44",
+      "question": "How does the zip function combine two or more sequences into a list or iterator of tuples?",
+      "category": "ch12_tuples",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.7689,
+      "top1_rerank_score": 6.4584
+    },
+    {
+      "id": "q45",
+      "question": "How does the dbm module work in Python to create and store persistent key-value databases on disk?",
+      "category": "ch14_files",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.6954,
+      "top1_rerank_score": 4.1038
+    },
+    {
+      "id": "q46",
+      "question": "What does the pickle module do to serialize and deserialize arbitrary Python objects into strings or bytes?",
+      "category": "ch14_files",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6897,
+      "top1_rerank_score": -0.008
+    },
+    {
+      "id": "q47",
+      "question": "What is a programmer-defined type or class in Python and how do you instantiate an object from it?",
+      "category": "ch15_classes",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.657,
+      "top1_rerank_score": 6.1795
+    },
+    {
+      "id": "q48",
+      "question": "What is the difference between shallow copy and deep copy when copying objects with the copy module?",
+      "category": "ch15_classes",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.467,
+      "top1_rerank_score": 0.6525
+    },
+    {
+      "id": "q49",
+      "question": "What is the difference between a pure function and a modifier method on an object?",
+      "category": "ch16_functions_methods",
+      "answerable": true,
+      "split": "dev",
+      "max_dense_score": 0.5522,
+      "top1_rerank_score": 4.6637
+    },
+    {
+      "id": "q50",
+      "question": "What is polymorphism in Python and how does it allow functions to work with arguments of different types?",
+      "category": "ch17_methods",
+      "answerable": true,
+      "split": "test",
+      "max_dense_score": 0.6362,
+      "top1_rerank_score": 3.221
+    },
+    {
+      "id": "u01",
+      "question": "What is the recommended recipe and starter feeding ratio for baking sourdough bread?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.205,
+      "top1_rerank_score": -10.0958
+    },
+    {
+      "id": "u02",
+      "question": "How do quantum computers use superconducting qubits and superposition for quantum supremacy?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.1678,
+      "top1_rerank_score": -10.905
+    },
+    {
+      "id": "u03",
+      "question": "What are the common symptoms of a blown head gasket in an automobile combustion engine?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.1718,
+      "top1_rerank_score": -9.7143
+    },
+    {
+      "id": "u04",
+      "question": "How do you prune panicle hydrangeas in late winter to encourage optimal summer blooming?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.1598,
+      "top1_rerank_score": -10.8148
+    },
+    {
+      "id": "u05",
+      "question": "What were the major military campaigns of Hannibal Barca during the Second Punic War?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.2113,
+      "top1_rerank_score": -9.6913
+    },
+    {
+      "id": "u06",
+      "question": "How do high-bypass turbofan jet engines compress air and generate thrust in commercial aviation?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.149,
+      "top1_rerank_score": -9.8304
+    },
+    {
+      "id": "u07",
+      "question": "What is the standard procedure for pre-infusion and brewing espresso using an E61 group head?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.1699,
+      "top1_rerank_score": -9.7666
+    },
+    {
+      "id": "u08",
+      "question": "How do central banks adjust monetary policy using repo rates to target headline inflation?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.1568,
+      "top1_rerank_score": -11.193
+    },
+    {
+      "id": "u09",
+      "question": "What soil pH and organic fertilizer requirements are needed to grow highbush blueberries?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.1847,
+      "top1_rerank_score": -10.8671
+    },
+    {
+      "id": "u10",
+      "question": "How do lithium-ion battery management systems perform passive cell balancing during high-voltage charging?",
+      "category": "unanswerable_easy",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.1581,
+      "top1_rerank_score": -11.1696
+    },
+    {
+      "id": "u11",
+      "question": "How do you define an asynchronous coroutine using async def and await in Python's asyncio event loop?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.3545,
+      "top1_rerank_score": -6.6232
+    },
+    {
+      "id": "u12",
+      "question": "How does the dataclass decorator automatically generate __init__ and __repr__ methods in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.4816,
+      "top1_rerank_score": 2.7148
+    },
+    {
+      "id": "u13",
+      "question": "How does structural pattern matching work using match and case statements in Python 3.10?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.4682,
+      "top1_rerank_score": -2.8178
+    },
+    {
+      "id": "u14",
+      "question": "How do you define static type hints using the typing module with Union, Optional, and TypedDict in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.4295,
+      "top1_rerank_score": -4.1176
+    },
+    {
+      "id": "u15",
+      "question": "How does the walrus operator := work for assignment expressions inside while conditions in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.532,
+      "top1_rerank_score": -0.0365
+    },
+    {
+      "id": "u16",
+      "question": "How does the Global Interpreter Lock (GIL) prevent multi-threaded CPython programs from executing bytecodes in parallel on multiple CPU cores?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.3374,
+      "top1_rerank_score": -8.6097
+    },
+    {
+      "id": "u17",
+      "question": "What is a metaclass in Python and how does __init_subclass__ customize class creation?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.5301,
+      "top1_rerank_score": 0.7823
+    },
+    {
+      "id": "u18",
+      "question": "How can C extensions be compiled and bound to Python using Cython, CFFI, or ctypes?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.4012,
+      "top1_rerank_score": -5.2317
+    },
+    {
+      "id": "u19",
+      "question": "How does the Python descriptor protocol implement property getters and setters using __get__ and __set__?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "test",
+      "max_dense_score": 0.4746,
+      "top1_rerank_score": -4.4947
+    },
+    {
+      "id": "u20",
+      "question": "How do abstract base classes enforce method implementation using abc.ABC and the @abstractmethod decorator in Python?",
+      "category": "unanswerable_hard",
+      "answerable": false,
+      "split": "dev",
+      "max_dense_score": 0.5316,
+      "top1_rerank_score": -3.3122
+    }
+  ]
+}

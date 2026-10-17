@@ -1,0 +1,131 @@
+[
+  {
+    "id": "ci_01",
+    "question": "What is the primary technique used for high availability in distributed systems?",
+    "expected_pages": [
+      1
+    ],
+    "answerable": true,
+    "category": "distributed_foundations"
+  },
+  {
+    "id": "ci_02",
+    "question": "What does the PACELC theorem state regarding latency and consistency?",
+    "expected_pages": [
+      2
+    ],
+    "answerable": true,
+    "category": "cap_pacelc"
+  },
+  {
+    "id": "ci_03",
+    "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+    "expected_pages": [
+      3
+    ],
+    "answerable": true,
+    "category": "paxos"
+  },
+  {
+    "id": "ci_04",
+    "question": "How does Multi-Paxos optimize basic Paxos for recurring log entries?",
+    "expected_pages": [
+      3
+    ],
+    "answerable": true,
+    "category": "paxos"
+  },
+  {
+    "id": "ci_05",
+    "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+    "expected_pages": [
+      4
+    ],
+    "answerable": true,
+    "category": "raft"
+  },
+  {
+    "id": "ci_06",
+    "question": "What RPCs are used by the Raft leader to replicate log entries across followers?",
+    "expected_pages": [
+      4
+    ],
+    "answerable": true,
+    "category": "raft"
+  },
+  {
+    "id": "ci_07",
+    "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+    "expected_pages": [
+      5
+    ],
+    "answerable": true,
+    "category": "logical_clocks"
+  },
+  {
+    "id": "ci_08",
+    "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+    "expected_pages": [
+      6
+    ],
+    "answerable": true,
+    "category": "byzantine"
+  },
+  {
+    "id": "ci_09",
+    "question": "What are the three operational phases of Practical Byzantine Fault Tolerance (PBFT)?",
+    "expected_pages": [
+      6
+    ],
+    "answerable": true,
+    "category": "byzantine"
+  },
+  {
+    "id": "ci_10",
+    "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+    "expected_pages": [
+      7
+    ],
+    "answerable": true,
+    "category": "distributed_transactions"
+  },
+  {
+    "id": "ci_11",
+    "question": "What mathematical properties of the merge operator guarantee convergence in state-based CRDTs?",
+    "expected_pages": [
+      8
+    ],
+    "answerable": true,
+    "category": "crdts"
+  },
+  {
+    "id": "ci_12",
+    "question": "What are common examples of conflict-free replicated data types such as PN-Counters and OR-Sets?",
+    "expected_pages": [
+      8
+    ],
+    "answerable": true,
+    "category": "crdts"
+  },
+  {
+    "id": "ci_u01",
+    "question": "How do plants convert sunlight into chemical energy during the light-dependent reactions of photosynthesis?",
+    "expected_pages": [],
+    "answerable": false,
+    "category": "unanswerable"
+  },
+  {
+    "id": "ci_u02",
+    "question": "What are the culinary techniques for making a classical French hollandaise emulsion sauce?",
+    "expected_pages": [],
+    "answerable": false,
+    "category": "unanswerable"
+  },
+  {
+    "id": "ci_u03",
+    "question": "How do pneumatic disc brakes function on heavy commercial freight trucks?",
+    "expected_pages": [],
+    "answerable": false,
+    "category": "unanswerable"
+  }
+]

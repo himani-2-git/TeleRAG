@@ -181,7 +181,20 @@ class TestOpenRouterClient(unittest.TestCase):
         messages = [{'role': 'user', 'content': 'Test'}]
         response = self.client.send_request(messages)
         
+    @patch('requests.post')
+    def test_send_request_model_not_found(self, mock_post):
+        """Test API request when configured model is not found."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.text = '{"error": {"message": "Model not found"}}'
+        mock_post.return_value = mock_response
+        
+        messages = [{'role': 'user', 'content': 'Test'}]
+        response = self.client.send_request(messages)
+        
         self.assertIsNone(response)
+        # Verify it didn't retry 3 times on 404
+        self.assertEqual(mock_post.call_count, 1)
 
 if __name__ == '__main__':
     unittest.main()

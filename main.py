@@ -54,7 +54,8 @@ def main():
                                       embeddings_path=config.embeddings_path)
         embedding_generator = EmbeddingGenerator(model_name=config.embedding_model)
         retriever = DocumentRetriever(top_k=config.top_k_results,
-                                     similarity_threshold=config.similarity_threshold)
+                                     similarity_threshold=config.similarity_threshold,
+                                     retrieval_mode=config.retrieval_mode)
         openrouter_client = OpenRouterClient(api_key=config.openrouter_api_key,
                                             model=config.openrouter_model,
                                             max_retries=config.max_retries,

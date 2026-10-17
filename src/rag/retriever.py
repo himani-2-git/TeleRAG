@@ -2,23 +2,61 @@
 
 from typing import List, Dict, Any, Tuple
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
 import logging
 
 logger = logging.getLogger(__name__)
 
 class DocumentRetriever:
-    """Retrieves relevant document chunks using similarity search."""
+    """Retrieves relevant document chunks using similarity search or hybrid retrieval."""
     
-    def __init__(self, top_k: int = 5, similarity_threshold: float = 0.3):
+    def __init__(self, top_k: int = 5, similarity_threshold: float = 0.3, retrieval_mode: str = "dense"):
         """Initialize document retriever.
         
         Args:
             top_k: Number of top results to return
             similarity_threshold: Minimum similarity score threshold
+            retrieval_mode: Retrieval strategy ('dense', 'hybrid', 'hybrid_rerank')
         """
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
+        self.retrieval_mode = retrieval_mode
+        self._hybrid_retriever = None
+        
+    def retrieve(self, query: str, query_embedding: List[float], 
+                 chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Retrieve relevant chunks according to configured retrieval_mode.
+        
+        Args:
+            query: Natural language query string
+            query_embedding: Query embedding vector
+            chunks: Document chunks
+            
+        Returns:
+            List of relevant chunks meeting threshold
+        """
+        if self.retrieval_mode == "hybrid":
+            from .hybrid import HybridRetriever
+            if self._hybrid_retriever is None:
+                self._hybrid_retriever = HybridRetriever(
+                    top_k=self.top_k, 
+                    similarity_threshold=self.similarity_threshold
+                )
+            return self._hybrid_retriever.search(query=query, query_embedding=query_embedding, chunks=chunks)
+            
+        elif self.retrieval_mode == "hybrid_rerank":
+            from .hybrid import HybridRetriever
+            from .reranker import CrossEncoderReranker
+            if self._hybrid_retriever is None:
+                self._hybrid_retriever = HybridRetriever(
+                    top_k=20, 
+                    similarity_threshold=self.similarity_threshold
+                )
+            candidates = self._hybrid_retriever.search(query=query, query_embedding=query_embedding, chunks=chunks)
+            reranker = CrossEncoderReranker()
+            return reranker.rerank(query=query, candidates=candidates, top_k=self.top_k)
+            
+        else:
+            return self.search_similar(query_embedding, chunks)
     
     def search_similar(self, query_embedding: List[float], 
                       chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -62,10 +100,14 @@ class DocumentRetriever:
         Returns:
             List of similarity scores
         """
-        query_vec = np.array(query_embedding).reshape(1, -1)
-        chunk_vecs = np.array([c['embedding'] for c in chunks])
-        
-        similarities = cosine_similarity(query_vec, chunk_vecs)[0]
+        query_vec = np.array(query_embedding, dtype=float)
+        chunk_vecs = np.array([c['embedding'] for c in chunks], dtype=float)
+        dot_product = np.dot(chunk_vecs, query_vec)
+        norm_chunks = np.linalg.norm(chunk_vecs, axis=1)
+        norm_query = np.linalg.norm(query_vec)
+        denominator = norm_chunks * norm_query
+        denominator = np.where(denominator == 0, 1e-10, denominator)
+        similarities = dot_product / denominator
         return similarities.tolist()
     
     def _rank_results(self, chunks: List[Dict[str, Any]], 
@@ -99,7 +141,7 @@ class DocumentRetriever:
         return results[:self.top_k]
     
     def format_context(self, chunks: List[Dict[str, Any]]) -> str:
-        """Format retrieved chunks into context string.
+        """Format retrieved chunks into context string with page-level citations.
         
         Args:
             chunks: List of retrieved chunks
@@ -111,13 +153,20 @@ class DocumentRetriever:
             return ""
         
         context_parts = []
-        for i, chunk in enumerate(chunks, 1):
+        for chunk in chunks:
             filename = chunk.get('filename', 'Unknown')
-            content = chunk['content']
-            score = chunk.get('similarity_score', 0)
+            content = chunk.get('content', '')
+            p_start = chunk.get('page_start')
+            p_end = chunk.get('page_end')
+            page = chunk.get('page')
             
-            context_parts.append(
-                f"[Source {i} - {filename} (relevance: {score:.2f})]\n{content}"
-            )
+            if p_start is not None and p_end is not None:
+                page_str = f"p. {p_start}" if p_start == p_end else f"p. {p_start}-{p_end}"
+            elif page is not None:
+                page_str = f"p. {page}"
+            else:
+                page_str = "p. 1"
+                
+            context_parts.append(f"[{filename}, {page_str}]\n{content}")
         
         return "\n\n".join(context_parts)

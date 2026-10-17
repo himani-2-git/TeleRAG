@@ -68,15 +68,19 @@ class DocumentStore:
         file_hash = self._calculate_file_hash(file_content)
         file_size = len(file_content)
         
-        # Prepare chunks with embedding paths
+        # Prepare chunks with embedding paths and page metadata
         chunks_data = []
         for i, chunk in enumerate(chunks):
-            chunks_data.append({
-                'chunk_index': chunk['chunk_index'],
-                'content': chunk['content'],
-                'char_count': chunk['char_count'],
+            chunk_dict = {
+                'chunk_index': chunk['chunk_index'] if isinstance(chunk, dict) else getattr(chunk, 'chunk_index', i),
+                'content': chunk['content'] if isinstance(chunk, dict) else getattr(chunk, 'content'),
+                'char_count': chunk['char_count'] if isinstance(chunk, dict) else getattr(chunk, 'char_count', len(getattr(chunk, 'content', ''))),
+                'page': chunk.get('page') if isinstance(chunk, dict) else getattr(chunk, 'page', None),
+                'page_start': chunk.get('page_start') if isinstance(chunk, dict) else getattr(chunk, 'page_start', None),
+                'page_end': chunk.get('page_end') if isinstance(chunk, dict) else getattr(chunk, 'page_end', None),
                 'embedding_path': None  # Will be set after document is created
-            })
+            }
+            chunks_data.append(chunk_dict)
         
         # Store in database
         document_id = self.db.store_document(user_id, filename, file_hash, 

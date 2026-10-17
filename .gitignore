@@ -26,11 +26,24 @@ wheels/
 
 # Environment
 .env
+.env.*
+!.env.example
 
-# Data
+# Data & Databases
 data/
 logs/
 output/
+tmp/
+models/
+*.db
+*.sqlite
+*.sqlite3
+eval/fixtures/book.pdf
+eval/results/tmp/
+
+# Certificates & Keys
+*.pem
+*.key
 
 # IDE
 .vscode/
@@ -43,8 +56,11 @@ output/
 .DS_Store
 Thumbs.db
 
-# Testing
+# Testing & Caches
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 .coverage
 htmlcov/
 

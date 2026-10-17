@@ -105,5 +105,77 @@ class TestDocumentStore(unittest.TestCase):
         embedding_file = os.path.join(self.embeddings_path, f"doc_{doc_id}_chunk_0.json")
         self.assertTrue(os.path.exists(embedding_file))
 
+    def test_store_and_retrieve_with_page_bounds(self):
+        """Test storing and retrieving chunks with page, page_start, and page_end."""
+        chunks = [
+            {'chunk_index': 0, 'content': 'Page 1-2 chunk', 'char_count': 15, 'page': 1, 'page_start': 1, 'page_end': 2},
+            {'chunk_index': 1, 'content': 'Page 2 chunk', 'char_count': 12, 'page': 2, 'page_start': 2, 'page_end': 2}
+        ]
+        embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        
+        doc_id = self.store.store_document(
+            user_id=123,
+            filename="pages.pdf",
+            file_content=b"pages pdf content",
+            chunks=chunks,
+            embeddings=embeddings
+        )
+        self.assertIsNotNone(doc_id)
+        
+        user_chunks = self.store.get_user_chunks_with_embeddings(123)
+        self.assertEqual(len(user_chunks), 2)
+        self.assertEqual(user_chunks[0]['page_start'], 1)
+        self.assertEqual(user_chunks[0]['page_end'], 2)
+        self.assertEqual(user_chunks[0]['page'], 1)
+        self.assertEqual(user_chunks[1]['page_start'], 2)
+        self.assertEqual(user_chunks[1]['page_end'], 2)
+
+    def test_schema_migration_backward_compatibility(self):
+        """Test non-destructive migration on existing database lacking page columns."""
+        import sqlite3
+        legacy_db_path = os.path.join(self.temp_dir, "legacy.db")
+        conn = sqlite3.connect(legacy_db_path)
+        # Create old schema without page columns
+        conn.execute("""
+            CREATE TABLE documents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                file_hash TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                chunk_count INTEGER NOT NULL,
+                upload_date TIMESTAMP NOT NULL,
+                UNIQUE(user_id, filename)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE document_chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_id INTEGER NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                embedding_path TEXT,
+                char_count INTEGER NOT NULL,
+                FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
+                UNIQUE(document_id, chunk_index)
+            )
+        """)
+        conn.commit()
+        conn.close()
+        
+        # Connect with Database class, which should trigger automatic migration
+        db = Database(legacy_db_path)
+        
+        # Verify columns exist now
+        conn2 = sqlite3.connect(legacy_db_path)
+        cursor = conn2.cursor()
+        cursor.execute("PRAGMA table_info(document_chunks)")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn2.close()
+        
+        self.assertIn("page", cols)
+        self.assertIn("page_start", cols)
+        self.assertIn("page_end", cols)
+
 if __name__ == '__main__':
     unittest.main()

@@ -25,6 +25,7 @@ class Config:
     embedding_model: str = "all-MiniLM-L6-v2"
     top_k_results: int = 5
     similarity_threshold: float = 0.3
+    retrieval_mode: str = "hybrid"
     
     # OpenRouter Settings
     openrouter_model: str = "qwen/qwen3.8-27b:free"
@@ -60,6 +61,7 @@ def get_config() -> Config:
         embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
         top_k_results=int(os.getenv("TOP_K_RESULTS", "5")),
         similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
+        retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
         openrouter_model=os.getenv("OPENROUTER_MODEL", "qwen/qwen3.8-27b:free"),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
         retry_delay=float(os.getenv("RETRY_DELAY", "1.0")),

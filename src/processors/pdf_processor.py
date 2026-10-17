@@ -1,7 +1,7 @@
 """PDF processing module for text extraction and validation."""
 
 import re
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 from PyPDF2 import PdfReader
 import logging
 
@@ -42,6 +42,44 @@ class PDFProcessor:
             logger.error(f"PDF validation failed: {e}")
             return False, "Invalid PDF format or corrupted file"
     
+    def extract_text_with_pages(self, file_path: str) -> List[Tuple[int, str]]:
+        """Extract text content from all PDF pages with 1-based page numbers.
+        
+        Args:
+            file_path: Path to the PDF file
+            
+        Returns:
+            List of (page_number, cleaned_text) tuples for non-empty pages.
+            
+        Raises:
+            Exception: If text extraction fails or file is empty
+        """
+        try:
+            pages_data: List[Tuple[int, str]] = []
+            
+            with open(file_path, 'rb') as f:
+                pdf_reader = PdfReader(f)
+                
+                for page_num, page in enumerate(pdf_reader.pages, 1):
+                    try:
+                        raw_page_text = page.extract_text()
+                        if raw_page_text:
+                            cleaned_page_text = self.clean_text(raw_page_text)
+                            if cleaned_page_text.strip():
+                                pages_data.append((page_num, cleaned_page_text))
+                    except Exception as e:
+                        logger.warning(f"Failed to extract text from page {page_num}: {e}")
+                        continue
+            
+            if not pages_data:
+                raise Exception("No text content could be extracted from PDF")
+                
+            return pages_data
+            
+        except Exception as e:
+            logger.error(f"Text extraction failed: {e}")
+            raise Exception(f"Failed to extract text from PDF: {str(e)}")
+            
     def extract_text(self, file_path: str) -> str:
         """Extract text content from all PDF pages.
         
@@ -54,30 +92,8 @@ class PDFProcessor:
         Raises:
             Exception: If text extraction fails
         """
-        try:
-            text_content = []
-            
-            with open(file_path, 'rb') as f:
-                pdf_reader = PdfReader(f)
-                
-                for page_num, page in enumerate(pdf_reader.pages, 1):
-                    try:
-                        page_text = page.extract_text()
-                        if page_text:
-                            text_content.append(page_text)
-                    except Exception as e:
-                        logger.warning(f"Failed to extract text from page {page_num}: {e}")
-                        continue
-            
-            if not text_content:
-                raise Exception("No text content could be extracted from PDF")
-            
-            full_text = "\n\n".join(text_content)
-            return self.clean_text(full_text)
-            
-        except Exception as e:
-            logger.error(f"Text extraction failed: {e}")
-            raise Exception(f"Failed to extract text from PDF: {str(e)}")
+        pages_data = self.extract_text_with_pages(file_path)
+        return "\n\n".join(text for _, text in pages_data)
     
     def clean_text(self, text: str) -> str:
         """Clean and normalize extracted text.

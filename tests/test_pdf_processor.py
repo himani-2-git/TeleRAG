@@ -54,5 +54,29 @@ class TestTextChunker(unittest.TestCase):
         is_valid = self.chunker.validate_chunks(chunks)
         self.assertTrue(is_valid)
 
+    def test_create_chunks_with_pages(self):
+        """Test page-aware chunking with page bounds."""
+        pages_data = [
+            (1, "First page content. " * 10),
+            (2, "Second page content with more detailed information. " * 10),
+            (3, "Third page conclusions and summary points. " * 10)
+        ]
+        chunks = self.chunker.create_chunks_with_pages(pages_data)
+        self.assertGreater(len(chunks), 0)
+        
+        # Verify first chunk starts on page 1
+        self.assertEqual(chunks[0].page_start, 1)
+        self.assertEqual(chunks[0].page, 1)
+        self.assertIsNotNone(chunks[0].page_end)
+        
+        # Verify last chunk ends on page 3
+        self.assertEqual(chunks[-1].page_end, 3)
+        
+        # Verify all chunks have valid page intervals
+        for chunk in chunks:
+            self.assertIsNotNone(chunk.page_start)
+            self.assertIsNotNone(chunk.page_end)
+            self.assertLessEqual(chunk.page_start, chunk.page_end)
+
 if __name__ == '__main__':
     unittest.main()

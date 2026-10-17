@@ -6,8 +6,8 @@ import requests
 import re
 import socket
 import ipaddress
-from typing import Tuple
-from urllib.parse import urlparse
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, urljoin
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
@@ -160,11 +160,11 @@ class BotHandlers:
                 await update.message.reply_text(f"❌ {error_msg}")
                 return
             
-            # Extract text
-            text = self.pdf_processor.extract_text(temp_file.name)
+            # Extract text with pages
+            pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
             
-            # Create chunks
-            chunks = self.text_chunker.create_chunks(text)
+            # Create chunks with page bounds
+            chunks = self.text_chunker.create_chunks_with_pages(pages_data)
             
             if not chunks:
                 await update.message.reply_text("❌ No text content found in PDF.")
@@ -179,7 +179,10 @@ class BotHandlers:
                 {
                     'chunk_index': chunk.chunk_index,
                     'content': chunk.content,
-                    'char_count': chunk.char_count
+                    'char_count': chunk.char_count,
+                    'page': chunk.page,
+                    'page_start': chunk.page_start,
+                    'page_end': chunk.page_end
                 }
                 for chunk in chunks
             ]
@@ -249,8 +252,8 @@ class BotHandlers:
             # Generate query embedding
             query_embedding = self.embedding_generator.generate_query_embedding(question)
             
-            # Search for relevant chunks
-            relevant_chunks = self.retriever.search_similar(query_embedding, chunks)
+            # Search for relevant chunks using configured retrieval mode
+            relevant_chunks = self.retriever.retrieve(query=question, query_embedding=query_embedding, chunks=chunks)
             
             if not relevant_chunks:
                 await update.message.reply_text(
@@ -265,7 +268,11 @@ class BotHandlers:
             answer = self.openrouter_client.generate_answer(question, context_text)
             answer = self.openrouter_client.validate_response(answer)
             
-            await update.message.reply_text(answer)
+            # Append verified programmatic source footer
+            footer = self._format_source_footer(relevant_chunks)
+            final_response = f"{answer}{footer}"
+            
+            await update.message.reply_text(final_response)
             
         except Exception as e:
             logger.error(f"Failed to answer question: {e}")
@@ -273,6 +280,37 @@ class BotHandlers:
                 "❌ Sorry, I encountered an error while processing your question. Please try again."
             )
     
+    def _format_source_footer(self, chunks: List[Dict[str, Any]]) -> str:
+        """Format verified sources footer from retrieved chunks."""
+        if not chunks:
+            return ""
+        
+        sources = []
+        seen = set()
+        for chunk in chunks:
+            filename = chunk.get("filename", "document.pdf")
+            p_start = chunk.get("page_start")
+            p_end = chunk.get("page_end")
+            page = chunk.get("page")
+            
+            if p_start is not None and p_end is not None:
+                page_str = f"p. {p_start}" if p_start == p_end else f"p. {p_start}-{p_end}"
+            elif page is not None:
+                page_str = f"p. {page}"
+            else:
+                page_str = "p. 1"
+                
+            entry = f"{filename} ({page_str})"
+            if entry not in seen:
+                seen.add(entry)
+                sources.append(entry)
+                
+        if not sources:
+            return ""
+            
+        footer_lines = ["\n\nSources:"] + [f"• {s}" for s in sources]
+        return "\n".join(footer_lines)
+
     def _is_url(self, text: str) -> bool:
         """Check if text contains a URL.
         
@@ -368,17 +406,62 @@ class BotHandlers:
         
         temp_file = None
         try:
-            # Download file from URL
+            # Download file from URL with manual redirect following to prevent SSRF via redirects
             download_headers = {
                 "User-Agent": "TeleRAG/1.0 (PDF Document Assistant)",
                 "Accept": "application/pdf, application/octet-stream;q=0.9, */*;q=0.8",
             }
-            response = requests.get(url, headers=download_headers, timeout=30, stream=True)
-            response.raise_for_status()
+            
+            current_url = url
+            max_redirects = 3
+            redirect_count = 0
+            response = None
+            
+            while True:
+                response = requests.get(
+                    current_url, 
+                    headers=download_headers, 
+                    timeout=30, 
+                    stream=True, 
+                    allow_redirects=False
+                )
+                
+                # Check for redirects (301, 302, 303, 307, 308)
+                if response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
+                    redirect_count += 1
+                    if redirect_count > max_redirects:
+                        response.close()
+                        await update.message.reply_text("❌ Too many redirects (maximum 3 allowed).")
+                        return
+                    
+                    location = response.headers.get('Location')
+                    if not location:
+                        response.close()
+                        await update.message.reply_text("❌ Redirect without location header.")
+                        return
+                    
+                    # Resolve relative redirect URLs against current URL
+                    next_url = urljoin(current_url, location)
+                    
+                    # Validate next hop URL for SSRF protection
+                    is_safe, error_msg = self._is_safe_url(next_url)
+                    if not is_safe:
+                        response.close()
+                        await update.message.reply_text(f"❌ Redirect blocked: {error_msg}")
+                        return
+                    
+                    response.close()
+                    current_url = next_url
+                    continue
+                
+                # If not a redirect, proceed to process the response
+                response.raise_for_status()
+                break
             
             # Check content type
             content_type = response.headers.get('content-type', '')
-            if 'pdf' not in content_type.lower() and not url.lower().endswith('.pdf'):
+            if 'pdf' not in content_type.lower() and not current_url.lower().endswith('.pdf'):
+                response.close()
                 await update.message.reply_text(
                     "❌ The URL doesn't point to a PDF file.\n"
                     f"Content type: {content_type}"
@@ -389,26 +472,34 @@ class BotHandlers:
             max_bytes = self.config.max_file_size_mb * 1024 * 1024
             content_length = response.headers.get('content-length')
             if content_length:
-                file_size = int(content_length)
-                if file_size > max_bytes:
-                    await update.message.reply_text(
-                        f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
-                    )
-                    return
-            
-            # Save to temp file with streaming cap to prevent unbounded download
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-            downloaded_bytes = 0
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    downloaded_bytes += len(chunk)
-                    if downloaded_bytes > max_bytes:
-                        temp_file.close()
+                try:
+                    file_size = int(content_length)
+                    if file_size > max_bytes:
+                        response.close()
                         await update.message.reply_text(
                             f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
                         )
                         return
-                    temp_file.write(chunk)
+                except ValueError:
+                    pass
+            
+            # Save to temp file with streaming cap to enforce MAX_FILE_SIZE_MB during streaming
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            downloaded_bytes = 0
+            try:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        downloaded_bytes += len(chunk)
+                        if downloaded_bytes > max_bytes:
+                            temp_file.close()
+                            response.close()
+                            await update.message.reply_text(
+                                f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
+                            )
+                            return
+                        temp_file.write(chunk)
+            finally:
+                response.close()
             temp_file.close()
             
             # Get actual downloaded file size
@@ -426,11 +517,11 @@ class BotHandlers:
                 await update.message.reply_text(f"❌ {error_msg}")
                 return
             
-            # Extract text
-            text = self.pdf_processor.extract_text(temp_file.name)
+            # Extract text with pages
+            pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
             
-            # Create chunks
-            chunks = self.text_chunker.create_chunks(text)
+            # Create chunks with page bounds
+            chunks = self.text_chunker.create_chunks_with_pages(pages_data)
             
             if not chunks:
                 await update.message.reply_text("❌ No text content found in PDF.")
@@ -445,13 +536,16 @@ class BotHandlers:
                 {
                     'chunk_index': chunk.chunk_index,
                     'content': chunk.content,
-                    'char_count': chunk.char_count
+                    'char_count': chunk.char_count,
+                    'page': chunk.page,
+                    'page_start': chunk.page_start,
+                    'page_end': chunk.page_end
                 }
                 for chunk in chunks
             ]
             
             # Get filename
-            filename = self._extract_filename_from_url(url)
+            filename = self._extract_filename_from_url(current_url)
             
             # Store document
             self.document_store.store_document(

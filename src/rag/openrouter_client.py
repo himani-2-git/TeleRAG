@@ -69,6 +69,15 @@ class OpenRouterClient:
                         continue
                     return None
                 
+                elif response.status_code == 404 or "not found" in response.text.lower():
+                    logger.error(
+                        "Configured model '%s' was not found on OpenRouter (HTTP %d). "
+                        "Free model IDs change periodically; check availability at https://openrouter.ai/models "
+                        "and update OPENROUTER_MODEL in your .env file.",
+                        self.model, response.status_code
+                    )
+                    return None
+                
                 else:
                     logger.error(f"API request failed: {response.status_code} - {response.text}")
                     if attempt < self.max_retries - 1:
@@ -122,6 +131,7 @@ class OpenRouterClient:
             "content": (
                 "You are a helpful assistant that answers questions based on provided document context. "
                 "Use only the information from the context to answer questions. "
+                "When citing information, cite the source in the format [<filename>, p. <page>]. "
                 "If the context doesn't contain relevant information, say so clearly. "
                 "Be concise and accurate."
             )

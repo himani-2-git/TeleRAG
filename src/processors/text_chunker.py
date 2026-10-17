@@ -1,6 +1,4 @@
-"""Text chunking module for splitting documents into manageable pieces."""
-
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 import logging
 
@@ -14,6 +12,9 @@ class TextChunk:
     start_pos: int
     end_pos: int
     char_count: int
+    page: Optional[int] = None
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
 
 class TextChunker:
     """Handles text chunking with configurable size and overlap."""
@@ -80,6 +81,49 @@ class TextChunker:
                 start_pos = end_pos
         
         logger.info(f"Created {len(chunks)} chunks from text of length {text_length}")
+        return chunks
+        
+    def create_chunks_with_pages(self, pages_data: List[Tuple[int, str]]) -> List[TextChunk]:
+        """Split page-annotated text into overlapping chunks, tracking page spans.
+        
+        Args:
+            pages_data: List of (page_number, page_text) tuples.
+            
+        Returns:
+            List of TextChunk objects with page_start, page_end, and page populated.
+        """
+        if not pages_data:
+            logger.warning("Empty pages_data provided for chunking")
+            return []
+            
+        pages_text: List[str] = []
+        offsets: List[Tuple[int, int, int]] = []
+        current_pos = 0
+        
+        for page_num, cleaned in pages_data:
+            pages_text.append(cleaned)
+            start_offset = current_pos
+            end_offset = current_pos + len(cleaned)
+            offsets.append((page_num, start_offset, end_offset))
+            current_pos = end_offset + 2  # account for \n\n separator
+            
+        full_text = "\n\n".join(pages_text)
+        chunks = self.create_chunks(full_text)
+        
+        def find_page_for_pos(pos: int) -> int:
+            for p_num, s_off, e_off in offsets:
+                if s_off <= pos < e_off:
+                    return p_num
+            return offsets[-1][0] if offsets else 1
+            
+        for chunk in chunks:
+            p_start = find_page_for_pos(chunk.start_pos)
+            end_char_pos = max(chunk.start_pos, chunk.end_pos - 1)
+            p_end = find_page_for_pos(end_char_pos)
+            chunk.page_start = p_start
+            chunk.page_end = p_end
+            chunk.page = p_start
+            
         return chunks
     
     def _find_break_point(self, text: str, start: int, end: int) -> int:

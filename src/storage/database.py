@@ -68,10 +68,23 @@ class Database:
                     content TEXT NOT NULL,
                     embedding_path TEXT,
                     char_count INTEGER NOT NULL,
+                    page INTEGER,
+                    page_start INTEGER,
+                    page_end INTEGER,
                     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
                     UNIQUE(document_id, chunk_index)
                 )
             """)
+            
+            # Non-destructive schema migration for existing databases
+            cursor.execute("PRAGMA table_info(document_chunks)")
+            existing_cols = {row[1] for row in cursor.fetchall()}
+            if "page" not in existing_cols:
+                cursor.execute("ALTER TABLE document_chunks ADD COLUMN page INTEGER")
+            if "page_start" not in existing_cols:
+                cursor.execute("ALTER TABLE document_chunks ADD COLUMN page_start INTEGER")
+            if "page_end" not in existing_cols:
+                cursor.execute("ALTER TABLE document_chunks ADD COLUMN page_end INTEGER")
             
             # Create indexes for efficient querying
             cursor.execute("""
@@ -125,10 +138,12 @@ class Database:
             for chunk in chunks:
                 cursor.execute("""
                     INSERT INTO document_chunks (document_id, chunk_index, content, 
-                                                embedding_path, char_count)
-                    VALUES (?, ?, ?, ?, ?)
+                                                embedding_path, char_count,
+                                                page, page_start, page_end)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (document_id, chunk['chunk_index'], chunk['content'],
-                      chunk.get('embedding_path'), chunk['char_count']))
+                      chunk.get('embedding_path'), chunk['char_count'],
+                      chunk.get('page'), chunk.get('page_start'), chunk.get('page_end')))
             
             conn.commit()
             logger.info(f"Stored document {filename} with {len(chunks)} chunks")
@@ -191,7 +206,8 @@ class Database:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, chunk_index, content, embedding_path, char_count
+                SELECT id, chunk_index, content, embedding_path, char_count,
+                       page, page_start, page_end
                 FROM document_chunks
                 WHERE document_id = ?
                 ORDER BY chunk_index
@@ -204,7 +220,10 @@ class Database:
                     'chunk_index': row['chunk_index'],
                     'content': row['content'],
                     'embedding_path': row['embedding_path'],
-                    'char_count': row['char_count']
+                    'char_count': row['char_count'],
+                    'page': row['page'],
+                    'page_start': row['page_start'],
+                    'page_end': row['page_end']
                 })
             
             return chunks
@@ -281,6 +300,7 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT dc.id, dc.chunk_index, dc.content, dc.embedding_path,
+                       dc.page, dc.page_start, dc.page_end,
                        d.id as document_id, d.filename
                 FROM document_chunks dc
                 JOIN documents d ON dc.document_id = d.id
@@ -296,7 +316,10 @@ class Database:
                     'content': row['content'],
                     'embedding_path': row['embedding_path'],
                     'document_id': row['document_id'],
-                    'filename': row['filename']
+                    'filename': row['filename'],
+                    'page': row['page'],
+                    'page_start': row['page_start'],
+                    'page_end': row['page_end']
                 })
             
             return chunks

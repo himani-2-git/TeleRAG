@@ -22,6 +22,7 @@ class TestBenchLLM(unittest.TestCase):
         self.assertTrue(is_refusal_response(""))
         self.assertFalse(is_refusal_response("In Python, functions are defined using def."))
 
+    @patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "mock_token_for_ci"}, clear=False)
     @patch("eval.bench_llm.LLMClient")
     def test_bench_llm_completes_with_mocked_client_and_exercises_abstention(self, mock_client_cls):
         """Benchmark runs across 12 CI questions, exercises abstention on unanswerables, and outputs table fields."""
@@ -83,6 +84,7 @@ class TestBenchLLM(unittest.TestCase):
             self.assertIn("test-mock-3b", saved_data)
             self.assertEqual(saved_data["test-mock-3b"]["sample_size"], 12)
 
+    @patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "mock_token_for_ci"}, clear=False)
     @patch("eval.bench_llm.LLMClient")
     def test_bench_llm_robust_against_question_exceptions(self, mock_client_cls):
         """Loop catches per-question exceptions, logs them, increments failure count, and continues."""

@@ -19,9 +19,7 @@ Retrieval was evaluated on a 70-question set over *Think Python 2e*, a smaller s
 
 ---
 
-## Screenshot
-
-![TeleRAG Telegram Answer](docs/screenshots/telegram-answer.png)
+<!-- demo video goes here -->
 
 ---
 
@@ -283,8 +281,7 @@ TeleRAG/
 │       ├── ci_eval.json        # Synthetic CI fixture metrics
 │       └── abstention_experiment.json # Stratified dev/test gate comparison
 ├── docs/
-│   ├── design-decisions.md     # Architecture decisions and trade-offs log
-│   └── screenshots/            # UI screenshots (telegram-answer.png)
+│   └── design-decisions.md     # Architecture decisions and trade-offs log
 ├── main.py                     # Bot entry point and lifecycle manager
 ├── requirements.txt            # Pinned production dependencies
 ├── requirements-dev.txt        # Development & evaluation dependencies (fpdf2)

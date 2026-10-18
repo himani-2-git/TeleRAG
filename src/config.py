@@ -42,7 +42,7 @@ class Config:
     log_level: str = "INFO"
     log_file: str = "logs/bot.log"
 
-def get_config() -> Config:
+def get_config(require_telegram: bool = True) -> Config:
     """Get application configuration from environment variables."""
     
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -50,16 +50,16 @@ def get_config() -> Config:
     llm_base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1").rstrip("/")
     llm_model = os.getenv("LLM_MODEL", "qwen2.5:3b")
     
-    if not telegram_token:
+    if require_telegram and not telegram_token:
         raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")
     
     # Ollama or local servers do not require an API key when pointing to localhost/127.0.0.1
     is_local = "localhost" in llm_base_url or "127.0.0.1" in llm_base_url
-    if not llm_key and not is_local:
+    if require_telegram and not llm_key and not is_local:
         raise ValueError("LLM_API_KEY environment variable is required when using a remote endpoint")
     
     return Config(
-        telegram_bot_token=telegram_token,
+        telegram_bot_token=telegram_token or "",
         llm_api_key=llm_key or "",
         llm_base_url=llm_base_url,
         max_file_size_mb=int(os.getenv("MAX_FILE_SIZE_MB", "20")),

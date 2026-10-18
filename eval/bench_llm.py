@@ -74,7 +74,21 @@ def run_llm_benchmark(
     output_path: str = "eval/results/llm_bench.json"
 ) -> Dict[str, Any]:
     """Run LLM latency and accuracy benchmark across specified models."""
-    config = get_config()
+    try:
+        config = get_config(require_telegram=False)
+    except Exception:
+        from src.config import Config
+        config = Config(
+            telegram_bot_token="",
+            llm_api_key=os.getenv("LLM_API_KEY", ""),
+            llm_base_url=os.getenv("LLM_BASE_URL", "http://localhost:11434/v1").rstrip("/"),
+            llm_model=os.getenv("LLM_MODEL", "qwen2.5:3b"),
+            llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
+            embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
+            top_k_results=int(os.getenv("TOP_K_RESULTS", "2")),
+            similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
+            retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
+        )
     
     # 1. Ingest fixture
     logger.info("Extracting and chunking %s...", pdf_path)
@@ -226,8 +240,9 @@ def run_llm_benchmark(
         }
         results[model_name] = model_result
         
-        # Save after EACH model finishes so partial results are never lost
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        out_dir = os.path.dirname(output_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
         logger.info("Saved benchmark results after model '%s' to %s", model_name, output_path)

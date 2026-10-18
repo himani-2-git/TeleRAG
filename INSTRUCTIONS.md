@@ -74,11 +74,23 @@ TeleRAG requires two external services: a Telegram Bot and an OpenRouter API key
 5. BotFather will provide an HTTP API token (format: `123456789:ABCdefGHIjklMNOpqrSTUvwxYZ`).
 6. Copy this token.
 
-### 3.2 Obtain an OpenRouter API Key
+### 3.2 Configure the LLM (Ollama or OpenRouter)
+
+#### Option A: Local Ollama Server (Documented Default — No API key needed)
+1. Install [Ollama](https://ollama.ai) on your system.
+2. Pull a local model, such as Qwen 2:
+   ```bash
+   ollama pull qwen2:7b
+   ```
+3. Run `ollama list` to inspect your installed models.
+4. Set `LLM_BASE_URL=http://localhost:11434/v1` and `OPENROUTER_MODEL=qwen2:7b` in `.env`.
+
+#### Option B: OpenRouter API (Cloud Alternative)
 1. Go to [OpenRouter](https://openrouter.ai/) and register an account.
 2. Navigate to **Keys** (`openrouter.ai/keys`) and click **Create Key**.
 3. Copy your API key (format: `sk-or-v1-...`).
-4. *Note: free model names change often; pick a model marked free there and set OPENROUTER_MODEL: https://openrouter.ai/models*
+4. Set `LLM_BASE_URL=https://openrouter.ai/api/v1` and paste your key into `OPENROUTER_API_KEY`.
+5. Pick an active free model from [https://openrouter.ai/models](https://openrouter.ai/models) (free model names change often) and set `OPENROUTER_MODEL`.
 
 ### 3.3 Configure `.env`
 Copy the template configuration file:
@@ -99,13 +111,20 @@ Open `.env` in an editor and enter your credentials:
 # Required Credentials
 # ===================================================================
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # ===================================================================
-# LLM Model Configuration
+# LLM Endpoint Configuration
+# Default: Local Ollama (no key needed)
 # ===================================================================
-# free model names change often; pick a model marked free there and set OPENROUTER_MODEL: https://openrouter.ai/models
-OPENROUTER_MODEL=qwen/qwen3.8-27b:free
+LLM_BASE_URL=http://localhost:11434/v1
+OPENROUTER_MODEL=qwen2:7b
+
+# Alternative: OpenRouter (uncomment and supply key)
+# LLM_BASE_URL=https://openrouter.ai/api/v1
+# OPENROUTER_API_KEY=your_openrouter_api_key_here
+# OPENROUTER_MODEL=<model_from_openrouter_models>
+OPENROUTER_API_KEY=
+
 MAX_RETRIES=3
 RETRY_DELAY=1.0
 
@@ -236,8 +255,8 @@ Once at least one document is uploaded, simply send natural language questions:
 
 ### 2. "User Safety: safe" Response from LLM
 * **Symptom**: The bot replies *"User Safety: safe"* to all questions instead of answering.
-* **Cause**: Using `openrouter/free` routes requests nondeterministically across all free models, which includes guardrail safety classifiers (e.g. `nvidia/nemotron-3.5-content-safety:free`).
-* **Resolution**: Keep `OPENROUTER_MODEL=qwen/qwen3.8-27b:free` configured in your `.env`.
+* **Cause**: Using generic router tags like `openrouter/free` routes requests nondeterministically across all free models, which includes guardrail safety classifiers (e.g. `nvidia/nemotron-3.5-content-safety:free`).
+* **Resolution**: Set `OPENROUTER_MODEL` to a specific instruction-tuned model (e.g. `qwen2:7b` on Ollama, or a specific free model slug chosen from https://openrouter.ai/models).
 
 ### 3. OpenRouter HTTP 429 "Too Many Requests"
 * **Symptom**: Error in logs `429 Too Many Requests`.

@@ -10,25 +10,66 @@ logger = logging.getLogger(__name__)
 class OpenRouterClient:
     """Client for OpenRouter API."""
     
-    def __init__(self, api_key: str, model: str = "qwen/qwen3.8-27b:free",
-                 max_retries: int = 3, retry_delay: float = 1.0):
-        """Initialize OpenRouter client.
+    def __init__(self, api_key: str = "", model: str = "qwen2:7b",
+                 max_retries: int = 3, retry_delay: float = 1.0,
+                 base_url: str = "http://localhost:11434/v1",
+                 timeout: float = 300.0):
+        """Initialize OpenRouter / LLM client.
         
         Args:
-            api_key: OpenRouter API key
+            api_key: OpenRouter API key (optional for local endpoints)
             model: Model identifier to use
             max_retries: Maximum number of retry attempts
             retry_delay: Initial delay between retries in seconds
+            base_url: Base URL for LLM API (chat/completions endpoint)
+            timeout: Request timeout in seconds (defaults to 300s for local models)
         """
         self.api_key = api_key
         self.model = model
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self.base_url = "https://openrouter.ai/api/v1/chat/completions"
+        self.timeout = timeout
+        
+        # Ensure base_url ends with /chat/completions
+        clean_url = base_url.rstrip("/")
+        if not clean_url.endswith("/chat/completions"):
+            self.base_url = f"{clean_url}/chat/completions"
+        else:
+            self.base_url = clean_url
+    
+    def check_availability(self) -> tuple[bool, Optional[int], str]:
+        """Check availability of the configured model with a minimal prompt.
+        
+        Returns:
+            Tuple of (is_ok, status_code, reason)
+        """
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": "hi"}],
+            "max_tokens": 5
+        }
+        try:
+            response = requests.post(
+                self.base_url,
+                headers=headers,
+                json=payload,
+                timeout=self.timeout
+            )
+            if response.status_code == 200:
+                return True, 200, "OK"
+            else:
+                short_msg = response.text[:200].strip()
+                return False, response.status_code, short_msg
+        except Exception as e:
+            return False, None, str(e)
     
     def send_request(self, messages: List[Dict[str, str]], 
                     temperature: float = 0.7) -> Optional[str]:
-        """Send chat completion request to OpenRouter.
+        """Send chat completion request to OpenRouter or local LLM server.
         
         Args:
             messages: List of message dictionaries with 'role' and 'content'
@@ -37,10 +78,9 @@ class OpenRouterClient:
         Returns:
             Generated response text or None if failed
         """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         
         payload = {
             "model": self.model,
@@ -54,7 +94,7 @@ class OpenRouterClient:
                     self.base_url,
                     headers=headers,
                     json=payload,
-                    timeout=30
+                    timeout=self.timeout
                 )
                 
                 if response.status_code == 200:
@@ -62,31 +102,38 @@ class OpenRouterClient:
                     return self._extract_response(data)
                 
                 elif response.status_code == 429:
-                    # Rate limit hit
-                    logger.warning(f"Rate limit hit, attempt {attempt + 1}/{self.max_retries}")
-                    if attempt < self.max_retries - 1:
-                        time.sleep(self.retry_delay * (2 ** attempt))
+                    # Rate limit hit: log response message (never keys) and do not retry more than once
+                    short_msg = response.text[:200].strip()
+                    logger.warning(
+                        f"Rate limit hit (HTTP 429: {short_msg}), attempt {attempt + 1}/{self.max_retries}"
+                    )
+                    # Retry at most once (only when attempt == 0)
+                    if attempt == 0 and self.max_retries > 1:
+                        time.sleep(self.retry_delay)
                         continue
                     return None
                 
                 elif response.status_code == 404 or "not found" in response.text.lower():
+                    # Extract short message if available in response
+                    short_msg = response.text[:200].strip()
                     logger.error(
-                        "Configured model '%s' was not found on OpenRouter (HTTP %d). "
+                        "Configured model '%s' was not found on LLM endpoint (HTTP %d: %s). "
                         "Free model IDs change periodically; check availability at https://openrouter.ai/models "
-                        "and update OPENROUTER_MODEL in your .env file.",
-                        self.model, response.status_code
+                        "or your local server and update OPENROUTER_MODEL in your .env file.",
+                        self.model, response.status_code, short_msg
                     )
                     return None
                 
                 else:
-                    logger.error(f"API request failed: {response.status_code} - {response.text}")
+                    short_msg = response.text[:200].strip()
+                    logger.error(f"LLM API request failed: HTTP {response.status_code} - {short_msg}")
                     if attempt < self.max_retries - 1:
                         time.sleep(self.retry_delay)
                         continue
                     return None
                     
             except requests.exceptions.Timeout:
-                logger.warning(f"Request timeout, attempt {attempt + 1}/{self.max_retries}")
+                logger.warning(f"Request timeout after {self.timeout}s, attempt {attempt + 1}/{self.max_retries}")
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay)
                     continue

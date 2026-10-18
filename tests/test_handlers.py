@@ -155,5 +155,145 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("File too large" in r for r in replies))
         mock_response.close.assert_called()
 
+class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
+    """Test question answering workflows, footer suppression, and summary handling."""
+    
+    def setUp(self):
+        self.config = DummyConfig()
+        self.mock_doc_store = Mock()
+        self.mock_embedder = Mock()
+        self.mock_retriever = Mock()
+        self.mock_llm = Mock()
+        
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=self.mock_doc_store,
+            embedding_generator=self.mock_embedder,
+            retriever=self.mock_retriever,
+            openrouter_client=self.mock_llm,
+            config=self.config
+        )
+    
+    async def test_no_source_footer_on_generation_failure(self):
+        """When LLM generation fails (returns None), no source footer should be appended."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{'id': 1, 'filename': 'doc.pdf'}]
+        chunks = [
+            {'content': 'Some content', 'filename': 'doc.pdf', 'page_start': 1, 'page_end': 1, 'chunk_index': 0}
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+        
+        # LLM generation fails (returns None)
+        self.mock_llm.generate_answer.return_value = None
+        self.mock_llm.validate_response.return_value = (
+            "I'm sorry, I couldn't generate a response at this time. Please try again."
+        )
+        
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "What is the algorithm?"
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+        
+        await self.handlers.handle_message(update, context)
+        
+        update.message.reply_text.assert_called_once()
+        reply = update.message.reply_text.call_args[0][0]
+        self.assertIn("couldn't generate a response", reply)
+        self.assertNotIn("Sources:", reply)
+    
+    async def test_summary_query_skips_cutoff_and_uses_first_chunks(self):
+        """Summary/overview queries should bypass retriever cutoff and take first ~8 chunks in page order."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{'id': 1, 'filename': 'book.pdf'}]
+        
+        # 10 chunks out of order
+        unordered_chunks = [
+            {'content': f'Chunk {i}', 'filename': 'book.pdf', 'page_start': 10 - i, 'page_end': 10 - i, 'chunk_index': 10 - i}
+            for i in range(10)
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = unordered_chunks
+        self.mock_retriever.format_context.return_value = "Summary context"
+        self.mock_llm.generate_answer.return_value = "This document is about Python programming."
+        self.mock_llm.validate_response.return_value = "This document is about Python programming."
+        
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "Can you summarize this document for me?"
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+        
+        await self.handlers.handle_message(update, context)
+        
+        # Retriever.retrieve should NOT be called because cutoff was skipped
+        self.mock_retriever.retrieve.assert_not_called()
+        self.mock_embedder.generate_query_embedding.assert_not_called()
+        
+        # format_context should receive 8 chunks sorted by page_start
+        self.mock_retriever.format_context.assert_called_once()
+        passed_chunks = self.mock_retriever.format_context.call_args[0][0]
+        self.assertEqual(len(passed_chunks), 8)
+        self.assertEqual(passed_chunks[0]['page_start'], 1)
+        self.assertEqual(passed_chunks[-1]['page_start'], 8)
+        
+        update.message.reply_text.assert_called_once()
+        reply = update.message.reply_text.call_args[0][0]
+        self.assertIn("This document is about Python programming.", reply)
+        self.assertIn("Sources:", reply)
+    
+    def test_is_summary_query_patterns(self):
+        """Test _is_summary_query detects common summary/overview phrasings."""
+        summary_queries = [
+            "summarize this document",
+            "Give me a summary",
+            "Can I get an overview of the book?",
+            "What is this document about?",
+            "What is the book about?",
+            "what is this pdf about",
+            "Brief overview of topics",
+            "What are the main points?"
+        ]
+        for q in summary_queries:
+            self.assertTrue(self.handlers._is_summary_query(q), f"Failed to detect summary query: {q}")
+            
+        non_summary_queries = [
+            "What is a variable?",
+            "How do for loops work in Python?",
+            "Explain recursion on page 42"
+        ]
+        for q in non_summary_queries:
+            self.assertFalse(self.handlers._is_summary_query(q), f"Incorrectly flagged non-summary query: {q}")
+
+    async def test_send_typing_action_retries_on_timeout(self):
+        """Test _send_typing_action retries once when telegram.error.TimedOut occurs."""
+        from telegram.error import TimedOut
+        context = Mock()
+        # First call fails with TimedOut, second succeeds
+        context.bot.send_chat_action = AsyncMock(side_effect=[TimedOut("Connection timed out"), None])
+        
+        await self.handlers._send_typing_action(context, 12345)
+        
+        self.assertEqual(context.bot.send_chat_action.call_count, 2)
+
+    async def test_reply_with_retry_on_network_error(self):
+        """Test _reply_with_retry retries reply_text once if NetworkError is raised."""
+        from telegram.error import NetworkError
+        update = Mock()
+        # First attempt fails with NetworkError, retry succeeds
+        update.message.reply_text = AsyncMock(side_effect=[NetworkError("Connection reset"), None])
+        
+        await self.handlers._reply_with_retry(update, "Hello world")
+        
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        update.message.reply_text.assert_called_with("Hello world")
+
 if __name__ == '__main__':
     unittest.main()

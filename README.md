@@ -21,8 +21,7 @@ Retrieval was evaluated on a 70-question set over *Think Python 2e*, a smaller s
 
 ## Screenshot
 
-![TeleRAG Telegram Answer](docs/screenshots/telegram-answer.png)  
-*(Screenshot placeholder: add your Telegram conversation screenshot at `docs/screenshots/telegram-answer.png`)*
+![TeleRAG Telegram Answer](docs/screenshots/telegram-answer.png)
 
 ---
 
@@ -58,6 +57,9 @@ Using a balanced, stratified split (`eval/split.json`, seed=42; 35 DEV, 35 TEST;
 | **Cross-Encoder ($T=-2.80$)**| TEST (N=35) | **100.0%** (25/25) | **100.0%** (5/5) | **40.0%** (2/5) | Rejects 2/5 hard negatives with 0/25 (0.0%) recall loss |
 
 *Limitations of the experiment*: While the cross-encoder gate rejected 2/5 hard negatives without penalizing answerable recall on TEST, the dev-tuned threshold may be overfit to the dev sample, the test sample size is small (5 hard test queries), and cross-encoder inference adds ~2s query latency on CPU. Dense cosine gating remains the default gatekeeper, with hybrid and reranking configurable via `RETRIEVAL_MODE`.
+
+> [!NOTE]
+> **End-to-End Latency**: The retrieval benchmarks above report indexing and retrieval search latency (57 ms for dense/hybrid, 2.0s with reranking). End-to-end generation depends on the model host: generating answers locally with a 7B parameter model (e.g. `qwen2:7b` on Ollama) on CPU typically takes roughly 1 to 2 minutes per answer, during which the bot streams typing indicators in a non-blocking worker thread. For cloud providers (OpenRouter), free hosted models return in a few seconds but can be rate-limited or retired over time.
 
 ---
 
@@ -121,8 +123,9 @@ User (Telegram Client)
 * **Cross-Encoder Reranking**: Optional deep re-ordering using `cross-encoder/ms-marco-MiniLM-L-6-v2`.
 * **Relevance Cutoff Gatekeeper**: Enforces a dense cosine threshold (`SIMILARITY_THRESHOLD=0.3`) before calling the LLM. If no chunk meets the threshold, the bot abstains. This reduces answers not supported by the document; does not eliminate hallucination.
 
-### 4. LLM Generation via OpenRouter
-* **Model Selection**: Connected to OpenRouter API. Free model names change often; pick a model marked free there and set OPENROUTER_MODEL: https://openrouter.ai/models
+### 4. LLM Generation via Local Ollama or OpenRouter
+* **Local Inference (Default)**: Preconfigured for local [Ollama](https://ollama.ai) at `http://localhost:11434/v1` using locally hosted models (e.g. `qwen2:7b` via `ollama list`) with zero external API dependencies or fees.
+* **Hosted Alternative (OpenRouter)**: Can optionally route to OpenRouter (`https://openrouter.ai/api/v1`) by supplying an `OPENROUTER_API_KEY` and selecting an available model from [https://openrouter.ai/models](https://openrouter.ai/models) (free model IDs rotate periodically and may become congested or retired).
 * **Grounded Prompts**: Dynamically compiles top-$k$ passages into concise prompts with explicit refusal instructions.
 
 ### 5. Multi-User Isolation & Session Control
@@ -148,13 +151,34 @@ pip install -r requirements.txt -r requirements-dev.txt
 ```bash
 cp .env.example .env
 ```
-Fill in your credentials in `.env`:
+By default, TeleRAG runs completely offline using a local Ollama server:
 ```ini
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_from_botfather
-OPENROUTER_API_KEY=your_openrouter_api_key
-OPENROUTER_MODEL=qwen/qwen3.8-27b:free
+LLM_BASE_URL=http://localhost:11434/v1
+OPENROUTER_MODEL=qwen2:7b
 RETRIEVAL_MODE=hybrid
 ```
+
+#### Run fully local with Ollama (Default)
+TeleRAG supports fully offline, local inference via [Ollama](https://ollama.ai)'s OpenAI-compatible endpoint. No API key is required when pointing to localhost:
+
+1. Install Ollama and pull your chosen model (e.g., Qwen 2):
+   ```bash
+   ollama pull qwen2:7b
+   ```
+2. Verify available models with `ollama list` and specify your model name in `OPENROUTER_MODEL` (e.g. `qwen2:7b`).
+3. Start Ollama (`ollama serve`) and run the bot. Requests execute completely locally with an unblocked worker thread and generous 300s timeout tailored for CPU inference.
+
+#### Alternative: Hosted Inference via OpenRouter
+To route to OpenRouter instead of running locally:
+1. Obtain an API key from [OpenRouter](https://openrouter.ai/keys).
+2. Choose an active free model from [https://openrouter.ai/models](https://openrouter.ai/models) (note: free hosted model endpoints rotate frequently, and may become rate-limited or retired).
+3. Update `.env`:
+   ```ini
+   LLM_BASE_URL=https://openrouter.ai/api/v1
+   OPENROUTER_API_KEY=your_openrouter_api_key_here
+   OPENROUTER_MODEL=your_chosen_model_slug
+   ```
 
 ### 3. Verify & Run Test Suite
 ```bash
@@ -212,10 +236,12 @@ python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golde
 
 1. **Hallucination Reduction, Not Elimination**: The relevance threshold ($\tau = 0.3$) and prompt instructions reduce unsupported answers, but an LLM can still misinterpret retrieved context or hallucinate nuances.
 2. **Hard Negative Abstention**: While bi-encoder cosine gating stops 100% of off-topic queries, it does not stop in-domain unanswerable queries (e.g., asking about `asyncio` on a basic Python textbook), where chunks score 0.35–0.48. The cross-encoder threshold experiment rejected 2/5 on test, but was tuned on a small sample.
-3. **Cross-Encoder Latency**: Reranking improves Hit@1 by +10.0 pp but increases query latency to ~2s on CPU compared to ~57 ms for dense or hybrid retrieval.
-4. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection, leaving a theoretical window for DNS rebinding attacks.
-5. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `PyPDF2`.
-6. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use rather than untrusted multi-tenant host environments.
+3. **Cross-Encoder & Local LLM Latency**: Reranking improves Hit@1 by +10.0 pp but adds ~2s on CPU. Running a local 7B parameter LLM on CPU takes roughly 1 to 2 minutes per answer; TeleRAG offloads this work to a background worker thread with periodic typing signals so the Telegram polling loop never times out.
+4. **Free Hosted Model Lifecycle Volatility**: Third-party free endpoints on OpenRouter frequently rotate, become rate-limited, or transition to paid slugs (e.g. returning HTTP 404/429), or can be retired entirely. The startup diagnostic catches unavailable models early.
+5. **Document-Level Summaries**: For general summary/overview queries, the bot samples the first ~8 chunks in document page order rather than performing hierarchical map-reduce summarization across very long books.
+6. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection, leaving a theoretical window for DNS rebinding attacks.
+7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `PyPDF2`.
+8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use rather than untrusted multi-tenant host environments.
 
 ---
 

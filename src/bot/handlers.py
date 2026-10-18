@@ -11,6 +11,8 @@ from urllib.parse import urlparse, urljoin
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ChatAction
+from telegram.error import TimedOut, NetworkError
+import asyncio
 import logging
 
 logger = logging.getLogger(__name__)
@@ -80,7 +82,7 @@ class BotHandlers:
             await update.message.reply_text(message)
             
         except Exception as e:
-            logger.error(f"Failed to list documents: {e}")
+            logger.error(f"Failed to list documents [{type(e).__name__}]: {e}")
             await update.message.reply_text("❌ Failed to retrieve document list.")
     
     async def delete_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -102,7 +104,7 @@ class BotHandlers:
                 await update.message.reply_text(f"❌ Document not found: {filename}")
                 
         except Exception as e:
-            logger.error(f"Failed to delete document: {e}")
+            logger.error(f"Failed to delete document [{type(e).__name__}]: {e}")
             await update.message.reply_text("❌ Failed to delete document.")
     
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -118,7 +120,7 @@ class BotHandlers:
                 await update.message.reply_text("📭 You don't have any documents to delete.")
                 
         except Exception as e:
-            logger.error(f"Failed to clear documents: {e}")
+            logger.error(f"Failed to clear documents [{type(e).__name__}]: {e}")
             await update.message.reply_text("❌ Failed to clear documents.")
     
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -203,7 +205,7 @@ class BotHandlers:
             )
             
         except Exception as e:
-            logger.error(f"Failed to process document: {e}")
+            logger.error(f"Failed to process document [{type(e).__name__}]: {e}")
             await update.message.reply_text(
                 f"❌ Failed to process PDF: {str(e)}"
             )
@@ -238,47 +240,136 @@ class BotHandlers:
             )
             return
         
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, 
-                                          action=ChatAction.TYPING)
+        await self._send_typing_action(context, update.effective_chat.id)
+        
+        # Periodic typing loop while waiting for blocking retrieval and model inference
+        stop_typing = asyncio.Event()
+        typing_task = asyncio.create_task(self._keep_typing(context, update.effective_chat.id, stop_typing))
         
         try:
-            # Get all user chunks with embeddings
-            chunks = self.document_store.get_user_chunks_with_embeddings(user_id)
+            # Run blocking document loading, embedding, retrieval, and LLM generation in worker thread
+            def _blocking_pipeline():
+                # Get all user chunks with embeddings
+                user_chunks = self.document_store.get_user_chunks_with_embeddings(user_id)
+                if not user_chunks:
+                    return "NO_CHUNKS", None, None
+                
+                # Check if this is a summary/overview question
+                if self._is_summary_query(question):
+                    logger.info(f"Summary/overview query detected for user {user_id}: '{question[:50]}'")
+                    sorted_chunks = sorted(
+                        user_chunks,
+                        key=lambda c: (
+                            c.get('page_start') if c.get('page_start') is not None else (c.get('page') or 0),
+                            c.get('chunk_index', 0)
+                        )
+                    )
+                    retrieved_chunks = sorted_chunks[:8]
+                else:
+                    query_embedding = self.embedding_generator.generate_query_embedding(question)
+                    retrieved_chunks = self.retriever.retrieve(
+                        query=question, query_embedding=query_embedding, chunks=user_chunks
+                    )
+                
+                if not retrieved_chunks:
+                    return "NO_RELEVANT", None, None
+                
+                context_text = self.retriever.format_context(retrieved_chunks)
+                raw_ans = self.openrouter_client.generate_answer(question, context_text)
+                return "SUCCESS", raw_ans, retrieved_chunks
+
+            status, raw_answer, relevant_chunks = await asyncio.to_thread(_blocking_pipeline)
             
-            if not chunks:
-                await update.message.reply_text("❌ No document content available.")
+            # Stop typing indicator
+            stop_typing.set()
+            await typing_task
+            
+            if status == "NO_CHUNKS":
+                await self._reply_with_retry(update, "❌ No document content available.")
                 return
             
-            # Generate query embedding
-            query_embedding = self.embedding_generator.generate_query_embedding(question)
-            
-            # Search for relevant chunks using configured retrieval mode
-            relevant_chunks = self.retriever.retrieve(query=question, query_embedding=query_embedding, chunks=chunks)
-            
-            if not relevant_chunks:
-                await update.message.reply_text(
+            if status == "NO_RELEVANT":
+                await self._reply_with_retry(
+                    update,
                     "🤔 I couldn't find relevant information in your documents to answer this question."
                 )
                 return
             
-            # Format context
-            context_text = self.retriever.format_context(relevant_chunks)
+            if not raw_answer:
+                logger.warning(f"LLM generation failed for question: {question[:50]}...")
+                answer = self.openrouter_client.validate_response(None)
+                await self._reply_with_retry(update, answer)
+                return
             
-            # Generate answer
-            answer = self.openrouter_client.generate_answer(question, context_text)
-            answer = self.openrouter_client.validate_response(answer)
-            
-            # Append verified programmatic source footer
+            answer = self.openrouter_client.validate_response(raw_answer)
             footer = self._format_source_footer(relevant_chunks)
             final_response = f"{answer}{footer}"
             
-            await update.message.reply_text(final_response)
+            await self._reply_with_retry(update, final_response)
             
         except Exception as e:
-            logger.error(f"Failed to answer question: {e}")
-            await update.message.reply_text(
+            stop_typing.set()
+            try:
+                await typing_task
+            except Exception:
+                pass
+            logger.error(f"Failed to answer question [{type(e).__name__}]: {e}")
+            await self._reply_with_retry(
+                update,
                 "❌ Sorry, I encountered an error while processing your question. Please try again."
             )
+
+    async def _send_typing_action(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+        """Send chat typing action with retry on transient network errors."""
+        try:
+            await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+        except (TimedOut, NetworkError) as e:
+            logger.warning(f"Typing action timed out/failed [{type(e).__name__}]: {e}. Retrying once...")
+            try:
+                await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+            except Exception as retry_err:
+                logger.warning(f"Typing action retry failed [{type(retry_err).__name__}]: {retry_err}")
+        except Exception as e:
+            logger.warning(f"Typing action failed [{type(e).__name__}]: {e}")
+
+    async def _keep_typing(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int, stop_event: asyncio.Event):
+        """Periodically refresh typing action every 4 seconds until stop_event is set."""
+        while not stop_event.is_set():
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=4.0)
+            except asyncio.TimeoutError:
+                if not stop_event.is_set():
+                    await self._send_typing_action(context, chat_id)
+
+    async def _reply_with_retry(self, update: Update, text: str):
+        """Send message reply with automatic single retry on TimedOut or NetworkError."""
+        try:
+            await update.message.reply_text(text)
+        except (TimedOut, NetworkError) as e:
+            logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}. Retrying once...")
+            await update.message.reply_text(text)
+            
+    def _is_summary_query(self, query: str) -> bool:
+        """Check if query is asking for a summary, overview, or document-level explanation."""
+        q = query.lower().strip()
+        patterns = [
+            "summarize",
+            "summary",
+            "overview",
+            "what is this document about",
+            "what is this book about",
+            "what is the document about",
+            "what is the book about",
+            "what is this pdf about",
+            "what is the pdf about",
+            "tell me about this document",
+            "tell me about this pdf",
+            "explain this document",
+            "brief overview",
+            "main points",
+            "key takeaways"
+        ]
+        return any(pattern in q for pattern in patterns)
     
     def _format_source_footer(self, chunks: List[Dict[str, Any]]) -> str:
         """Format verified sources footer from retrieved chunks."""
@@ -563,21 +654,21 @@ class BotHandlers:
                 f"You can now ask questions about this document!"
             )
             
-        except requests.exceptions.Timeout:
-            logger.error(f"Timeout downloading from URL: {url}")
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Timeout downloading from URL [{type(e).__name__}]: {e}")
             await update.message.reply_text(
                 "❌ Download timeout. The file took too long to download.\n"
                 "Please try again or use a different link."
             )
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to download from URL: {e}")
+            logger.error(f"Failed to download from URL [{type(e).__name__}]: {e}")
             await update.message.reply_text(
                 f"❌ Failed to download PDF from URL.\n"
                 f"Error: {str(e)}\n\n"
                 f"Please check the URL and try again."
             )
         except Exception as e:
-            logger.error(f"Failed to process URL upload: {e}")
+            logger.error(f"Failed to process URL upload [{type(e).__name__}]: {e}")
             await update.message.reply_text(
                 f"❌ Failed to process PDF: {str(e)}"
             )
@@ -591,4 +682,6 @@ class BotHandlers:
     
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle errors."""
-        logger.error(f"Update {update} caused error {context.error}")
+        err = context.error
+        err_type = type(err).__name__ if err else "UnknownError"
+        logger.error(f"Update caused error [{err_type}]: {err}")

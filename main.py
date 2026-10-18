@@ -27,6 +27,11 @@ def setup_logging(config):
             logging.StreamHandler()
         ]
     )
+    
+    # Silence verbose library loggers that could print bot tokens in request URLs
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("telegram").setLevel(logging.WARNING)
+    logging.getLogger("telegram.ext").setLevel(logging.WARNING)
 
 def main():
     """Main application entry point."""
@@ -59,7 +64,27 @@ def main():
         openrouter_client = OpenRouterClient(api_key=config.openrouter_api_key,
                                             model=config.openrouter_model,
                                             max_retries=config.max_retries,
-                                            retry_delay=config.retry_delay)
+                                            retry_delay=config.retry_delay,
+                                            base_url=config.llm_base_url,
+                                            timeout=300.0)
+        
+        # Check LLM availability on startup
+        logger.info(f"Checking LLM model availability ({config.openrouter_model} at {config.llm_base_url})...")
+        is_ok, status_code, reason = openrouter_client.check_availability()
+        if is_ok:
+            print("LLM OK")
+            logger.info("LLM OK: Model is available and responding.")
+        else:
+            print(f"LLM Check Failed: HTTP {status_code} - {reason}")
+            logger.warning(f"LLM Check Failed: HTTP {status_code} - {reason}")
+            if status_code in (404, 429):
+                hint = (
+                    "Hint: Free model names change often on OpenRouter. "
+                    "Pick another free model from https://openrouter.ai/models "
+                    "or verify your local Ollama model name, and update OPENROUTER_MODEL in your .env file."
+                )
+                print(hint)
+                logger.warning(hint)
         
         # Initialize bot handlers
         bot_handlers = BotHandlers(
@@ -72,8 +97,17 @@ def main():
             config=config
         )
         
-        # Create application
-        application = Application.builder().token(config.telegram_bot_token).build()
+        # Create application with generous timeouts for slow local LLMs / CPU inference
+        application = (
+            Application.builder()
+            .token(config.telegram_bot_token)
+            .connect_timeout(30.0)
+            .read_timeout(30.0)
+            .write_timeout(30.0)
+            .pool_timeout(30.0)
+            .get_updates_read_timeout(30.0)
+            .build()
+        )
         
         # Register handlers
         application.add_handler(CommandHandler("start", bot_handlers.start_command))

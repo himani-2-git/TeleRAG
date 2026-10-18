@@ -196,5 +196,71 @@ class TestOpenRouterClient(unittest.TestCase):
         # Verify it didn't retry 3 times on 404
         self.assertEqual(mock_post.call_count, 1)
 
+    @patch('requests.post')
+    def test_check_availability_success(self, mock_post):
+        """Test check_availability when model is available (HTTP 200)."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+        
+        is_ok, status_code, reason = self.client.check_availability()
+        self.assertTrue(is_ok)
+        self.assertEqual(status_code, 200)
+        self.assertEqual(reason, "OK")
+
+    @patch('requests.post')
+    def test_check_availability_failure(self, mock_post):
+        """Test check_availability when model returns 404."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.text = '{"error": {"message": "Model not found"}}'
+        mock_post.return_value = mock_response
+        
+        is_ok, status_code, reason = self.client.check_availability()
+        self.assertFalse(is_ok)
+        self.assertEqual(status_code, 404)
+        self.assertIn("Model not found", reason)
+
+    @patch('requests.post')
+    def test_custom_llm_base_url_and_no_key(self, mock_post):
+        """Test client with custom LLM base URL (e.g. Ollama localhost) without an API key."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'choices': [{'message': {'content': 'Local answer'}}]
+        }
+        mock_post.return_value = mock_response
+        
+        client = OpenRouterClient(api_key="", model="qwen2:7b", base_url="http://localhost:11434/v1")
+        self.assertEqual(client.base_url, "http://localhost:11434/v1/chat/completions")
+        
+        messages = [{'role': 'user', 'content': 'Test local'}]
+        response = client.send_request(messages)
+        
+        self.assertEqual(response, 'Local answer')
+        mock_post.assert_called_once()
+        headers = mock_post.call_args[1]['headers']
+        self.assertNotIn("Authorization", headers)
+        self.assertEqual(mock_post.call_args[1]['timeout'], 300.0)
+
+    @patch('requests.post')
+    def test_rate_limit_429_retries_at_most_once(self, mock_post):
+        """Test that HTTP 429 rate limit is retried at most once and does not loop repeatedly."""
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_response.text = '{"error": {"message": "Rate limit reached"}}'
+        mock_post.return_value = mock_response
+        
+        client = OpenRouterClient(api_key="key", model="qwen", max_retries=5, retry_delay=0.01)
+        messages = [{'role': 'user', 'content': 'Test 429'}]
+        
+        with patch('time.sleep') as mock_sleep:
+            response = client.send_request(messages)
+            
+        self.assertIsNone(response)
+        # Should attempt initial request + at most 1 retry = 2 total requests, not 5
+        self.assertEqual(mock_post.call_count, 2)
+        mock_sleep.assert_called_once()
+
 if __name__ == '__main__':
     unittest.main()

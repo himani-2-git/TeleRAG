@@ -1,5 +1,6 @@
 """Tests for bot handlers and security validations."""
 
+import asyncio
 import unittest
 from unittest.mock import Mock, AsyncMock, patch
 from src.bot.handlers import BotHandlers
@@ -7,6 +8,7 @@ from src.bot.handlers import BotHandlers
 class DummyConfig:
     """Mock configuration for testing."""
     max_file_size_mb = 20
+    llm_model = "qwen2.5:3b"
 
 class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
     """Test SSRF validation and redirect handling in BotHandlers."""
@@ -20,7 +22,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
             document_store=Mock(),
             embedding_generator=Mock(),
             retriever=Mock(),
-            openrouter_client=Mock(),
+            llm_client=Mock(),
             config=self.config
         )
     
@@ -171,7 +173,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             document_store=self.mock_doc_store,
             embedding_generator=self.mock_embedder,
             retriever=self.mock_retriever,
-            openrouter_client=self.mock_llm,
+            llm_client=self.mock_llm,
             config=self.config
         )
     
@@ -193,20 +195,25 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             "I'm sorry, I couldn't generate a response at this time. Please try again."
         )
         
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
         update = Mock()
         update.effective_user.id = user_id
         update.effective_chat.id = 456
         update.message.text = "What is the algorithm?"
-        update.message.reply_text = AsyncMock()
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
         
         await self.handlers.handle_message(update, context)
         
-        update.message.reply_text.assert_called_once()
-        reply = update.message.reply_text.call_args[0][0]
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        self.assertEqual("Thinking...", update.message.reply_text.call_args_list[0][0][0])
+        reply = update.message.reply_text.call_args_list[1][0][0]
         self.assertIn("couldn't generate a response", reply)
         self.assertNotIn("Sources:", reply)
+        self.assertNotIn("Answered in", reply)
+        mock_thinking_msg.delete.assert_called_once()
     
     async def test_summary_query_skips_cutoff_and_uses_first_chunks(self):
         """Summary/overview queries should bypass retriever cutoff and take first ~8 chunks in page order."""
@@ -223,11 +230,13 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.mock_llm.generate_answer.return_value = "This document is about Python programming."
         self.mock_llm.validate_response.return_value = "This document is about Python programming."
         
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
         update = Mock()
         update.effective_user.id = user_id
         update.effective_chat.id = 456
         update.message.text = "Can you summarize this document for me?"
-        update.message.reply_text = AsyncMock()
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
         
@@ -244,10 +253,13 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(passed_chunks[0]['page_start'], 1)
         self.assertEqual(passed_chunks[-1]['page_start'], 8)
         
-        update.message.reply_text.assert_called_once()
-        reply = update.message.reply_text.call_args[0][0]
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        self.assertEqual("Thinking...", update.message.reply_text.call_args_list[0][0][0])
+        reply = update.message.reply_text.call_args_list[1][0][0]
         self.assertIn("This document is about Python programming.", reply)
         self.assertIn("Sources:", reply)
+        self.assertIn("Answered in", reply)
+        mock_thinking_msg.delete.assert_called_once()
     
     def test_is_summary_query_patterns(self):
         """Test _is_summary_query detects common summary/overview phrasings."""
@@ -294,6 +306,171 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         
         self.assertEqual(update.message.reply_text.call_count, 2)
         update.message.reply_text.assert_called_with("Hello world")
+
+    async def test_answer_sent_as_new_reply_and_thinking_deleted_with_timing_footer(self):
+        """Answer is delivered as a new reply, thinking message is deleted, and timing footer is appended."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{'id': 1, 'filename': 'doc.pdf'}]
+        chunks = [
+            {'content': 'Test content', 'filename': 'doc.pdf', 'page_start': 1, 'page_end': 1, 'chunk_index': 0}
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Test content"
+        self.mock_llm.generate_answer.return_value = "Test answer"
+        self.mock_llm.validate_response.return_value = "Test answer"
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "What is this?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        # First reply is Thinking...
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        first_call = update.message.reply_text.call_args_list[0][0][0]
+        self.assertEqual("Thinking...", first_call)
+
+        # Second reply is final answer with Sources and Answered in footer
+        final_call = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("Test answer", final_call)
+        self.assertIn("Sources:", final_call)
+        self.assertIn("Answered in", final_call)
+        self.assertIn("with qwen2.5:3b", final_call)
+
+        # Thinking message deleted
+        mock_thinking_msg.delete.assert_called_once()
+
+    async def test_queue_position_message_when_semaphore_busy(self):
+        """When the LLM semaphore is busy, immediately reply with queue position."""
+        user_id = 999
+        self.mock_doc_store.list_documents.return_value = [{'id': 1, 'filename': 'doc.pdf'}]
+        chunks = [
+            {'content': 'Test chunk', 'filename': 'doc.pdf', 'page_start': 1, 'page_end': 1, 'chunk_index': 0}
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Context text"
+        self.mock_llm.generate_answer.return_value = "Grounded response"
+        self.mock_llm.validate_response.return_value = "Grounded response"
+
+        mock_queued_msg = Mock()
+        mock_queued_msg.delete = AsyncMock()
+
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 888
+        update.message.text = "What is the result?"
+        update.message.reply_text = AsyncMock(return_value=mock_queued_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        # Simulate semaphore locked and 1 active request ahead
+        await self.handlers.llm_semaphore.acquire()
+        self.handlers.active_requests = 1
+
+        # Release semaphore after brief sleep to allow handle_message to finish
+        async def release_later():
+            await asyncio.sleep(0.01)
+            self.handlers.llm_semaphore.release()
+        asyncio.create_task(release_later())
+
+        await self.handlers.handle_message(update, context)
+
+        # 1. Verify queue notice was sent first (active_requests ahead was 1)
+        reply_calls = [call.args[0] for call in update.message.reply_text.call_args_list]
+        self.assertTrue(any("Queued: 1 question(s) ahead of you. I'll reply when it's your turn." in r for r in reply_calls))
+
+        # 2. Verify answer delivered as a new reply
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        final_reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("Grounded response", final_reply)
+        self.assertIn("Sources:", final_reply)
+        self.assertIn("Answered in", final_reply)
+
+        # 3. Queued message was deleted
+        mock_queued_msg.delete.assert_called_once()
+
+    async def test_insufficient_context_response_suppresses_sources_footer(self):
+        """When the LLM replies with INSUFFICIENT_CONTEXT or indicates missing context, suppress Sources footer."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{'id': 1, 'filename': 'guide.pdf'}]
+        chunks = [
+            {'content': 'Some unrelated programming tips.', 'filename': 'guide.pdf', 'page_start': 5, 'page_end': 5, 'chunk_index': 0}
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+        
+        # Model returns INSUFFICIENT_CONTEXT
+        self.mock_llm.generate_answer.return_value = "INSUFFICIENT_CONTEXT"
+        self.mock_llm.validate_response.return_value = "INSUFFICIENT_CONTEXT"
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "How do I bake sourdough bread?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("I couldn't find relevant information in your documents to answer this question.", reply)
+        self.assertNotIn("Sources:", reply)
+        self.assertNotIn("Answered in", reply)
+        self.assertNotIn("guide.pdf", reply)
+        mock_thinking_msg.delete.assert_called_once()
+
+    async def test_normal_answer_includes_sources_footer(self):
+        """A normal grounded LLM answer must still retain its verified Sources footer."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{'id': 1, 'filename': 'python_tutorial.pdf'}]
+        chunks = [
+            {'content': 'Functions are defined using the def keyword.', 'filename': 'python_tutorial.pdf', 'page_start': 12, 'page_end': 13, 'chunk_index': 2}
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Context text"
+        
+        # Model returns a valid answer
+        self.mock_llm.generate_answer.return_value = "In Python, functions are defined using the def keyword."
+        self.mock_llm.validate_response.return_value = "In Python, functions are defined using the def keyword."
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "How do you define a function in Python?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("In Python, functions are defined using the def keyword.", reply)
+        self.assertIn("Sources:", reply)
+        self.assertIn("python_tutorial.pdf (p. 12-13)", reply)
+        self.assertIn("Answered in", reply)
+        mock_thinking_msg.delete.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

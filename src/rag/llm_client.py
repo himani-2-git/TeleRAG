@@ -1,4 +1,4 @@
-"""OpenRouter API client for LLM interactions."""
+"""LLM client for chat completion interactions."""
 
 import requests
 from typing import List, Dict, Any, Optional
@@ -7,28 +7,31 @@ import time
 
 logger = logging.getLogger(__name__)
 
-class OpenRouterClient:
-    """Client for OpenRouter API."""
+class LLMClient:
+    """Client for OpenAI-compatible LLM endpoints."""
     
-    def __init__(self, api_key: str = "", model: str = "qwen2:7b",
+    def __init__(self, api_key: str = "", model: str = "qwen2.5:3b",
                  max_retries: int = 3, retry_delay: float = 1.0,
                  base_url: str = "http://localhost:11434/v1",
-                 timeout: float = 300.0):
-        """Initialize OpenRouter / LLM client.
+                 timeout: float = 300.0,
+                 max_tokens: int = 300):
+        """Initialize LLM client.
         
         Args:
-            api_key: OpenRouter API key (optional for local endpoints)
+            api_key: API key (optional for local endpoints)
             model: Model identifier to use
             max_retries: Maximum number of retry attempts
             retry_delay: Initial delay between retries in seconds
             base_url: Base URL for LLM API (chat/completions endpoint)
             timeout: Request timeout in seconds (defaults to 300s for local models)
+            max_tokens: Maximum tokens in generated completion (default 300)
         """
         self.api_key = api_key
         self.model = model
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.timeout = timeout
+        self.max_tokens = max_tokens
         
         # Ensure base_url ends with /chat/completions
         clean_url = base_url.rstrip("/")
@@ -68,12 +71,14 @@ class OpenRouterClient:
             return False, None, str(e)
     
     def send_request(self, messages: List[Dict[str, str]], 
-                    temperature: float = 0.7) -> Optional[str]:
-        """Send chat completion request to OpenRouter or local LLM server.
+                    temperature: float = 0.7,
+                    max_tokens: Optional[int] = None) -> Optional[str]:
+        """Send chat completion request to LLM server.
         
         Args:
             messages: List of message dictionaries with 'role' and 'content'
             temperature: Sampling temperature
+            max_tokens: Optional token limit override (defaults to self.max_tokens)
             
         Returns:
             Generated response text or None if failed
@@ -82,10 +87,12 @@ class OpenRouterClient:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         
+        tokens_limit = max_tokens if max_tokens is not None else self.max_tokens
         payload = {
             "model": self.model,
             "messages": messages,
-            "temperature": temperature
+            "temperature": temperature,
+            "max_tokens": tokens_limit
         }
         
         for attempt in range(self.max_retries):
@@ -118,8 +125,7 @@ class OpenRouterClient:
                     short_msg = response.text[:200].strip()
                     logger.error(
                         "Configured model '%s' was not found on LLM endpoint (HTTP %d: %s). "
-                        "Free model IDs change periodically; check availability at https://openrouter.ai/models "
-                        "or your local server and update OPENROUTER_MODEL in your .env file.",
+                        "Verify model availability on your LLM server and update LLM_MODEL in your .env file.",
                         self.model, response.status_code, short_msg
                     )
                     return None
@@ -179,8 +185,8 @@ class OpenRouterClient:
                 "You are a helpful assistant that answers questions based on provided document context. "
                 "Use only the information from the context to answer questions. "
                 "When citing information, cite the source in the format [<filename>, p. <page>]. "
-                "If the context doesn't contain relevant information, say so clearly. "
-                "Be concise and accurate."
+                "When the provided context does not contain the answer, reply with exactly: INSUFFICIENT_CONTEXT (and nothing else). "
+                "Be concise and accurate. Answer in at most 150 words unless the user explicitly asks for detail."
             )
         }
         

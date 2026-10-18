@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 from src.rag.embeddings import EmbeddingGenerator
 from src.rag.retriever import DocumentRetriever
-from src.rag.openrouter_client import OpenRouterClient
+from src.rag.llm_client import LLMClient
 
 class TestEmbeddingGenerator(unittest.TestCase):
     """Test embedding generator."""
@@ -122,12 +122,12 @@ class TestDocumentRetriever(unittest.TestCase):
         self.assertEqual(results[1]['content'], 'Moderate similarity chunk')
         self.assertGreater(results[0]['similarity_score'], results[1]['similarity_score'])
 
-class TestOpenRouterClient(unittest.TestCase):
-    """Test OpenRouter client."""
+class TestLLMClient(unittest.TestCase):
+    """Test LLM client."""
     
     def setUp(self):
         """Set up test fixtures."""
-        self.client = OpenRouterClient(api_key="test_key", model="test_model")
+        self.client = LLMClient(api_key="test_key", model="test_model")
     
     def test_format_prompt(self):
         """Test prompt formatting."""
@@ -141,6 +141,7 @@ class TestOpenRouterClient(unittest.TestCase):
         self.assertEqual(messages[1]['role'], 'user')
         self.assertIn(question, messages[1]['content'])
         self.assertIn(context, messages[1]['content'])
+        self.assertIn("INSUFFICIENT_CONTEXT", messages[0]['content'])
     
     def test_validate_response(self):
         """Test response validation."""
@@ -180,6 +181,7 @@ class TestOpenRouterClient(unittest.TestCase):
         
         messages = [{'role': 'user', 'content': 'Test'}]
         response = self.client.send_request(messages)
+        self.assertIsNone(response)
         
     @patch('requests.post')
     def test_send_request_model_not_found(self, mock_post):
@@ -231,7 +233,7 @@ class TestOpenRouterClient(unittest.TestCase):
         }
         mock_post.return_value = mock_response
         
-        client = OpenRouterClient(api_key="", model="qwen2:7b", base_url="http://localhost:11434/v1")
+        client = LLMClient(api_key="", model="qwen2:7b", base_url="http://localhost:11434/v1")
         self.assertEqual(client.base_url, "http://localhost:11434/v1/chat/completions")
         
         messages = [{'role': 'user', 'content': 'Test local'}]
@@ -251,7 +253,7 @@ class TestOpenRouterClient(unittest.TestCase):
         mock_response.text = '{"error": {"message": "Rate limit reached"}}'
         mock_post.return_value = mock_response
         
-        client = OpenRouterClient(api_key="key", model="qwen", max_retries=5, retry_delay=0.01)
+        client = LLMClient(api_key="key", model="qwen", max_retries=5, retry_delay=0.01)
         messages = [{'role': 'user', 'content': 'Test 429'}]
         
         with patch('time.sleep') as mock_sleep:
@@ -261,6 +263,44 @@ class TestOpenRouterClient(unittest.TestCase):
         # Should attempt initial request + at most 1 retry = 2 total requests, not 5
         self.assertEqual(mock_post.call_count, 2)
         mock_sleep.assert_called_once()
+
+    @patch('requests.post')
+    def test_send_request_includes_max_tokens_and_concise_prompt(self, mock_post):
+        """Test that send_request passes max_tokens in payload and format_prompt includes 150-word constraint."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'choices': [{'message': {'content': 'Concise answer'}}]
+        }
+        mock_post.return_value = mock_response
+        
+        client = LLMClient(api_key="test_key", model="qwen2:7b", max_tokens=250)
+        messages = client.format_prompt("What is recursion?", "Context text")
+        
+        # Verify prompt instructions
+        self.assertIn("at most 150 words", messages[0]['content'])
+        
+        # Verify payload max_tokens
+        client.send_request(messages)
+        mock_post.assert_called_once()
+        sent_payload = mock_post.call_args[1]['json']
+        self.assertEqual(sent_payload['max_tokens'], 250)
+
+    def test_config_reads_llm_env_vars(self):
+        """Test that get_config reads LLM_BASE_URL, LLM_MODEL, and LLM_API_KEY from environment."""
+        import os
+        from src.config import get_config
+        
+        with patch.dict(os.environ, {
+            "TELEGRAM_BOT_TOKEN": "test_token",
+            "LLM_MODEL": "custom-model",
+            "LLM_API_KEY": "custom-key",
+            "LLM_BASE_URL": "http://localhost:11434/v1"
+        }, clear=True):
+            cfg = get_config()
+            self.assertEqual(cfg.llm_model, "custom-model")
+            self.assertEqual(cfg.llm_api_key, "custom-key")
+            self.assertEqual(cfg.llm_base_url, "http://localhost:11434/v1")
 
 if __name__ == '__main__':
     unittest.main()

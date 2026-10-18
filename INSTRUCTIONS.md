@@ -64,7 +64,7 @@ pip install -r requirements.txt -r requirements-dev.txt
 
 ## 3. API Credentials & Configuration
 
-TeleRAG requires two external services: a Telegram Bot and an OpenRouter API key.
+TeleRAG requires a Telegram Bot Token (from BotFather) and an OpenAI-compatible LLM endpoint (defaulting to local Ollama with zero external keys).
 
 ### 3.1 Create a Telegram Bot Token
 1. Open the Telegram app and search for `@BotFather`.
@@ -74,23 +74,22 @@ TeleRAG requires two external services: a Telegram Bot and an OpenRouter API key
 5. BotFather will provide an HTTP API token (format: `123456789:ABCdefGHIjklMNOpqrSTUvwxYZ`).
 6. Copy this token.
 
-### 3.2 Configure the LLM (Ollama or OpenRouter)
+### 3.2 Configure the LLM
 
 #### Option A: Local Ollama Server (Documented Default — No API key needed)
 1. Install [Ollama](https://ollama.ai) on your system.
-2. Pull a local model, such as Qwen 2:
+2. Pull a local model, such as Qwen 2.5:
    ```bash
-   ollama pull qwen2:7b
+   ollama pull qwen2.5:3b
    ```
 3. Run `ollama list` to inspect your installed models.
-4. Set `LLM_BASE_URL=http://localhost:11434/v1` and `OPENROUTER_MODEL=qwen2:7b` in `.env`.
+4. Set `LLM_BASE_URL=http://localhost:11434/v1` and `LLM_MODEL=qwen2.5:3b` in `.env`.
 
-#### Option B: OpenRouter API (Cloud Alternative)
-1. Go to [OpenRouter](https://openrouter.ai/) and register an account.
-2. Navigate to **Keys** (`openrouter.ai/keys`) and click **Create Key**.
-3. Copy your API key (format: `sk-or-v1-...`).
-4. Set `LLM_BASE_URL=https://openrouter.ai/api/v1` and paste your key into `OPENROUTER_API_KEY`.
-5. Pick an active free model from [https://openrouter.ai/models](https://openrouter.ai/models) (free model names change often) and set `OPENROUTER_MODEL`.
+#### Optional: use a hosted provider (Groq, Google AI Studio, or other endpoints)
+To route requests to a hosted OpenAI-compatible endpoint instead of running locally:
+1. Obtain an API key from your provider (e.g. Groq or Google AI Studio).
+2. Set the base URL pattern to your provider's OpenAI-compatible endpoint. Choose an active model and verify rate limits and availability.
+3. Set `LLM_BASE_URL=https://api.example.com/v1`, `LLM_API_KEY=your_api_key_here`, and `LLM_MODEL=your_chosen_model_name` in `.env`.
 
 ### 3.3 Configure `.env`
 Copy the template configuration file:
@@ -117,13 +116,13 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 # Default: Local Ollama (no key needed)
 # ===================================================================
 LLM_BASE_URL=http://localhost:11434/v1
-OPENROUTER_MODEL=qwen2:7b
+LLM_MODEL=qwen2:7b
 
-# Alternative: OpenRouter (uncomment and supply key)
-# LLM_BASE_URL=https://openrouter.ai/api/v1
-# OPENROUTER_API_KEY=your_openrouter_api_key_here
-# OPENROUTER_MODEL=<model_from_openrouter_models>
-OPENROUTER_API_KEY=
+# Optional: Hosted LLM endpoint (requires API key)
+# LLM_BASE_URL=https://api.example.com/v1
+# LLM_API_KEY=your_api_key_here
+# LLM_MODEL=your_chosen_model_name
+LLM_API_KEY=
 
 MAX_RETRIES=3
 RETRY_DELAY=1.0
@@ -136,8 +135,9 @@ MAX_FILE_SIZE_MB=20
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 EMBEDDING_MODEL=all-MiniLM-L6-v2
-TOP_K_RESULTS=5
+TOP_K_RESULTS=3
 SIMILARITY_THRESHOLD=0.3
+LLM_MAX_TOKENS=300
 
 # ===================================================================
 # Storage & Logging Paths
@@ -240,7 +240,7 @@ Once at least one document is uploaded, simply send natural language questions:
 * *"Summarize chapter 3."*
 
 #### Grounding & Abstention Behavior
-* **In-Context Queries**: If relevant chunks meet the similarity threshold (`>= 0.3`), the bot constructs a context prompt for OpenRouter and returns an answer citing retrieved page ranges. This relevance cutoff reduces answers not supported by the document; does not eliminate hallucination.
+* **In-Context Queries**: If relevant chunks meet the similarity threshold (`>= 0.3`), the bot constructs a context prompt for the LLM and returns an answer citing retrieved page ranges. This relevance cutoff reduces answers not supported by the document; does not eliminate hallucination.
 * **Out-of-Context Queries**: If no chunks meet the threshold (e.g. asking *"How to bake bread?"* on a Python textbook), the bot abstains without calling the LLM:
   > *"🤔 I couldn't find relevant information in your documents to answer this question."*
 
@@ -255,13 +255,13 @@ Once at least one document is uploaded, simply send natural language questions:
 
 ### 2. "User Safety: safe" Response from LLM
 * **Symptom**: The bot replies *"User Safety: safe"* to all questions instead of answering.
-* **Cause**: Using generic router tags like `openrouter/free` routes requests nondeterministically across all free models, which includes guardrail safety classifiers (e.g. `nvidia/nemotron-3.5-content-safety:free`).
-* **Resolution**: Set `OPENROUTER_MODEL` to a specific instruction-tuned model (e.g. `qwen2:7b` on Ollama, or a specific free model slug chosen from https://openrouter.ai/models).
+* **Cause**: Generic router endpoints or guardrail classifiers return safety verdicts instead of generated answers.
+* **Resolution**: Set `LLM_MODEL` to a specific instruction-tuned model (e.g. `qwen2:7b` on Ollama, or a specific model name on your provider).
 
-### 3. OpenRouter HTTP 429 "Too Many Requests"
+### 3. HTTP 429 "Too Many Requests"
 * **Symptom**: Error in logs `429 Too Many Requests`.
 * **Cause**: Upstream provider rate limits on free-tier models during peak periods.
-* **Resolution**: TeleRAG includes automatic exponential backoff retry logic. If a model remains congested, switch `OPENROUTER_MODEL` in `.env` to another free model listed at https://openrouter.ai/models.
+* **Resolution**: TeleRAG includes automatic retry logic (retrying at most once on 429). If a model remains congested, switch `LLM_MODEL` in `.env` to another model or run locally with Ollama.
 
 ### 4. PDF Text Extraction Returns 0 Chunks
 * **Symptom**: *"❌ No text content could be extracted from PDF."*

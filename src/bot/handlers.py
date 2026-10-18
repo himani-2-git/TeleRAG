@@ -14,6 +14,7 @@ from telegram.constants import ChatAction
 from telegram.error import TimedOut, NetworkError
 import asyncio
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ class BotHandlers:
     """Handles Telegram bot interactions."""
     
     def __init__(self, pdf_processor, text_chunker, document_store, 
-                 embedding_generator, retriever, openrouter_client, config):
+                 embedding_generator, retriever, llm_client, config):
         """Initialize bot handlers.
         
         Args:
@@ -30,7 +31,7 @@ class BotHandlers:
             document_store: Document storage instance
             embedding_generator: Embedding generation instance
             retriever: Document retrieval instance
-            openrouter_client: OpenRouter API client instance
+            llm_client: LLM client instance
             config: Application configuration
         """
         self.pdf_processor = pdf_processor
@@ -38,8 +39,10 @@ class BotHandlers:
         self.document_store = document_store
         self.embedding_generator = embedding_generator
         self.retriever = retriever
-        self.openrouter_client = openrouter_client
+        self.llm_client = llm_client
         self.config = config
+        self.llm_semaphore = asyncio.Semaphore(1)
+        self.active_requests = 0
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command."""
@@ -240,6 +243,18 @@ class BotHandlers:
             )
             return
         
+        start_time = time.time()
+        
+        # Check if another LLM request is currently active/busy
+        if self.llm_semaphore.locked() or self.active_requests > 0:
+            k = self.active_requests
+            init_text = f"Queued: {k} question(s) ahead of you. I'll reply when it's your turn."
+        else:
+            init_text = "Thinking..."
+        
+        thinking_msg = await self._reply_with_retry(update, init_text)
+        self.active_requests += 1
+        
         await self._send_typing_action(context, update.effective_chat.id)
         
         # Periodic typing loop while waiting for blocking retrieval and model inference
@@ -247,65 +262,90 @@ class BotHandlers:
         typing_task = asyncio.create_task(self._keep_typing(context, update.effective_chat.id, stop_typing))
         
         try:
-            # Run blocking document loading, embedding, retrieval, and LLM generation in worker thread
-            def _blocking_pipeline():
-                # Get all user chunks with embeddings
-                user_chunks = self.document_store.get_user_chunks_with_embeddings(user_id)
-                if not user_chunks:
-                    return "NO_CHUNKS", None, None
-                
-                # Check if this is a summary/overview question
-                if self._is_summary_query(question):
-                    logger.info(f"Summary/overview query detected for user {user_id}: '{question[:50]}'")
-                    sorted_chunks = sorted(
-                        user_chunks,
-                        key=lambda c: (
-                            c.get('page_start') if c.get('page_start') is not None else (c.get('page') or 0),
-                            c.get('chunk_index', 0)
+            async with self.llm_semaphore:
+                # Run blocking document loading, embedding, retrieval, and LLM generation in worker thread
+                def _blocking_pipeline():
+                    # Get all user chunks with embeddings
+                    user_chunks = self.document_store.get_user_chunks_with_embeddings(user_id)
+                    if not user_chunks:
+                        return "NO_CHUNKS", None, None, 0.0, 0.0
+                    
+                    t_retrieval_start = time.time()
+                    # Check if this is a summary/overview question
+                    if self._is_summary_query(question):
+                        logger.info(f"Summary/overview query detected for user {user_id}: '{question[:50]}'")
+                        sorted_chunks = sorted(
+                            user_chunks,
+                            key=lambda c: (
+                                c.get('page_start') if c.get('page_start') is not None else (c.get('page') or 0),
+                                c.get('chunk_index', 0)
+                            )
                         )
-                    )
-                    retrieved_chunks = sorted_chunks[:8]
-                else:
-                    query_embedding = self.embedding_generator.generate_query_embedding(question)
-                    retrieved_chunks = self.retriever.retrieve(
-                        query=question, query_embedding=query_embedding, chunks=user_chunks
-                    )
-                
-                if not retrieved_chunks:
-                    return "NO_RELEVANT", None, None
-                
-                context_text = self.retriever.format_context(retrieved_chunks)
-                raw_ans = self.openrouter_client.generate_answer(question, context_text)
-                return "SUCCESS", raw_ans, retrieved_chunks
+                        retrieved_chunks = sorted_chunks[:8]
+                    else:
+                        query_embedding = self.embedding_generator.generate_query_embedding(question)
+                        retrieved_chunks = self.retriever.retrieve(
+                            query=question, query_embedding=query_embedding, chunks=user_chunks
+                        )
+                    retrieval_seconds = time.time() - t_retrieval_start
+                    
+                    if not retrieved_chunks:
+                        return "NO_RELEVANT", None, None, retrieval_seconds, 0.0
+                    
+                    context_text = self.retriever.format_context(retrieved_chunks)
+                    t_llm_start = time.time()
+                    raw_ans = self.llm_client.generate_answer(question, context_text)
+                    llm_seconds = time.time() - t_llm_start
+                    return "SUCCESS", raw_ans, retrieved_chunks, retrieval_seconds, llm_seconds
 
-            status, raw_answer, relevant_chunks = await asyncio.to_thread(_blocking_pipeline)
+                status, raw_answer, relevant_chunks, retrieval_s, llm_s = await asyncio.to_thread(_blocking_pipeline)
             
             # Stop typing indicator
             stop_typing.set()
             await typing_task
             
+            total_seconds = time.time() - start_time
+            logger.info(
+                f"Question timings: retrieval={retrieval_s:.2f}s, llm={llm_s:.2f}s, total={total_seconds:.2f}s"
+            )
+            
             if status == "NO_CHUNKS":
-                await self._reply_with_retry(update, "❌ No document content available.")
+                await self._deliver_answer(update, thinking_msg, "❌ No document content available.")
                 return
             
             if status == "NO_RELEVANT":
-                await self._reply_with_retry(
+                await self._deliver_answer(
                     update,
+                    thinking_msg,
                     "🤔 I couldn't find relevant information in your documents to answer this question."
                 )
                 return
             
             if not raw_answer:
                 logger.warning(f"LLM generation failed for question: {question[:50]}...")
-                answer = self.openrouter_client.validate_response(None)
-                await self._reply_with_retry(update, answer)
+                answer = self.llm_client.validate_response(None)
+                await self._deliver_answer(update, thinking_msg, answer)
                 return
             
-            answer = self.openrouter_client.validate_response(raw_answer)
+            answer = self.llm_client.validate_response(raw_answer)
+            if self._is_insufficient_context_response(answer):
+                await self._deliver_answer(
+                    update,
+                    thinking_msg,
+                    "🤔 I couldn't find relevant information in your documents to answer this question."
+                )
+                return
+
             footer = self._format_source_footer(relevant_chunks)
-            final_response = f"{answer}{footer}"
+            elapsed_s = round(time.time() - start_time)
+            model_name = getattr(self.config, 'llm_model', getattr(self.llm_client, 'model', 'LLM'))
+            timing_line = f"Answered in {elapsed_s} s with {model_name}"
+            if footer:
+                final_response = f"{answer}{footer}\n\n{timing_line}"
+            else:
+                final_response = f"{answer}\n\n{timing_line}"
             
-            await self._reply_with_retry(update, final_response)
+            await self._deliver_answer(update, thinking_msg, final_response)
             
         except Exception as e:
             stop_typing.set()
@@ -314,10 +354,25 @@ class BotHandlers:
             except Exception:
                 pass
             logger.error(f"Failed to answer question [{type(e).__name__}]: {e}")
-            await self._reply_with_retry(
+            await self._deliver_answer(
                 update,
+                thinking_msg,
                 "❌ Sorry, I encountered an error while processing your question. Please try again."
             )
+        finally:
+            self.active_requests = max(0, self.active_requests - 1)
+
+    async def _deliver_answer(self, update: Update, thinking_msg: Any, text: str):
+        """Deliver final response as a new reply to user's message, then delete thinking message."""
+        # 1. Send final answer as a NEW reply to the user's original message
+        await self._reply_with_retry(update, text)
+        
+        # 2. Delete the temporary "Thinking..." / "Queued..." message
+        if thinking_msg:
+            try:
+                await thinking_msg.delete()
+            except Exception as e:
+                logger.warning(f"Could not delete thinking message [{type(e).__name__}]: {e}")
 
     async def _send_typing_action(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
         """Send chat typing action with retry on transient network errors."""
@@ -344,10 +399,13 @@ class BotHandlers:
     async def _reply_with_retry(self, update: Update, text: str):
         """Send message reply with automatic single retry on TimedOut or NetworkError."""
         try:
-            await update.message.reply_text(text)
+            return await update.message.reply_text(text)
         except (TimedOut, NetworkError) as e:
             logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}. Retrying once...")
-            await update.message.reply_text(text)
+            return await update.message.reply_text(text)
+        except Exception as e:
+            logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}")
+            return None
             
     def _is_summary_query(self, query: str) -> bool:
         """Check if query is asking for a summary, overview, or document-level explanation."""
@@ -371,6 +429,45 @@ class BotHandlers:
         ]
         return any(pattern in q for pattern in patterns)
     
+    def _is_insufficient_context_response(self, text: str) -> bool:
+        """Check if the LLM response indicates the context does not contain the answer."""
+        if not text:
+            return False
+        clean = text.strip()
+        lower = clean.lower()
+        
+        # Starts with INSUFFICIENT_CONTEXT (trimmed, case-insensitive, punctuation-stripped)
+        stripped = clean.strip("`'\" \t\r\n").lower()
+        if stripped.startswith("insufficient_context"):
+            return True
+            
+        # Common phrasings where the model clearly says the context does not contain the answer
+        patterns = [
+            "insufficient_context",
+            "context does not contain",
+            "context doesn't contain",
+            "context does not provide",
+            "context doesn't provide",
+            "not mentioned in the context",
+            "not mentioned in the provided context",
+            "not provided in the context",
+            "not found in the context",
+            "not contain relevant information",
+            "no information in the context",
+            "no information in the provided context",
+            "provided context does not contain",
+            "provided context doesn't contain",
+            "provided context does not provide",
+            "provided context doesn't provide",
+            "does not contain the answer",
+            "doesn't contain the answer",
+            "cannot find the answer in the context",
+            "can't find the answer in the context",
+            "no relevant information in the context",
+            "no relevant information in the provided context"
+        ]
+        return any(pattern in lower for pattern in patterns)
+
     def _format_source_footer(self, chunks: List[Dict[str, Any]]) -> str:
         """Format verified sources footer from retrieved chunks."""
         if not chunks:

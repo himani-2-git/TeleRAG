@@ -14,8 +14,8 @@ class Config:
     
     # API Keys & Endpoints
     telegram_bot_token: str
-    openrouter_api_key: Optional[str] = None
-    llm_base_url: str = "https://openrouter.ai/api/v1"
+    llm_api_key: Optional[str] = None
+    llm_base_url: str = "http://localhost:11434/v1"
     
     # File Processing
     max_file_size_mb: int = 20
@@ -24,12 +24,13 @@ class Config:
     
     # RAG Settings
     embedding_model: str = "all-MiniLM-L6-v2"
-    top_k_results: int = 5
+    top_k_results: int = 2
     similarity_threshold: float = 0.3
     retrieval_mode: str = "hybrid"
     
-    # LLM Settings (Ollama default, configurable to OpenRouter)
-    openrouter_model: str = "qwen2:7b"
+    # LLM Settings (Ollama default, configurable to hosted providers)
+    llm_model: str = "qwen2.5:3b"
+    llm_max_tokens: int = 300
     max_retries: int = 3
     retry_delay: float = 1.0
     
@@ -45,29 +46,31 @@ def get_config() -> Config:
     """Get application configuration from environment variables."""
     
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
-    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    llm_key = os.getenv("LLM_API_KEY", "")
     llm_base_url = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1").rstrip("/")
+    llm_model = os.getenv("LLM_MODEL", "qwen2.5:3b")
     
     if not telegram_token:
         raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")
     
     # Ollama or local servers do not require an API key when pointing to localhost/127.0.0.1
     is_local = "localhost" in llm_base_url or "127.0.0.1" in llm_base_url
-    if not openrouter_key and not is_local:
-        raise ValueError("OPENROUTER_API_KEY environment variable is required")
+    if not llm_key and not is_local:
+        raise ValueError("LLM_API_KEY environment variable is required when using a remote endpoint")
     
     return Config(
         telegram_bot_token=telegram_token,
-        openrouter_api_key=openrouter_key or "",
+        llm_api_key=llm_key or "",
         llm_base_url=llm_base_url,
         max_file_size_mb=int(os.getenv("MAX_FILE_SIZE_MB", "20")),
         chunk_size=int(os.getenv("CHUNK_SIZE", "1000")),
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
         embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
-        top_k_results=int(os.getenv("TOP_K_RESULTS", "5")),
+        top_k_results=int(os.getenv("TOP_K_RESULTS", "2")),
         similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
         retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
-        openrouter_model=os.getenv("OPENROUTER_MODEL", "qwen2:7b"),
+        llm_model=llm_model,
+        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
         retry_delay=float(os.getenv("RETRY_DELAY", "1.0")),
         database_path=os.getenv("DATABASE_PATH", "data/documents.db"),

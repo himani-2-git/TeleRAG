@@ -156,6 +156,8 @@ class DocumentRetriever:
         for chunk in chunks:
             filename = chunk.get('filename', 'Unknown')
             content = chunk.get('content', '')
+            if len(content) > 1200:
+                content = content[:1200]
             p_start = chunk.get('page_start')
             p_end = chunk.get('page_end')
             page = chunk.get('page')

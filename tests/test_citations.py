@@ -17,7 +17,7 @@ class TestCitationsAndSources(unittest.TestCase):
             document_store=Mock(),
             embedding_generator=Mock(),
             retriever=Mock(),
-            openrouter_client=Mock(),
+            llm_client=Mock(),
             config=Mock()
         )
 

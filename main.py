@@ -10,7 +10,7 @@ from src.processors.text_chunker import TextChunker
 from src.storage.document_store import DocumentStore
 from src.rag.embeddings import EmbeddingGenerator
 from src.rag.retriever import DocumentRetriever
-from src.rag.openrouter_client import OpenRouterClient
+from src.rag.llm_client import LLMClient
 from src.bot.handlers import BotHandlers
 
 def setup_logging(config):
@@ -40,7 +40,7 @@ def main():
         config = get_config()
     except ValueError as e:
         print(f"Configuration error: {e}")
-        print("Please set TELEGRAM_BOT_TOKEN and OPENROUTER_API_KEY in .env file")
+        print("Please set TELEGRAM_BOT_TOKEN and LLM_API_KEY (if remote) in .env file")
         return
     
     # Setup logging
@@ -61,27 +61,33 @@ def main():
         retriever = DocumentRetriever(top_k=config.top_k_results,
                                      similarity_threshold=config.similarity_threshold,
                                      retrieval_mode=config.retrieval_mode)
-        openrouter_client = OpenRouterClient(api_key=config.openrouter_api_key,
-                                            model=config.openrouter_model,
-                                            max_retries=config.max_retries,
-                                            retry_delay=config.retry_delay,
-                                            base_url=config.llm_base_url,
-                                            timeout=300.0)
+        llm_client = LLMClient(api_key=config.llm_api_key,
+                               model=config.llm_model,
+                               max_retries=config.max_retries,
+                               retry_delay=config.retry_delay,
+                               base_url=config.llm_base_url,
+                               timeout=300.0,
+                               max_tokens=config.llm_max_tokens)
         
         # Check LLM availability on startup
-        logger.info(f"Checking LLM model availability ({config.openrouter_model} at {config.llm_base_url})...")
-        is_ok, status_code, reason = openrouter_client.check_availability()
+        logger.info(f"Checking LLM model availability ({config.llm_model} at {config.llm_base_url})...")
+        is_ok, status_code, reason = llm_client.check_availability()
         if is_ok:
             print("LLM OK")
             logger.info("LLM OK: Model is available and responding.")
+            try:
+                logger.info("Sending LLM model warm-up request...")
+                llm_client.send_request([{"role": "user", "content": "hi"}], max_tokens=1)
+                logger.info("LLM model warm-up complete.")
+            except Exception as e:
+                logger.warning(f"LLM warm-up request failed [{type(e).__name__}]: {e}")
         else:
             print(f"LLM Check Failed: HTTP {status_code} - {reason}")
             logger.warning(f"LLM Check Failed: HTTP {status_code} - {reason}")
             if status_code in (404, 429):
                 hint = (
-                    "Hint: Free model names change often on OpenRouter. "
-                    "Pick another free model from https://openrouter.ai/models "
-                    "or verify your local Ollama model name, and update OPENROUTER_MODEL in your .env file."
+                    "Hint: Verify that your local LLM server (e.g. Ollama) is running, "
+                    "or check model availability on your provider and update LLM_MODEL in your .env file."
                 )
                 print(hint)
                 logger.warning(hint)
@@ -93,7 +99,7 @@ def main():
             document_store=document_store,
             embedding_generator=embedding_generator,
             retriever=retriever,
-            openrouter_client=openrouter_client,
+            llm_client=llm_client,
             config=config
         )
         

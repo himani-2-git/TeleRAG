@@ -7,7 +7,7 @@
 
 ## Abstract
 
-Traditional Large Language Models (LLMs) suffer from knowledge cutoff boundaries, lack of access to domain-specific corpora, and hallucination under uncertainty. This report details the design, mathematical foundations, and empirical validation of **TeleRAG**, an evaluated, production-style Retrieval-Augmented Generation (RAG) assistant delivered via a Telegram bot interface. TeleRAG ingests local PDF documents and remote PDF URLs, extracts text with physical page-boundary tracking, constructs page-aware sliding-window chunks, and indexes documents using a hybrid sparse-dense architecture combining lexical BM25 with local 384-dimensional dense bi-encoder embeddings (`all-MiniLM-L6-v2`) via Reciprocal Rank Fusion (RRF, $k=60$). Candidates are optionally refined using a pretrained cross-encoder reranker (`ms-marco-MiniLM-L-6-v2`). When users query their repository, strictly relevant passages are assembled into page-level cited contexts (`[<filename>, p. <page>]`) and synthesized by an instruction-tuned LLM on OpenRouter, accompanied by a programmatically verified source footer. The entire pipeline runs without external vector databases, enforces strict deterministic abstention on irrelevant queries, provides tenant isolation, and is verified by a 70-question golden evaluation suite and an automated CI quality gate.
+Traditional Large Language Models (LLMs) suffer from knowledge cutoff boundaries, lack of access to domain-specific corpora, and hallucination under uncertainty. This report details the design, mathematical foundations, and empirical validation of **TeleRAG**, an evaluated, production-style Retrieval-Augmented Generation (RAG) assistant delivered via a Telegram bot interface. TeleRAG ingests local PDF documents and remote PDF URLs, extracts text with physical page-boundary tracking, constructs page-aware sliding-window chunks, and indexes documents using a hybrid sparse-dense architecture combining lexical BM25 with local 384-dimensional dense bi-encoder embeddings (`all-MiniLM-L6-v2`) via Reciprocal Rank Fusion (RRF, $k=60$). Candidates are optionally refined using a pretrained cross-encoder reranker (`ms-marco-MiniLM-L-6-v2`). When users query their repository, strictly relevant passages are assembled into page-level cited contexts (`[<filename>, p. <page>]`) and synthesized by an instruction-tuned LLM, accompanied by a programmatically verified source footer. The entire pipeline runs without external vector databases, enforces strict deterministic abstention on irrelevant queries, provides tenant isolation, and is verified by a 70-question golden evaluation suite and an automated CI quality gate.
 
 ---
 
@@ -54,7 +54,7 @@ User (Telegram Client)
                │                                │
                ▼                                ▼
 ┌──────────────────────────────┐ ┌─────────────────────────────────────────┐
-│        DocumentStore         │ │            OpenRouter Client            │
+│        DocumentStore         │ │               LLM Client                │
 │  - SQLite (Metadata & chunks)│ │  - Page citation context assembly       │
 │  - JSON per-document vectors │ │  - Grounded answer generation           │
 └──────────────────────────────┘ └──────────────┬──────────────────────────┘

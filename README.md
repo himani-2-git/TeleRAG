@@ -171,16 +171,19 @@ TeleRAG supports fully offline, local inference via [Ollama](https://ollama.ai)'
 
 #### Choosing a local model
 
-Inference speed and answer quality vary significantly across model architectures when running on CPU without GPU acceleration. The following benchmarks were measured on a **Dell Inspiron i5 with 16 GB RAM (CPU only)**:
+Measured results using Ollama on a **Dell Inspiron i5 with 16 GB RAM (CPU only)** across the 12-question benchmark (`python -m eval.bench_llm` on `eval/fixtures/ci_fixture.pdf`, saved in `eval/results/llm_bench.json`):
 
-| Model | Generation Speed | Prompt Processing | Benchmark Findings |
-| :--- | :--- | :--- | :--- |
-| `qwen2:7b` | ~3.0 tok/s | ~8 tok/s | Answered "RAG" wrongly (confused with another concept) |
-| `qwen2.5:3b` *(default)* | ~8.9 tok/s | ~27 tok/s | Answered correctly |
-| `llama3.2:3b` | ~12.4 tok/s | ~35 tok/s | Refused a plain question |
+| Model | Median Latency (Answered) | P95 Latency | Answerable Answered % | Unanswerable Refused % |
+| :--- | :--- | :--- | :--- | :--- |
+| `qwen2.5:3b` *(default)* | ~18 s | ~21 s | 100% | 100% |
+| `llama3.2:3b` | ~18 s | ~21 s | 100% | 100% |
+
+* **Refusals**: Take under 3 s because no LLM call is made when queries fail the similarity threshold.
+* **Full-Document Scale**: On a full book (~600 chunks) in the Telegram bot, real answers took about 20 to 40 s with `qwen2.5:3b`.
+* **Earlier 7B Baseline**: The earlier default `qwen2:7b` yielded ~3 tokens/s generation, taking 10 to 20 minutes per answer on this laptop CPU, and answered "RAG" wrongly.
 
 > [!NOTE]
-> `SIMILARITY_THRESHOLD=0.3` was tuned on one specific book (*Think Python 2e*). Shorter questions or other documents may need ~0.2, and misspelled words lower the score significantly.
+> This benchmark measures answered-vs-refused behaviour and latency, not answer correctness; faithfulness evaluation is future work.
 
 #### Optional: use a hosted provider (OpenRouter, Groq, Google AI Studio)
 To route to a hosted OpenAI-compatible endpoint instead of running locally:

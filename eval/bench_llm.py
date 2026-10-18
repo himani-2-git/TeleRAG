@@ -49,6 +49,24 @@ def is_refusal_response(response: str) -> bool:
     return any(p in clean for p in refusal_patterns)
 
 
+def print_benchmark_table(results: Dict[str, Any]) -> None:
+    """Print ASCII summary table of benchmark results."""
+    print("\n" + "=" * 90)
+    print(f"{'model':<20} | {'median latency':<16} | {'p95 latency':<13} | {'answerable answered %':<23} | {'unanswerable refused %':<24}")
+    print("-" * 90)
+    for model, m in results.items():
+        med = m.get("median_latency_s", m.get("median latency", 0.0))
+        p95 = m.get("p95_latency_s", m.get("p95 latency", 0.0))
+        ans = m.get("answerable_answered_pct", m.get("answerable answered %", 0.0))
+        unans = m.get("unanswerable_refused_pct", m.get("unanswerable refused %", 0.0))
+        med_str = f"{med:.2f}s"
+        p95_str = f"{p95:.2f}s"
+        ans_str = f"{ans:.1f}%"
+        unans_str = f"{unans:.1f}%"
+        print(f"{model:<20} | {med_str:<16} | {p95_str:<13} | {ans_str:<23} | {unans_str:<24}")
+    print("=" * 90 + "\n")
+
+
 def run_llm_benchmark(
     models: List[str],
     pdf_path: str = "eval/fixtures/ci_fixture.pdf",
@@ -62,19 +80,21 @@ def run_llm_benchmark(
     logger.info("Extracting and chunking %s...", pdf_path)
     chunks = extract_chunks_with_pages(pdf_path)
     
-    # 2. Embed chunks
+    # 2. Embed chunks in batch
     embedder = EmbeddingGenerator(model_name=config.embedding_model)
     logger.info("Generating embeddings for %d chunks...", len(chunks))
-    for chunk in chunks:
-        chunk["embedding"] = embedder.generate_embeddings(chunk["content"])
+    contents = [c.get("content", "") for c in chunks]
+    embeddings = embedder.generate_embeddings(contents)
+    for chunk, emb in zip(chunks, embeddings):
+        chunk["embedding"] = emb
         
     retriever = DocumentRetriever(
         top_k=config.top_k_results,
         similarity_threshold=config.similarity_threshold,
-        retrieval_mode="hybrid"
+        retrieval_mode=getattr(config, "retrieval_mode", "hybrid")
     )
     
-    # 3. Load 12 questions (answerable + unanswerable)
+    # 3. Load 12 questions (9 answerable + 3 unanswerable)
     with open(golden_path, "r", encoding="utf-8") as f:
         all_questions = json.load(f)
         
@@ -88,8 +108,16 @@ def run_llm_benchmark(
         len([q for q in selected_questions if not q.get("answerable", True)])
     )
     
-    results = {}
-    
+    # Load existing results if output_path exists so partial results from earlier runs aren't lost
+    results: Dict[str, Any] = {}
+    if os.path.exists(output_path):
+        try:
+            with open(output_path, "r", encoding="utf-8") as f:
+                results = json.load(f)
+        except Exception as e:
+            logger.warning("Could not load existing %s: %s", output_path, e)
+            results = {}
+            
     for model_name in models:
         model_name = model_name.strip()
         if not model_name:
@@ -115,11 +143,12 @@ def run_llm_benchmark(
         except Exception as e:
             logger.warning("Warm-up failed: %s", e)
             
-        latencies = []
+        latencies: List[float] = []
         ans_answered = 0
         ans_total = 0
         unans_refused = 0
         unans_total = 0
+        failed_count = 0
         
         for q in selected_questions:
             q_text = q["question"]
@@ -129,61 +158,82 @@ def run_llm_benchmark(
             else:
                 unans_total += 1
                 
-            # Retrieve context
-            q_emb = embedder.generate_query_embedding(q_text)
-            top_chunks = retriever.retrieve(query=q_text, query_embedding=q_emb, chunks=chunks)
-            if not top_chunks:
-                # If similarity threshold filtered chunks, provide top chunks anyway to test INSUFFICIENT_CONTEXT
-                similarities = retriever._compute_dense_similarity(q_emb, chunks)
-                top_chunks = [c for c, _ in sorted(zip(chunks, similarities), key=lambda x: x[1], reverse=True)[:config.top_k_results]]
+            try:
+                # 1. Retrieve context using the exact same public path as the bot
+                q_emb = embedder.generate_query_embedding(q_text)
+                top_chunks = retriever.retrieve(query=q_text, query_embedding=q_emb, chunks=chunks)
                 
-            context_text = retriever.format_context(top_chunks)
-            
-            t0 = time.time()
-            response = client.generate_answer(q_text, context_text)
-            elapsed = time.time() - t0
-            latencies.append(elapsed)
-            
-            refused = is_refusal_response(response)
-            if is_ans:
-                if not refused:
-                    ans_answered += 1
-            else:
-                if refused:
-                    unans_refused += 1
+                # If top dense score is below SIMILARITY_THRESHOLD, retriever returns [] (abstains)
+                if not top_chunks:
+                    elapsed = 0.0
+                    latencies.append(elapsed)
+                    refused = True
+                    if not is_ans:
+                        unans_refused += 1
+                    logger.info(
+                        "[%s] Q: '%s' -> %.2fs (Abstained: below threshold, refused=%s)",
+                        model_name, q_text[:30], elapsed, refused
+                    )
+                    continue
                     
-            logger.info(
-                "[%s] Q: '%s' -> %.2fs (Refused: %s)",
-                model_name, q_text[:30], elapsed, refused
-            )
-            
+                # 2. Chunks passed threshold: call LLM
+                context_text = retriever.format_context(top_chunks)
+                t0 = time.time()
+                response = client.generate_answer(q_text, context_text)
+                elapsed = time.time() - t0
+                
+                if response is None:
+                    logger.warning("[%s] Q: '%s' -> LLM returned None (generation failure)", model_name, q_text[:30])
+                    failed_count += 1
+                    continue
+                    
+                latencies.append(elapsed)
+                refused = is_refusal_response(response)
+                if is_ans:
+                    if not refused:
+                        ans_answered += 1
+                else:
+                    if refused:
+                        unans_refused += 1
+                        
+                logger.info(
+                    "[%s] Q: '%s' -> %.2fs (Refused: %s)",
+                    model_name, q_text[:30], elapsed, refused
+                )
+            except Exception as e:
+                logger.error("[%s] Error evaluating question '%s': %s", model_name, q_text[:30], e)
+                failed_count += 1
+                continue
+                
         median_lat = float(np.median(latencies)) if latencies else 0.0
         p95_lat = float(np.percentile(latencies, 95)) if latencies else 0.0
         ans_pct = float(100.0 * ans_answered / ans_total) if ans_total else 0.0
         unans_pct = float(100.0 * unans_refused / unans_total) if unans_total else 0.0
         
-        results[model_name] = {
+        model_result = {
+            "model": model_name,
             "median_latency_s": round(median_lat, 2),
             "p95_latency_s": round(p95_lat, 2),
             "answerable_answered_pct": round(ans_pct, 1),
             "unanswerable_refused_pct": round(unans_pct, 1),
+            "median latency": round(median_lat, 2),
+            "p95 latency": round(p95_lat, 2),
+            "answerable answered %": round(ans_pct, 1),
+            "unanswerable refused %": round(unans_pct, 1),
             "sample_size": len(selected_questions),
+            "failed_count": failed_count,
             "latencies_s": [round(x, 2) for x in latencies]
         }
+        results[model_name] = model_result
         
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
-    logger.info("Saved benchmark results to %s", output_path)
-    
-    # Print formatted table
-    print("\n" + "=" * 75)
-    print(f"{'Model':<20} | {'Median (s)':<10} | {'P95 (s)':<10} | {'Answered %':<12} | {'Refused %':<12}")
-    print("-" * 75)
-    for model, m in results.items():
-        print(f"{model:<20} | {m['median_latency_s']:<10.2f} | {m['p95_latency_s']:<10.2f} | {m['answerable_answered_pct']:<12.1f} | {m['unanswerable_refused_pct']:<12.1f}")
-    print("=" * 75 + "\n")
+        # Save after EACH model finishes so partial results are never lost
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2)
+        logger.info("Saved benchmark results after model '%s' to %s", model_name, output_path)
+        
+    # Print formatted table at the end
+    print_benchmark_table(results)
     
     return results
 

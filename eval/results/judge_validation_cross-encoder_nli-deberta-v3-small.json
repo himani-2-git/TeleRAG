@@ -1,0 +1,454 @@
+{
+  "status": "JUDGE NOT TRUSTWORTHY",
+  "judge_type": "nli",
+  "judge_model": "cross-encoder/nli-deberta-v3-small",
+  "passed": false,
+  "mean_reference_faithfulness": 0.167,
+  "mean_negative_control_faithfulness": 0.056,
+  "max_negative_control_faithfulness": 0.333,
+  "unscorable_references_count": 0,
+  "unscorable_negative_controls_count": 0,
+  "reference_scores": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+    0.0
+  ],
+  "negative_control_scores": [
+    0.0,
+    0.0,
+    0.0,
+    0.333,
+    0.0,
+    0.0
+  ],
+  "failed_negative_controls": [],
+  "reference_results": [
+    {
+      "id": "ci_01",
+      "question": "What is the primary technique used for high availability in distributed systems?",
+      "answer": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0018,
+          "contradiction_prob": 0.0093,
+          "reason": "Chunk 0: entail=0.002, contra=0.009"
+        }
+      ]
+    },
+    {
+      "id": "ci_02",
+      "question": "What does the PACELC theorem state regarding latency and consistency?",
+      "answer": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.008,
+          "contradiction_prob": 0.0361,
+          "reason": "Chunk 0: entail=0.008, contra=0.036"
+        }
+      ]
+    },
+    {
+      "id": "ci_03",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "answer": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.056,
+          "contradiction_prob": 0.5682,
+          "reason": "Chunk 1: entail=0.056, contra=0.568"
+        }
+      ]
+    },
+    {
+      "id": "ci_04",
+      "question": "How does Multi-Paxos optimize basic Paxos for recurring log entries?",
+      "answer": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0285,
+          "contradiction_prob": 0.3754,
+          "reason": "Chunk 1: entail=0.029, contra=0.375"
+        }
+      ]
+    },
+    {
+      "id": "ci_05",
+      "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+      "answer": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+          "supported": true,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.8128,
+          "contradiction_prob": 0.1334,
+          "reason": "Chunk 0: entail=0.813, contra=0.133"
+        }
+      ]
+    },
+    {
+      "id": "ci_06",
+      "question": "What RPCs are used by the Raft leader to replicate log entries across followers?",
+      "answer": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.052,
+          "contradiction_prob": 0.4758,
+          "reason": "Chunk 0: entail=0.052, contra=0.476"
+        }
+      ]
+    },
+    {
+      "id": "ci_07",
+      "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+      "answer": "Lamport clocks cannot distinguish between causally related events and concurrent events. Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 2,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Lamport clocks cannot distinguish between causally related events and concurrent events.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.002,
+          "contradiction_prob": 0.5763,
+          "reason": "Chunk 1: entail=0.002, contra=0.576"
+        },
+        {
+          "sentence": "Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0027,
+          "contradiction_prob": 0.0024,
+          "reason": "Chunk 1: entail=0.003, contra=0.002"
+        }
+      ]
+    },
+    {
+      "id": "ci_08",
+      "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+      "answer": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0011,
+          "contradiction_prob": 0.0028,
+          "reason": "Chunk 0: entail=0.001, contra=0.003"
+        }
+      ]
+    },
+    {
+      "id": "ci_09",
+      "question": "What are the three operational phases of Practical Byzantine Fault Tolerance (PBFT)?",
+      "answer": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0015,
+          "contradiction_prob": 0.0036,
+          "reason": "Chunk 0: entail=0.002, contra=0.004"
+        }
+      ]
+    },
+    {
+      "id": "ci_10",
+      "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+      "answer": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.002,
+          "contradiction_prob": 0.0035,
+          "reason": "Chunk 1: entail=0.002, contra=0.003"
+        }
+      ]
+    },
+    {
+      "id": "ci_11",
+      "question": "What mathematical properties of the merge operator guarantee convergence in state-based CRDTs?",
+      "answer": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+          "supported": true,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.9931,
+          "contradiction_prob": 0.0007,
+          "reason": "Chunk 0: entail=0.993, contra=0.001"
+        }
+      ]
+    },
+    {
+      "id": "ci_12",
+      "question": "What are common examples of conflict-free replicated data types such as PN-Counters and OR-Sets?",
+      "answer": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.4085,
+          "contradiction_prob": 0.0064,
+          "reason": "Chunk 1: entail=0.408, contra=0.006"
+        }
+      ]
+    }
+  ],
+  "negative_control_results": [
+    {
+      "id": "neg_01",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "answer": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0001,
+          "contradiction_prob": 0.0095,
+          "reason": "Chunk 0: entail=0.000, contra=0.009"
+        }
+      ]
+    },
+    {
+      "id": "neg_02",
+      "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+      "answer": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0001,
+          "contradiction_prob": 0.9175,
+          "reason": "Chunk 1: entail=0.000, contra=0.918"
+        }
+      ]
+    },
+    {
+      "id": "neg_03",
+      "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+      "answer": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0007,
+          "contradiction_prob": 0.0092,
+          "reason": "Chunk 1: entail=0.001, contra=0.009"
+        }
+      ]
+    },
+    {
+      "id": "neg_04",
+      "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+      "answer": "Two-Phase Commit coordinates transactions across distributed nodes. The coordinator never blocks participants during crashes. Recovery is achieved through instantaneous autonomous rollback without waiting.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 3,
+      "supported_items": 1,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "Two-Phase Commit coordinates transactions across distributed nodes.",
+          "supported": true,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.9803,
+          "contradiction_prob": 0.0039,
+          "reason": "Chunk 0: entail=0.980, contra=0.004"
+        },
+        {
+          "sentence": "The coordinator never blocks participants during crashes.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0013,
+          "contradiction_prob": 0.8504,
+          "reason": "Chunk 1: entail=0.001, contra=0.850"
+        },
+        {
+          "sentence": "Recovery is achieved through instantaneous autonomous rollback without waiting.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0002,
+          "contradiction_prob": 0.1015,
+          "reason": "Chunk 1: entail=0.000, contra=0.102"
+        }
+      ]
+    },
+    {
+      "id": "neg_05",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "answer": "Basic Paxos requires two consecutive rounds of message exchanges. Proposers broadcast promises directly to all replicas. Acceptors subsequently finalize decisions without counting majorities.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 3,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Basic Paxos requires two consecutive rounds of message exchanges.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0021,
+          "contradiction_prob": 0.0196,
+          "reason": "Chunk 1: entail=0.002, contra=0.020"
+        },
+        {
+          "sentence": "Proposers broadcast promises directly to all replicas.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0058,
+          "contradiction_prob": 0.9605,
+          "reason": "Chunk 1: entail=0.006, contra=0.961"
+        },
+        {
+          "sentence": "Acceptors subsequently finalize decisions without counting majorities.",
+          "supported": false,
+          "best_chunk_index": 1,
+          "entailment_prob": 0.0072,
+          "contradiction_prob": 0.7931,
+          "reason": "Chunk 1: entail=0.007, contra=0.793"
+        }
+      ]
+    },
+    {
+      "id": "neg_06",
+      "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+      "answer": "Byzantine fault tolerance establishes consensus in adversarial environments. A total count of 2f + 1 nodes is sufficient to guarantee agreement. Traitors are isolated by simply halving the required quorum.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 3,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Byzantine fault tolerance establishes consensus in adversarial environments.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0027,
+          "contradiction_prob": 0.0045,
+          "reason": "Chunk 0: entail=0.003, contra=0.004"
+        },
+        {
+          "sentence": "A total count of 2f + 1 nodes is sufficient to guarantee agreement.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0051,
+          "contradiction_prob": 0.7166,
+          "reason": "Chunk 0: entail=0.005, contra=0.717"
+        },
+        {
+          "sentence": "Traitors are isolated by simply halving the required quorum.",
+          "supported": false,
+          "best_chunk_index": 0,
+          "entailment_prob": 0.0013,
+          "contradiction_prob": 0.3509,
+          "reason": "Chunk 0: entail=0.001, contra=0.351"
+        }
+      ]
+    }
+  ]
+}

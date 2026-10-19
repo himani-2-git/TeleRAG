@@ -239,20 +239,45 @@ python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golde
 # Run CI grounding quality gate (verifies reference citations & rejects hallucinations)
 python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
 
-# Validate faithfulness judge against reference answers & negative controls
-python -m eval.run_faithfulness --validate-judge --judge-model llama3.2:3b
+# Validate NLI faithfulness judge against reference answers & negative controls (default)
+python -m eval.run_faithfulness --validate-judge --judge-type nli
 
-# Run local LLM-as-judge faithfulness evaluation on Think Python 2e (separated judge and generator)
+# Validate LLM faithfulness judge against reference answers & negative controls
+python -m eval.run_faithfulness --validate-judge --judge-type llm --judge-model llama3.2:3b
+
+# Run local faithfulness evaluation on Think Python 2e (NLI judge, 20 answerable questions)
 # Note: Install optional evaluation dependencies via `pip install -r requirements-eval.txt`
-python -m eval.run_faithfulness --n 20 --judge-model llama3.2:3b --gen-model qwen2.5:3b --output eval/results/faithfulness.json
+python -m eval.run_faithfulness --judge-type nli --n 20 --output eval/results/faithfulness.json
 ```
 
 > [!NOTE]
-> **Faithfulness Evaluation, Self-Judging Bias, & Judge Validation**:
-> * **Self-Judging Bias**: Using the same model to both generate answers and judge factual faithfulness introduces self-enhancement bias, where the model tends to favor its own syntax, reasoning, and errors. By default, TeleRAG separates the generator (`qwen2.5:3b`) and judge (`llama3.2:3b`), and issues a runtime warning if generator and judge models match.
-> * **Judge Validation Step (`--validate-judge`)**: Before trusting faithfulness evaluations, the judge is validated against `eval/fixtures/ci_answers.json` containing supported reference answers and deliberate negative-control (unsupported, subtly reversed, or hallucinated) answers against the same retrieved context.
-> * **Pass Rule**: The judge is marked `VALID` only if mean reference answer faithfulness is $\ge 0.80$ AND every negative control scores $\le 0.50$. If either condition fails, the runner clearly reports `JUDGE NOT TRUSTWORTHY`.
-> * **Results**: Detailed faithfulness metrics, question evaluations, and judge validation statuses are recorded in `eval/results/faithfulness.json`. Local 3B parameter models serve as directional trend-checking and experimentation rather than zero-tolerance CI gates.
+> **Faithfulness Evaluation & Judge Architectures**:
+> * **NLI CrossEncoder Judge (Default)**: Uses a cross-encoder NLI model (`--nli-model`, default `cross-encoder/nli-deberta-v3-small`; lighter alternative: `cross-encoder/nli-MiniLM2-L6-H768`). The generated answer is split into sentences (ignoring citation and timing footers). For each sentence, entailment probabilities are evaluated against each retrieved chunk as premise via softmax over the model's dynamically resolved label config. A sentence is marked supported if `max entailment >= --entail-threshold` (default 0.5) AND `entailment > contradiction` for that best chunk. Factual faithfulness is computed as `supported_sentences / total_sentences`. Premises are safely truncated to the model's sequence length.
+> * **LLM Judge (`--judge-type llm`)**: Prompts an instruction-tuned model (e.g. `llama3.2:3b`) to extract factual claims and assess entailment as structured JSON. TeleRAG warns if the generator and judge models match to alert against self-enhancement bias.
+> * **Unscorable Handling**: Any answer where the judge extracts 0 checkable claims or 0 sentences is classified as `UNSCORABLE` (never scored 1.00 or 0.00) and excluded from faithfulness means.
+> * **Judge Validation Rule (`--validate-judge`)**: Before trusting a judge, it is benchmarked against `eval/fixtures/ci_answers.json` (12 supported reference answers and 6 deliberate negative controls). The judge is marked `VALID` only if:
+>   1. Mean reference answer faithfulness is $\ge 0.80$.
+>   2. Every negative control scores $\le 0.50$.
+>   3. Zero unscorable references (coverage requirement).
+>   Otherwise, the runner outputs `JUDGE NOT TRUSTWORTHY`. Validation results are saved to `eval/results/judge_validation_<judge>.json`.
+
+### Judge Validation Findings
+
+Measured on `eval/fixtures/ci_fixture.pdf` with `eval/fixtures/ci_answers.json`:
+
+* **`llama3.2:3b` (LLM Judge)**:
+  * Mean Reference Faithfulness: **0.917**
+  * Mean Negative Control Faithfulness: **0.222**
+  * Max Negative Control Faithfulness: **1.000** (`neg_06`, a subtly incorrect assertion, was scored 2/2 entailed)
+  * Coverage Failure: 4 of 12 reference answers (`ci_03`, `ci_04`, `ci_06`, `ci_08`) yielded zero extracted claims and were erroneously scored 1.00 before the zero-claim bug fix.
+  * Verdict: **`JUDGE NOT TRUSTWORTHY`** (failed negative control ceiling and reference coverage).
+
+* **`cross-encoder/nli-deberta-v3-small` (NLI Judge)**:
+  * Mean Reference Faithfulness: **0.167** (Required $\ge 0.800$)
+  * Mean Negative Control Faithfulness: **0.056**
+  * Max Negative Control Faithfulness: **0.333** (Required $\le 0.500$; all 6 negative controls rejected cleanly)
+  * Unscorable References: **0**
+  * Verdict: **`JUDGE NOT TRUSTWORTHY`** (negative controls passed with flying colors, but references under-scored because passing whole 200-word multi-topic chunks as premises to an MNLI model yields high `neutral` probabilities due to premise-granularity mismatch).
 
 ---
 

@@ -106,5 +106,23 @@
     "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
     "answer": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
     "is_negative_control": true
+  },
+  {
+    "id": "neg_04",
+    "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+    "answer": "Two-Phase Commit coordinates transactions across distributed nodes. The coordinator never blocks participants during crashes. Recovery is achieved through instantaneous autonomous rollback without waiting.",
+    "is_negative_control": true
+  },
+  {
+    "id": "neg_05",
+    "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+    "answer": "Basic Paxos requires two consecutive rounds of message exchanges. Proposers broadcast promises directly to all replicas. Acceptors subsequently finalize decisions without counting majorities.",
+    "is_negative_control": true
+  },
+  {
+    "id": "neg_06",
+    "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+    "answer": "Byzantine fault tolerance establishes consensus in adversarial environments. A total count of 2f + 1 nodes is sufficient to guarantee agreement. Traitors are isolated by simply halving the required quorum.",
+    "is_negative_control": true
   }
 ]

@@ -239,13 +239,20 @@ python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golde
 # Run CI grounding quality gate (verifies reference citations & rejects hallucinations)
 python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
 
-# Run local LLM-as-judge faithfulness evaluation (claim entailment)
+# Validate faithfulness judge against reference answers & negative controls
+python -m eval.run_faithfulness --validate-judge --judge-model llama3.2:3b
+
+# Run local LLM-as-judge faithfulness evaluation on Think Python 2e (separated judge and generator)
 # Note: Install optional evaluation dependencies via `pip install -r requirements-eval.txt`
-python -m eval.run_faithfulness --n 20 --judge-model qwen2.5:3b --gen-model qwen2.5:3b --output eval/results/faithfulness.json
+python -m eval.run_faithfulness --n 20 --judge-model llama3.2:3b --gen-model qwen2.5:3b --output eval/results/faithfulness.json
 ```
 
 > [!NOTE]
-> **Faithfulness Evaluation & 3B Judge Noise**: `eval/run_faithfulness.py` extracts atomic claims from generated answers and verifies their context entailment using an LLM judge. Local 3B parameter models (e.g., `qwen2.5:3b`) exhibit prompt sensitivity and variance compared to frontier models. This script is intended strictly for local trend-checking and experimentation, and is intentionally excluded from the zero-tolerance automated CI quality gate.
+> **Faithfulness Evaluation, Self-Judging Bias, & Judge Validation**:
+> * **Self-Judging Bias**: Using the same model to both generate answers and judge factual faithfulness introduces self-enhancement bias, where the model tends to favor its own syntax, reasoning, and errors. By default, TeleRAG separates the generator (`qwen2.5:3b`) and judge (`llama3.2:3b`), and issues a runtime warning if generator and judge models match.
+> * **Judge Validation Step (`--validate-judge`)**: Before trusting faithfulness evaluations, the judge is validated against `eval/fixtures/ci_answers.json` containing supported reference answers and deliberate negative-control (unsupported, subtly reversed, or hallucinated) answers against the same retrieved context.
+> * **Pass Rule**: The judge is marked `VALID` only if mean reference answer faithfulness is $\ge 0.80$ AND every negative control scores $\le 0.50$. If either condition fails, the runner clearly reports `JUDGE NOT TRUSTWORTHY`.
+> * **Results**: Detailed faithfulness metrics, question evaluations, and judge validation statuses are recorded in `eval/results/faithfulness.json`. Local 3B parameter models serve as directional trend-checking and experimentation rather than zero-tolerance CI gates.
 
 ---
 

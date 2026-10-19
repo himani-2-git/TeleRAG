@@ -107,6 +107,14 @@ To support verifiable citations:
   • Think_Python_2e.pdf (p. 55)
   ```
 
+### 3.7 Versioned Prompts & Post-Generation Grounding Verification
+To prevent ungrounded assertions from reaching users and track prompt evolutions systematically:
+* **Versioned Prompt Configurations**: Prompt templates and system instructions are decoupled into `prompts/<PROMPT_VERSION>.yaml` (default `v1.yaml`). The loader validates required schema keys (`version`, `system_prompt`, `user_template`, `refusal_message`, `insufficient_context_marker`) at startup.
+* **Post-Generation Grounding Check**: Before delivering an answer, `src/rag/grounding.py` strips citation and timing footers, splits the answer into constituent sentences, and calculates maximum cosine similarity against retrieved chunk embeddings (`GROUNDING_THRESHOLD = 0.45`).
+* **Enforcement Gate**: In production, grounding operates in log-only mode (`GROUNDING_ENFORCE = false`). When enabled (`GROUNDING_ENFORCE = true`), any answer with citation coverage below `GROUNDING_MIN_COVERAGE = 0.5` is cleanly refused with the standardized refusal notice.
+* **Attribution and Timing Footers**: Responses append verified physical page sources (`Sources:\n• <doc> (p. X)`) followed by measured end-to-end latency and model identifier (`Answered in <N> s with <model>`).
+
+
 ---
 
 ## 4. Empirical Evaluation & Benchmarks
@@ -133,6 +141,15 @@ The table below reports measured figures saved in `eval/results/*.json`:
 1. **Span vs. Strict Discrepancy**: Across all modes, the Span metric demonstrates that chunks frequently cross page boundaries. When chunks starting at page $P$ contain key definitions that bleed into page $P+1$, the strict metric erroneously counts them as misses. Page-span tracking accurately reflects the information retrieved.
 2. **Dense vs. Hybrid Baseline**: Dense and hybrid differ by 1-2 questions on a 50-question set and are within noise; the measurable gain comes from the reranker (hit@1 66% -> 76%, MRR 0.79 -> 0.85, at ~2 s/query on CPU).
 3. **Cross-Encoder Reranking Precision**: Reranking top-20 hybrid candidates with the cross-encoder yields a Hit@1 of 76.0% (+10.0 pp over baseline) and MRR of 0.8507 (+6.1 pp over baseline), establishing the highest semantic ranking accuracy on this benchmark.
+
+### 4.4 End-to-End Generation Latency on Host CPU
+While retrieval execution is sub-60 ms (hybrid) to 2.0 s (reranked), end-to-end generation latency is dominated by local LLM inference on host CPU. On a Dell Inspiron i5 laptop (16 GB RAM, CPU only) using Ollama with `eval/bench_llm.py` on `ci_fixture.pdf`:
+* `qwen2.5:3b` (default): ~18 s median per answered question, p95 ~21 s; 100% answerable answered, 100% unanswerable refused.
+* `llama3.2:3b`: ~18 s median per answered question, p95 ~21 s; 100% answerable answered, 100% unanswerable refused.
+* Unanswerable queries fail similarity gating and refuse in < 3 s without calling the LLM.
+* Full-document book queries (~600 chunks in Telegram) average 20–40 s with `qwen2.5:3b`.
+* Earlier 7B baseline (`qwen2:7b`): generated at 3 tokens/s, requiring 10–20 minutes per answer on laptop CPU.
+
 
 ---
 
@@ -172,23 +189,30 @@ To explore gating without data leakage:
 
 ---
 
-## 7. Verification Matrix & CI Quality Gate
+## 7. Verification Matrix & CI Quality Gates
 
 ### 7.1 Automated Unit Test Suite
-The repository maintains 41 automated unit tests across 7 test modules, executing in $\approx 10\text{ seconds}$ on CPU:
+The repository maintains comprehensive automated unit tests across 11 test modules:
 * `tests/test_citations.py`: Page citation formatting and programmatic source footer deduplication.
-* `tests/test_handlers.py`: SSRF scheme checks, loopback/private IP blocking, multi-hop redirect defense, and streaming byte caps.
+* `tests/test_handlers.py`: SSRF scheme checks, loopback/private IP blocking, multi-hop redirect defense, queueing, and new-reply delivery.
 * `tests/test_hybrid.py`: BM25 tokenization, RRF rank aggregation, empty corpus handling, and strict abstention invariant.
 * `tests/test_pdf_processor.py`: Per-page text extraction, whitespace normalization, and page-bound tracking.
 * `tests/test_rag.py`: Embedding generation, cosine similarity math, descending ordering, and sub-threshold abstention.
 * `tests/test_reranker.py`: Cross-encoder lazy loading, empty candidate handling, and reranking order.
 * `tests/test_storage.py`: Relational CRUD, multi-tenant isolation, page migration schema alteration, and cascade deletion.
+* `tests/test_bench_llm.py`: Benchmark loop stability, abstention counting, and JSON output formatting.
+* `tests/test_prompts.py`: Versioned YAML prompt loader, validation, and missing-key error handling.
+* `tests/test_grounding.py`: Sentence splitting, footer stripping, cosine similarity, and refusal coverage invariants.
+* `tests/test_faithfulness.py`: LLM-as-judge claim extraction, structured Pydantic validation, and entailment calculation.
 
-### 7.2 Continuous Integration Quality Gate
-A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request across Python 3.10, 3.11, and 3.12:
-1. Runs full 41-test unit suite.
-2. Executes retrieval evaluation harness against a synthetic 8-page document (`eval/fixtures/ci_fixture.pdf`) and 15-question golden set (`eval/golden_ci.json`).
-3. Enforces regression thresholds (`eval/thresholds.json`): `min_hit_at_5 >= 0.85`, `min_mrr >= 0.70`, `min_abstention_easy >= 0.90`. Builds fail automatically if retrieval performance regresses.
+### 7.2 Continuous Integration Quality Gates
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request to `main` across Python 3.10, 3.11, and 3.12:
+1. **Unit Test Suite**: Executes all 75 unit tests across the 11 modules.
+2. **Retrieval Evaluation Quality Gate**: Evaluates retrieval on the synthetic 8-page document (`eval/fixtures/ci_fixture.pdf`) and 15-question golden set (`eval/golden_ci.json`), enforcing `min_hit_at_5 >= 0.85`, `min_mrr >= 0.70`, and `min_abstention_easy >= 0.90`.
+3. **Grounding Quality Gate**: Evaluates citation coverage across reference answers and verifies rejection of negative controls (`eval/run_grounding_gate.py`), asserting mean reference coverage $\ge 0.85$ and negative control score $\le 0.40$.
+
+### 7.3 Offline Faithfulness Evaluation Harness
+For offline experimentation, `eval/run_faithfulness.py` provides an LLM-as-a-judge claim entailment verification harness. Because local 3B parameter models introduce noticeable variance, this evaluation is decoupled from the automated CI gate and used for local trend tracking.
 
 ---
 

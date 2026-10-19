@@ -4,6 +4,7 @@ import requests
 from typing import List, Dict, Any, Optional
 import logging
 import time
+from .prompts import PromptConfig, load_prompt_config
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,8 @@ class LLMClient:
                  max_retries: int = 3, retry_delay: float = 1.0,
                  base_url: str = "http://localhost:11434/v1",
                  timeout: float = 300.0,
-                 max_tokens: int = 300):
+                 max_tokens: int = 300,
+                 prompt_config: Optional[PromptConfig] = None):
         """Initialize LLM client.
         
         Args:
@@ -25,6 +27,7 @@ class LLMClient:
             base_url: Base URL for LLM API (chat/completions endpoint)
             timeout: Request timeout in seconds (defaults to 300s for local models)
             max_tokens: Maximum tokens in generated completion (default 300)
+            prompt_config: Optional PromptConfig instance (defaults to loaded config)
         """
         self.api_key = api_key
         self.model = model
@@ -32,6 +35,7 @@ class LLMClient:
         self.retry_delay = retry_delay
         self.timeout = timeout
         self.max_tokens = max_tokens
+        self.prompt_config = prompt_config or load_prompt_config()
         
         # Ensure base_url ends with /chat/completions
         clean_url = base_url.rstrip("/")
@@ -181,18 +185,12 @@ class LLMClient:
         """
         system_message = {
             "role": "system",
-            "content": (
-                "You are a helpful assistant that answers questions based on provided document context. "
-                "Use only the information from the context to answer questions. "
-                "When citing information, cite the source in the format [<filename>, p. <page>]. "
-                "When the provided context does not contain the answer, reply with exactly: INSUFFICIENT_CONTEXT (and nothing else). "
-                "Be concise and accurate. Answer in at most 150 words unless the user explicitly asks for detail."
-            )
+            "content": self.prompt_config.system_prompt
         }
         
         user_message = {
             "role": "user",
-            "content": f"Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+            "content": self.prompt_config.format_user_prompt(context=context, question=question)
         }
         
         return [system_message, user_message]

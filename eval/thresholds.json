@@ -2,5 +2,7 @@
   "min_hit_at_5": 0.85,
   "min_mrr": 0.70,
   "min_abstention_easy": 0.90,
-  "description": "Quality gate thresholds for CI synthetic evaluation (eval/golden_ci.json)"
+  "min_grounding_mean_coverage": 0.85,
+  "max_grounding_negative_control_coverage": 0.40,
+  "description": "Quality gate thresholds for CI synthetic evaluation (eval/golden_ci.json and eval/fixtures/ci_answers.json)"
 }

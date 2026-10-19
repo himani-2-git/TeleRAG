@@ -15,6 +15,8 @@ from telegram.error import TimedOut, NetworkError
 import asyncio
 import logging
 import time
+from ..rag.prompts import PromptConfig, load_prompt_config
+from ..rag.grounding import grounding_report
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +43,10 @@ class BotHandlers:
         self.retriever = retriever
         self.llm_client = llm_client
         self.config = config
+        pv = getattr(self.config, 'prompt_version', 'v1')
+        if not isinstance(pv, str):
+            pv = "v1"
+        self.prompt_config = load_prompt_config(pv)
         self.llm_semaphore = asyncio.Semaphore(1)
         self.active_requests = 0
     
@@ -317,7 +323,7 @@ class BotHandlers:
                 await self._deliver_answer(
                     update,
                     thinking_msg,
-                    "🤔 I couldn't find relevant information in your documents to answer this question."
+                    self.prompt_config.refusal_message
                 )
                 return
             
@@ -332,9 +338,47 @@ class BotHandlers:
                 await self._deliver_answer(
                     update,
                     thinking_msg,
-                    "🤔 I couldn't find relevant information in your documents to answer this question."
+                    self.prompt_config.refusal_message
                 )
                 return
+
+            # Post-generation grounding check
+            try:
+                grounding_thresh = getattr(self.config, "grounding_threshold", 0.45)
+                if not isinstance(grounding_thresh, (int, float)):
+                    grounding_thresh = 0.45
+                report = grounding_report(
+                    answer=answer,
+                    chunks=relevant_chunks,
+                    embedder=self.embedding_generator,
+                    threshold=grounding_thresh,
+                )
+                logger.info(
+                    f"Grounding check: applicable={report.applicable}, "
+                    f"coverage={report.citation_coverage:.2f} ({report.supported_sentences}/{report.total_sentences} supported), "
+                    f"threshold={grounding_thresh}"
+                )
+
+                grounding_enforce = getattr(self.config, "grounding_enforce", False)
+                if not isinstance(grounding_enforce, bool):
+                    grounding_enforce = False
+                min_coverage = getattr(self.config, "grounding_min_coverage", 0.5)
+                if not isinstance(min_coverage, (int, float)):
+                    min_coverage = 0.5
+
+                if grounding_enforce and report.applicable and report.citation_coverage < min_coverage:
+                    logger.warning(
+                        f"Grounding check failed enforcement: coverage={report.citation_coverage:.2f} < min_coverage={min_coverage:.2f}. "
+                        f"Refusing answer."
+                    )
+                    await self._deliver_answer(
+                        update,
+                        thinking_msg,
+                        self.prompt_config.refusal_message
+                    )
+                    return
+            except Exception as ge:
+                logger.warning(f"Grounding check evaluation error [{type(ge).__name__}]: {ge}")
 
             footer = self._format_source_footer(relevant_chunks)
             elapsed_s = round(time.time() - start_time)
@@ -436,9 +480,10 @@ class BotHandlers:
         clean = text.strip()
         lower = clean.lower()
         
-        # Starts with INSUFFICIENT_CONTEXT (trimmed, case-insensitive, punctuation-stripped)
+        # Starts with insufficient context marker (trimmed, case-insensitive, punctuation-stripped)
         stripped = clean.strip("`'\" \t\r\n").lower()
-        if stripped.startswith("insufficient_context"):
+        marker = getattr(self.prompt_config, "insufficient_context_marker", "INSUFFICIENT_CONTEXT").strip().lower()
+        if stripped.startswith(marker) or stripped.startswith("insufficient_context"):
             return True
             
         # Common phrasings where the model clearly says the context does not contain the answer

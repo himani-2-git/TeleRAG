@@ -122,9 +122,11 @@ User (Telegram Client)
 * **Relevance Cutoff Gatekeeper**: Enforces a dense cosine threshold (`SIMILARITY_THRESHOLD=0.3`) before calling the LLM. If no chunk meets the threshold, the bot abstains. This reduces answers not supported by the document; does not eliminate hallucination.
 
 ### 4. LLM Generation via Local Ollama or Hosted Endpoints
-* **Local Inference (Default)**: Preconfigured for local [Ollama](https://ollama.ai) at `http://localhost:11434/v1` using locally hosted models (e.g. `qwen2:7b` via `ollama list`) with zero external API dependencies or fees.
+* **Local Inference (Default)**: Preconfigured for local [Ollama](https://ollama.ai) at `http://localhost:11434/v1` using locally hosted models (e.g. `qwen2.5:3b` via `ollama list`) with zero external API dependencies or fees.
 * **Hosted Alternative**: Can optionally route to remote OpenAI-compatible endpoints by supplying an API key and base URL.
-* **Grounded Prompts**: Dynamically compiles top-$k$ passages into concise prompts with explicit refusal instructions.
+* **Versioned Prompts**: Loads structured prompt configurations from `prompts/<PROMPT_VERSION>.yaml` (default `v1`) with system prompt, context template, and explicit refusal instructions.
+* **Post-Generation Grounding Check**: Measures sentence-level semantic alignment against retrieved passages (`GROUNDING_THRESHOLD=0.45`). By default, runs in log-only mode (`GROUNDING_ENFORCE=false`). When enforcement is enabled (`GROUNDING_ENFORCE=true`), answers with citation coverage below `GROUNDING_MIN_COVERAGE=0.5` are safely refused.
+* **Dual Verified Footers**: Successful responses append physical page citations (`Sources:\n• <doc> (p. X)`) followed by generation latency and model attribution (`Answered in <N> s with <model>`).
 
 ### 5. Multi-User Isolation & Session Control
 * **Tenant Isolation**: SQLite metadata and chunk records are indexed and scoped by Telegram `user_id`. Users can only query and manage their own documents.
@@ -231,9 +233,19 @@ python eval/run_eval.py --mode hybrid --pdf eval/fixtures/book.pdf --golden eval
 # Evaluate hybrid retrieval + cross-encoder reranking
 python eval/run_eval.py --mode hybrid_rerank --pdf eval/fixtures/book.pdf --golden eval/golden.json --out eval/results/hybrid_rerank.json
 
-# Run CI quality gate on synthetic 8-page fixture
+# Run CI retrieval evaluation quality gate on synthetic 8-page fixture
 python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golden eval/golden_ci.json --thresholds eval/thresholds.json
+
+# Run CI grounding quality gate (verifies reference citations & rejects hallucinations)
+python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
+
+# Run local LLM-as-judge faithfulness evaluation (claim entailment)
+# Note: Install optional evaluation dependencies via `pip install -r requirements-eval.txt`
+python -m eval.run_faithfulness --n 20 --judge-model qwen2.5:3b --gen-model qwen2.5:3b --output eval/results/faithfulness.json
 ```
+
+> [!NOTE]
+> **Faithfulness Evaluation & 3B Judge Noise**: `eval/run_faithfulness.py` extracts atomic claims from generated answers and verifies their context entailment using an LLM judge. Local 3B parameter models (e.g., `qwen2.5:3b`) exhibit prompt sensitivity and variance compared to frontier models. This script is intended strictly for local trend-checking and experimentation, and is intentionally excluded from the zero-tolerance automated CI quality gate.
 
 ---
 
@@ -267,24 +279,36 @@ TeleRAG/
 │   └── workflows/
 │       └── ci.yml              # GitHub Actions CI quality gate
 ├── eval/
-│   ├── fixtures/               # Evaluation PDFs (ci_fixture.pdf synthetic document)
+│   ├── fixtures/
+│   │   ├── ci_fixture.pdf      # Synthetic 8-page regression document
+│   │   ├── ci_answers.json     # Reference answers & negative controls for grounding gate
+│   │   ├── build_golden.py     # Golden dataset generator
+│   │   ├── make_fixture.py     # CI fixture builder
+│   │   └── make_split.py       # Stratified split generator
 │   ├── golden.json             # 70-question verified golden dataset (Think Python 2e)
 │   ├── golden_ci.json          # 15-question synthetic CI golden dataset
 │   ├── split.json              # Stratified DEV/TEST split (seed 42)
-│   ├── thresholds.json         # Regression thresholds for CI quality gate
-│   ├── run_eval.py             # Evaluation harness (dense, hybrid, hybrid_rerank)
+│   ├── thresholds.json         # Regression thresholds for CI quality & grounding gates
+│   ├── run_eval.py             # Retrieval evaluation harness (dense, hybrid, hybrid_rerank)
+│   ├── run_grounding_gate.py   # CI factual citation coverage & hallucination check
+│   ├── run_faithfulness.py     # Local LLM-as-judge claim entailment evaluation
 │   ├── run_abstention_experiment.py # Dev/Test abstention gate experiment
+│   ├── bench_llm.py            # Local model latency and refusal benchmark
 │   └── results/                # Measured benchmark outputs (JSON)
 │       ├── baseline.json       # Dense baseline metrics
 │       ├── hybrid.json         # BM25 + Dense RRF metrics
 │       ├── hybrid_rerank.json  # Cross-encoder reranked metrics
 │       ├── ci_eval.json        # Synthetic CI fixture metrics
+│       ├── llm_bench.json      # Measured local LLM latency & refusal metrics
 │       └── abstention_experiment.json # Stratified dev/test gate comparison
+├── prompts/
+│   └── v1.yaml                 # Versioned prompt configuration (system, user, refusal)
 ├── docs/
 │   └── design-decisions.md     # Architecture decisions and trade-offs log
 ├── main.py                     # Bot entry point and lifecycle manager
 ├── requirements.txt            # Pinned production dependencies
-├── requirements-dev.txt        # Development & evaluation dependencies (fpdf2)
+├── requirements-dev.txt        # Development & CI fixture dependencies (fpdf2)
+├── requirements-eval.txt       # Optional local evaluation dependencies (pydantic, ragas)
 ├── .env.example                # Configuration template
 ├── .gitignore                  # Git exclusion rules
 ├── INSTRUCTIONS.md             # Complete installation, configuration & user manual
@@ -295,7 +319,7 @@ TeleRAG/
 ├── src/
 │   ├── config.py               # Central environment variable configuration
 │   ├── bot/
-│   │   ├── handlers.py         # Telegram message & command handlers, SSRF checks, source footer
+│   │   ├── handlers.py         # Telegram handlers, queueing, grounding check & footers
 │   │   └── __init__.py
 │   ├── processors/
 │   │   ├── pdf_processor.py    # Page-aware extraction, validation
@@ -303,10 +327,12 @@ TeleRAG/
 │   │   └── __init__.py
 │   ├── rag/
 │   │   ├── embeddings.py       # SentenceTransformers embedding generation
+│   │   ├── grounding.py        # Post-generation sentence grounding report
 │   │   ├── hybrid.py           # BM25 + dense Reciprocal Rank Fusion
+│   │   ├── llm_client.py       # OpenAI-compatible LLM client & response parsing
+│   │   ├── prompts.py          # Versioned YAML prompt loader
 │   │   ├── reranker.py         # CrossEncoder candidate reranking
 │   │   ├── retriever.py        # Routing retriever & page citation context formatting
-│   │   ├── llm_client.py       # OpenAI-compatible LLM client & response parsing
 │   │   └── __init__.py
 │   └── storage/
 │       ├── database.py         # SQLite schema, page columns & migrations
@@ -314,10 +340,14 @@ TeleRAG/
 │       └── __init__.py
 │
 └── tests/                      # Automated unit test suite
+    ├── test_bench_llm.py       # Tests for benchmark loop, abstention & recovery
     ├── test_citations.py       # Tests for page citations & source footers
-    ├── test_handlers.py        # Tests for SSRF defense, redirects, and streaming limits
+    ├── test_faithfulness.py    # Tests for LLM-as-judge claim verification
+    ├── test_grounding.py       # Tests for sentence grounding & footer stripping
+    ├── test_handlers.py        # Tests for SSRF defense, redirects, queueing & answers
     ├── test_hybrid.py          # Tests for BM25, RRF fusion, and abstention invariant
     ├── test_pdf_processor.py   # Tests for extraction, chunking, and page boundaries
+    ├── test_prompts.py         # Tests for YAML prompt loading & validation
     ├── test_rag.py             # Tests for embeddings, cosine search, 404 handling, thresholds
     ├── test_reranker.py        # Tests for cross-encoder reranking order and scores
     └── test_storage.py         # Tests for database CRUD, page migrations, and cascades

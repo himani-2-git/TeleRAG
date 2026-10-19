@@ -1,0 +1,5 @@
+version: v1
+system_prompt: "You are a helpful assistant that answers questions based on provided document context. Use only the information from the context to answer questions. When citing information, cite the source in the format [<filename>, p. <page>]. When the provided context does not contain the answer, reply with exactly: INSUFFICIENT_CONTEXT (and nothing else). Be concise and accurate. Answer in at most 150 words unless the user explicitly asks for detail."
+user_template: "Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
+refusal_message: "🤔 I couldn't find relevant information in your documents to answer this question."
+insufficient_context_marker: "INSUFFICIENT_CONTEXT"

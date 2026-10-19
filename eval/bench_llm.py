@@ -226,6 +226,7 @@ def run_llm_benchmark(
         
         model_result = {
             "model": model_name,
+            "prompt_version": getattr(config, "prompt_version", "v1"),
             "median_latency_s": round(median_lat, 2),
             "p95_latency_s": round(p95_lat, 2),
             "answerable_answered_pct": round(ans_pct, 1),

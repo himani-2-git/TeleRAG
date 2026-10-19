@@ -33,6 +33,12 @@ class Config:
     llm_max_tokens: int = 300
     max_retries: int = 3
     retry_delay: float = 1.0
+    prompt_version: str = "v1"
+    
+    # Grounding Check Settings
+    grounding_threshold: float = 0.45
+    grounding_enforce: bool = False
+    grounding_min_coverage: float = 0.5
     
     # Database
     database_path: str = "data/documents.db"
@@ -73,6 +79,10 @@ def get_config(require_telegram: bool = True) -> Config:
         llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
         retry_delay=float(os.getenv("RETRY_DELAY", "1.0")),
+        prompt_version=os.getenv("PROMPT_VERSION", "v1"),
+        grounding_threshold=float(os.getenv("GROUNDING_THRESHOLD", "0.45")),
+        grounding_enforce=os.getenv("GROUNDING_ENFORCE", "false").lower() in ("true", "1", "yes"),
+        grounding_min_coverage=float(os.getenv("GROUNDING_MIN_COVERAGE", "0.5")),
         database_path=os.getenv("DATABASE_PATH", "data/documents.db"),
         embeddings_path=os.getenv("EMBEDDINGS_PATH", "data/embeddings"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),

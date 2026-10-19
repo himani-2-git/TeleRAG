@@ -39,3 +39,10 @@ jobs:
             --pdf eval/fixtures/ci_fixture.pdf \
             --golden eval/golden_ci.json \
             --thresholds eval/thresholds.json
+
+      - name: Run grounding evaluation quality gate
+        run: |
+          python eval/run_grounding_gate.py \
+            --pdf eval/fixtures/ci_fixture.pdf \
+            --answers eval/fixtures/ci_answers.json \
+            --thresholds eval/thresholds.json

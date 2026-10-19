@@ -116,7 +116,7 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 # Default: Local Ollama (no key needed)
 # ===================================================================
 LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=qwen2:7b
+LLM_MODEL=qwen2.5:3b
 
 # Optional: Hosted LLM endpoint (requires API key)
 # LLM_BASE_URL=https://api.example.com/v1
@@ -128,16 +128,20 @@ MAX_RETRIES=3
 RETRY_DELAY=1.0
 
 # ===================================================================
-# RAG Retrieval & Chunking Settings
+# RAG Retrieval, Prompts & Grounding Settings
 # ===================================================================
 RETRIEVAL_MODE=hybrid
 MAX_FILE_SIZE_MB=20
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 EMBEDDING_MODEL=all-MiniLM-L6-v2
-TOP_K_RESULTS=3
+TOP_K_RESULTS=2
 SIMILARITY_THRESHOLD=0.3
 LLM_MAX_TOKENS=300
+PROMPT_VERSION=v1
+GROUNDING_THRESHOLD=0.45
+GROUNDING_ENFORCE=false
+GROUNDING_MIN_COVERAGE=0.5
 
 # ===================================================================
 # Storage & Logging Paths
@@ -160,11 +164,11 @@ python -m unittest discover tests
 
 Expected output:
 ```text
-Ran unit tests in ~10s
+Ran unit tests in ~20s
 
 OK
 ```
-This validates SSRF defense, multi-hop redirect checks, streaming limits, per-page PDF parsing, sliding-window chunk bounds, page citations and source footers, SQLite schema migrations, BM25 indexing, RRF rank fusion, cross-encoder reranking, and cosine similarity threshold filtering without making external network calls.
+This validates SSRF defense, multi-hop redirect checks, streaming limits, per-page PDF parsing, sliding-window chunk bounds, page citations and source footers, SQLite schema migrations, BM25 indexing, RRF rank fusion, cross-encoder reranking, YAML prompt loading, grounding checks, and cosine similarity threshold filtering without making external network calls.
 
 ### 4.1 Running the Retrieval Evaluation Quality Gate
 To verify retrieval performance against the synthetic regression fixture:
@@ -172,6 +176,21 @@ To verify retrieval performance against the synthetic regression fixture:
 python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golden eval/golden_ci.json --thresholds eval/thresholds.json
 ```
 All quality gate assertions (`min_hit_at_5 >= 0.85`, `min_mrr >= 0.70`, `min_abstention_easy >= 0.90`) should pass.
+
+### 4.2 Running the Grounding Evaluation Quality Gate
+To verify citation grounding and rejection of ungrounded hallucinations:
+```bash
+python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
+```
+Verifies that mean reference answer citation coverage meets the threshold ($\ge 0.85$) and negative controls score $\le 0.40$.
+
+### 4.3 Running Local Faithfulness Evaluation (Optional)
+To run claim-level entailment evaluation with an LLM judge:
+```bash
+pip install -r requirements-eval.txt
+python -m eval.run_faithfulness --n 20 --judge-model qwen2.5:3b --gen-model qwen2.5:3b --output eval/results/faithfulness.json
+```
+*(Note: A local 3B judge is noisy and intended for directional trend-checking, not a strict CI gate).*
 
 ---
 

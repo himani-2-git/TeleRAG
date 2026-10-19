@@ -1,0 +1,110 @@
+[
+  {
+    "id": "ci_01",
+    "question": "What is the primary technique used for high availability in distributed systems?",
+    "answer": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_02",
+    "question": "What does the PACELC theorem state regarding latency and consistency?",
+    "answer": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_03",
+    "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+    "answer": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_04",
+    "question": "How does Multi-Paxos optimize basic Paxos for recurring log entries?",
+    "answer": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_05",
+    "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+    "answer": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_06",
+    "question": "What RPCs are used by the Raft leader to replicate log entries across followers?",
+    "answer": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_07",
+    "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+    "answer": "Lamport clocks cannot distinguish between causally related events and concurrent events. Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_08",
+    "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+    "answer": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_09",
+    "question": "What are the three operational phases of Practical Byzantine Fault Tolerance (PBFT)?",
+    "answer": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_10",
+    "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+    "answer": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_11",
+    "question": "What mathematical properties of the merge operator guarantee convergence in state-based CRDTs?",
+    "answer": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_12",
+    "question": "What are common examples of conflict-free replicated data types such as PN-Counters and OR-Sets?",
+    "answer": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_u01",
+    "question": "How do plants convert sunlight into chemical energy during the light-dependent reactions of photosynthesis?",
+    "answer": "INSUFFICIENT_CONTEXT",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_u02",
+    "question": "What are the culinary techniques for making a classical French hollandaise emulsion sauce?",
+    "answer": "INSUFFICIENT_CONTEXT",
+    "is_negative_control": false
+  },
+  {
+    "id": "ci_u03",
+    "question": "How do pneumatic disc brakes function on heavy commercial freight trucks?",
+    "answer": "INSUFFICIENT_CONTEXT",
+    "is_negative_control": false
+  },
+  {
+    "id": "neg_01",
+    "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+    "answer": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+    "is_negative_control": true
+  },
+  {
+    "id": "neg_02",
+    "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+    "answer": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+    "is_negative_control": true
+  },
+  {
+    "id": "neg_03",
+    "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+    "answer": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+    "is_negative_control": true
+  }
+]

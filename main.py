@@ -11,6 +11,7 @@ from src.storage.document_store import DocumentStore
 from src.rag.embeddings import EmbeddingGenerator
 from src.rag.retriever import DocumentRetriever
 from src.rag.llm_client import LLMClient
+from src.rag.prompts import load_prompt_config
 from src.bot.handlers import BotHandlers
 
 def setup_logging(config):
@@ -47,11 +48,13 @@ def main():
     setup_logging(config)
     logger = logging.getLogger(__name__)
     logger.info("Starting PDF RAG Chatbot...")
+    logger.info(f"Loaded prompt version: {config.prompt_version}")
     
     try:
         # Initialize components
         logger.info("Initializing components...")
         
+        prompt_config = load_prompt_config(config.prompt_version)
         pdf_processor = PDFProcessor(max_file_size_mb=config.max_file_size_mb)
         text_chunker = TextChunker(chunk_size=config.chunk_size, 
                                    overlap=config.chunk_overlap)
@@ -67,7 +70,8 @@ def main():
                                retry_delay=config.retry_delay,
                                base_url=config.llm_base_url,
                                timeout=300.0,
-                               max_tokens=config.llm_max_tokens)
+                               max_tokens=config.llm_max_tokens,
+                               prompt_config=prompt_config)
         
         # Check LLM availability on startup
         logger.info(f"Checking LLM model availability ({config.llm_model} at {config.llm_base_url})...")

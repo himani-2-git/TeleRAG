@@ -1,0 +1,98 @@
+[
+  {
+    "id": "heldout_ref_01",
+    "question": "What model assumptions distinguish synchronous distributed systems from asynchronous ones?",
+    "answer": "Synchronous systems assume known bounds on processing and network delays, whereas asynchronous systems operate without any timing assumptions.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_02",
+    "question": "Which database systems favor availability and low latency according to the PACELC classification?",
+    "answer": "Dynamo and Cassandra choose the PA/EL trade-off, prioritizing availability during partitions and low latency during normal execution.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_03",
+    "question": "What must happen before a proposer issues an Accept request in basic Paxos?",
+    "answer": "A proposer must receive Promise responses from a majority quorum of acceptors pledging not to accept proposals with lower ballot numbers.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_04",
+    "question": "What action does a Raft node take when it transitions into the candidate state?",
+    "answer": "When a follower transitions to a candidate, it increments its term, votes for itself, and broadcasts RequestVote RPCs to peer nodes.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_05",
+    "question": "How do Lamport timestamps update when a message is received from another node?",
+    "answer": "Upon message reception, a node updates its Lamport timestamp to one plus the maximum of its local clock and the received clock value.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_06",
+    "question": "What security mechanisms do nodes in PBFT rely on to authenticate messages in an asynchronous network?",
+    "answer": "Practical Byzantine Fault Tolerance relies on cryptographic signatures or message authentication codes to protect communication.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_07",
+    "question": "What voting conditions determine whether a Two-Phase Commit coordinator decides to commit or abort?",
+    "answer": "If every participant votes VOTE_COMMIT, the coordinator issues a GLOBAL_COMMIT; otherwise, if any participant aborts, it broadcasts GLOBAL_ABORT.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_ref_08",
+    "question": "What are the two distinct categories into which Conflict-free Replicated Data Types are divided?",
+    "answer": "CRDTs are categorized into state-based CvRDTs, which transmit full state, and operation-based CmRDTs.",
+    "is_negative_control": false
+  },
+  {
+    "id": "heldout_neg_01",
+    "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+    "answer": "A Byzantine system requires at least 2f + 2 total nodes to tolerate f arbitrary failures in an asynchronous environment.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_02",
+    "question": "Which database systems favor availability and low latency according to the PACELC classification?",
+    "answer": "Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_03",
+    "question": "Who designed the Raft consensus algorithm and what protocol was it created to replace?",
+    "answer": "Leslie Lamport created Raft as an understandable replacement for Practical Byzantine Fault Tolerance.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_04",
+    "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+    "answer": "Two events are detected as concurrent by vector clocks when one vector clock completely dominates the other.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_05",
+    "question": "What must happen before a proposer issues an Accept request in basic Paxos?",
+    "answer": "A proposer sends a Prepare request with a unique ballot number to acceptors. If a majority responds, the proposer immediately issues a GLOBAL_COMMIT without Phase 2.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_06",
+    "question": "What action does a Raft node take when it transitions into the candidate state?",
+    "answer": "When a follower detects an election timeout, it becomes a candidate and increments its current term. The candidate then immediately assumes leadership and replicates log entries without collecting votes.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_07",
+    "question": "What voting conditions determine whether a Two-Phase Commit coordinator decides to commit or abort?",
+    "answer": "In Two-Phase Commit, participants write uncommitted modifications to a write-ahead log. If any participant votes VOTE_ABORT, the coordinator overrides the abort and broadcasts GLOBAL_COMMIT.",
+    "is_negative_control": true
+  },
+  {
+    "id": "heldout_neg_08",
+    "question": "What are the two distinct categories into which Conflict-free Replicated Data Types are divided?",
+    "answer": "CRDTs come in two varieties: State-based (CvRDTs) and Operation-based (CmRDTs). State-based CRDTs resolve conflicts by locking distributed transactions with two-phase commit.",
+    "is_negative_control": true
+  }
+]

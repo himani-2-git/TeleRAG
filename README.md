@@ -252,32 +252,51 @@ python -m eval.run_faithfulness --judge-type nli --n 20 --output eval/results/fa
 
 > [!NOTE]
 > **Faithfulness Evaluation & Judge Architectures**:
-> * **NLI CrossEncoder Judge (Default)**: Uses a cross-encoder NLI model (`--nli-model`, default `cross-encoder/nli-deberta-v3-small`; lighter alternative: `cross-encoder/nli-MiniLM2-L6-H768`). The generated answer is split into sentences (ignoring citation and timing footers). For each sentence, entailment probabilities are evaluated against each retrieved chunk as premise via softmax over the model's dynamically resolved label config. A sentence is marked supported if `max entailment >= --entail-threshold` (default 0.5) AND `entailment > contradiction` for that best chunk. Factual faithfulness is computed as `supported_sentences / total_sentences`. Premises are safely truncated to the model's sequence length.
+> * **NLI CrossEncoder Judge (Default)**: Uses a cross-encoder NLI model (`--nli-model`, default `cross-encoder/nli-deberta-v3-base`; lighter alternative: `cross-encoder/nli-deberta-v3-small`). The generated answer is split into sentences (ignoring citation and timing footers). To resolve premise dilution, chunks are segmented into sentences and evaluated across sliding premise windows (sizes 1, 2, and 3 consecutive sentences, `--premise-window "1,2,3"`). For each sentence, entailment probabilities are evaluated against all premise windows via batched softmax over the model's dynamically resolved label config. A sentence is marked supported if `max entailment >= --entail-threshold` AND `entailment > contradiction` for the best window. Factual faithfulness is computed as `supported_sentences / total_sentences`.
 > * **LLM Judge (`--judge-type llm`)**: Prompts an instruction-tuned model (e.g. `llama3.2:3b`) to extract factual claims and assess entailment as structured JSON. TeleRAG warns if the generator and judge models match to alert against self-enhancement bias.
 > * **Unscorable Handling**: Any answer where the judge extracts 0 checkable claims or 0 sentences is classified as `UNSCORABLE` (never scored 1.00 or 0.00) and excluded from faithfulness means.
-> * **Judge Validation Rule (`--validate-judge`)**: Before trusting a judge, it is benchmarked against `eval/fixtures/ci_answers.json` (12 supported reference answers and 6 deliberate negative controls). The judge is marked `VALID` only if:
+> * **Judge Validation Rule (`--validate-judge`)**: Before trusting a judge, it is benchmarked against `eval/fixtures/ci_answers.json` (DEV set: 12 reference answers and 6 negative controls) and `eval/fixtures/ci_answers_heldout.json` (HELD-OUT set: 8 reference answers and 8 negative controls). Threshold calibration sweeps 0.30 to 0.90 on DEV only, selecting the optimal threshold with the largest pass margin. The held-out set is evaluated strictly once at that fixed threshold. The judge is marked `VALID` only if BOTH sets pass:
 >   1. Mean reference answer faithfulness is $\ge 0.80$.
->   2. Every negative control scores $\le 0.50$.
+>   2. Every negative control scores $\le 0.50$ (false-accept rate = 0%).
 >   3. Zero unscorable references (coverage requirement).
->   Otherwise, the runner outputs `JUDGE NOT TRUSTWORTHY`. Validation results are saved to `eval/results/judge_validation_<judge>.json`.
+>   Otherwise, the runner outputs `JUDGE NOT TRUSTWORTHY` and flags the judge as `UNVALIDATED JUDGE: treat scores as directional`. Validation results are saved to `eval/results/judge_validation_<judge>.json`.
 
 ### Judge Validation Findings
 
-Measured on `eval/fixtures/ci_fixture.pdf` with `eval/fixtures/ci_answers.json`:
+Validation scores reference answers against **retrieved context** (not raw ground-truth fixture text). Consequently, a retrieval miss counts against the reference. For example, on `ci_06` (*What RPCs are used by the Raft leader to replicate log entries across followers?*), the true reference answer was scored `0.00` across all judges because hybrid retrieval's top-2 chunks did not contain the sentence explaining `AppendEntries`, demonstrating that end-to-end judge validation tests the joint retrieval-and-judge pipeline.
+
+#### Summary of Evaluated Judges
+
+| Judge Architecture | Model | Premise Granularity | DEV Ref Mean | DEV Neg Max (False Accept) | HELD-OUT Ref Mean | HELD-OUT Neg Max (False Accept) | Validation Verdict |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| LLM Judge | `llama3.2:3b` | Whole retrieved context | 0.917 | 1.000 (16.7%) | n/a | n/a | **`NOT TRUSTWORTHY`** |
+| NLI CrossEncoder | `nli-deberta-v3-small` | Whole chunk | 0.167 | 0.333 (0.0%) | n/a | n/a | **`NOT TRUSTWORTHY`** |
+| NLI CrossEncoder | `nli-deberta-v3-small` | Sentence windows (1,2,3) | 0.917 | 0.333 (0.0%) | 0.875 | 1.000 (12.5%) | **`NOT TRUSTWORTHY`** |
+| NLI CrossEncoder (Default) | `nli-deberta-v3-base` | Sentence windows (1,2,3) | 0.750 | 0.333 (0.0%) | 0.875 | 0.500 (0.0%) | **`NOT TRUSTWORTHY`** |
+
+#### Detailed Judge Analysis
 
 * **`llama3.2:3b` (LLM Judge)**:
-  * Mean Reference Faithfulness: **0.917**
-  * Mean Negative Control Faithfulness: **0.222**
-  * Max Negative Control Faithfulness: **1.000** (`neg_06`, a subtly incorrect assertion, was scored 2/2 entailed)
+  * DEV Set: Mean Ref **0.917**, Mean Neg **0.222**, Max Neg **1.000** (`neg_06`, a subtly incorrect assertion, scored 2/2 entailed; false-accept rate 16.7%).
   * Coverage Failure: 4 of 12 reference answers (`ci_03`, `ci_04`, `ci_06`, `ci_08`) yielded zero extracted claims and were erroneously scored 1.00 before the zero-claim bug fix.
   * Verdict: **`JUDGE NOT TRUSTWORTHY`** (failed negative control ceiling and reference coverage).
 
-* **`cross-encoder/nli-deberta-v3-small` (NLI Judge)**:
-  * Mean Reference Faithfulness: **0.167** (Required $\ge 0.800$)
-  * Mean Negative Control Faithfulness: **0.056**
-  * Max Negative Control Faithfulness: **0.333** (Required $\le 0.500$; all 6 negative controls rejected cleanly)
-  * Unscorable References: **0**
-  * Verdict: **`JUDGE NOT TRUSTWORTHY`** (negative controls passed with flying colors, but references under-scored because passing whole 200-word multi-topic chunks as premises to an MNLI model yields high `neutral` probabilities due to premise-granularity mismatch).
+* **`cross-encoder/nli-deberta-v3-small` (Whole Chunks)**:
+  * DEV Set: Mean Ref **0.167** (failed $\ge 0.800$ requirement), Mean Neg **0.056**, Max Neg **0.333** (false-accept rate 0.0%).
+  * Root Cause: Premise granularity mismatch. Passing multi-topic 200-word chunks as premises to a small MNLI model diluted attention, producing ~0.98 `neutral` probabilities even for verbatim claims.
+  * Verdict: **`JUDGE NOT TRUSTWORTHY`**.
+
+* **`cross-encoder/nli-deberta-v3-small` (Sentence Windows `1,2,3`, Calibrated Threshold `0.35`)**:
+  * DEV Set: Mean Ref **0.917** (11/12 passed, accept rate 91.7%), Mean Neg **0.167**, Max Neg **0.333** (false-accept rate 0.0%, fully-accepted rate 0.0%). DEV Set Status: **PASS**.
+  * HELD-OUT Set: Mean Ref **0.875** (7/8 passed, accept rate 87.5%), Mean Neg **0.375**, Max Neg **1.000** (false-accept rate 12.5%, fully-accepted rate 12.5%). HELD-OUT Set Status: **FAIL**.
+  * Root Cause: Entity-swap blindness on `heldout_neg_02`.
+  * Verdict: **`JUDGE NOT TRUSTWORTHY`**.
+
+* **`cross-encoder/nli-deberta-v3-base` (Sentence Windows `1,2,3`, Calibrated Threshold `0.30`, Default)**:
+  * DEV Set: Mean Ref **0.750** (9/12 passed, accept rate 75.0%; `ci_04`, `ci_06`, `ci_12` under-scored), Mean Neg **0.111**, Max Neg **0.333** (false-accept rate 0.0%, fully-accepted rate 0.0%). DEV Set Status: **FAIL**.
+  * HELD-OUT Set: Mean Ref **0.875** (7/8 passed, accept rate 87.5%), Mean Neg **0.250**, Max Neg **0.500** (false-accept rate **0.0%**, fully-accepted rate **0.0%**). HELD-OUT Set Status: **PASS**.
+  * Key Advantage: Unlike the small model, `base` was not fooled by `heldout_neg_02` (correctly rejecting it with score 0.00), achieving 0.0% false-accept rate across all 14 negative controls on both sets and passing the held-out set. However, because it under-scored on DEV (75.0% < 80.0%), it remains an unvalidated judge whose reports are explicitly flagged as directional.
+  * Verdict: **`JUDGE NOT TRUSTWORTHY`**.
 
 ---
 
@@ -300,6 +319,7 @@ Measured on `eval/fixtures/ci_fixture.pdf` with `eval/fixtures/ci_answers.json`:
 6. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection, leaving a theoretical window for DNS rebinding attacks.
 7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `PyPDF2`.
 8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use rather than untrusted multi-tenant host environments.
+9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias. For example, on `heldout_neg_02` (*Which database systems favor availability and low latency according to the PACELC classification?*), the subtly inverted answer `Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.` was assigned entailment `0.7545` (scored 1.000) against the PACELC premise window because all mentioned entities (Spanner, Bigtable, PA/EL, availability, low latency) co-occur in the same sentence window even though the passage assigns PA/EL to Dynamo/Cassandra and PC/EC to Bigtable/Spanner. Testing the larger `cross-encoder/nli-deberta-v3-base` resolved this specific entity-swap error (rejecting `heldout_neg_02` with score 0.00 and 0.0% false-accept rate on held-out), but under-scored certain dev references (`ci_04`, `ci_12`), leaving both NLI models marked as unvalidated judges.
 
 ---
 

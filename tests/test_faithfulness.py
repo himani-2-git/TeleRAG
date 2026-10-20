@@ -9,11 +9,13 @@ from unittest.mock import Mock
 import numpy as np
 
 from eval.run_faithfulness import (
+    build_premise_windows,
     extract_json_block,
     get_nli_label_indices,
     judge_answer_faithfulness_llm,
     judge_answer_faithfulness_nli,
     make_cache_key,
+    parse_premise_windows,
     run_faithfulness_evaluation,
     validate_judge,
 )
@@ -247,6 +249,144 @@ class TestFaithfulness(unittest.TestCase):
             # The old LLM question should not be present in new results
             self.assertNotIn("q_old", summary["questions"])
 
+    def test_build_premise_windows_does_not_cross_chunks(self):
+        """Verify premise windows (1, 2, 3 sentences) never cross chunk boundaries."""
+        chunks = [
+            {"content": "Chunk one sentence A. Chunk one sentence B. Chunk one sentence C."},
+            {"content": "Chunk two sentence X. Chunk two sentence Y."},
+        ]
+        windows = build_premise_windows(chunks, window_sizes=[1, 2, 3])
+
+        # Every window must belong strictly to chunk 1 or chunk 2, never mixing both
+        for w in windows:
+            in_c1 = "Chunk one" in w
+            in_c2 = "Chunk two" in w
+            self.assertTrue(in_c1 != in_c2, f"Window crossed chunk boundary: {w}")
+
+        # Chunk 1: 3 sentences -> w=1: 3, w=2: 2, w=3: 1 -> 6 windows
+        # Chunk 2: 2 sentences -> w=1: 2, w=2: 1 -> 3 windows
+        # Total = 9 windows
+        self.assertEqual(len(windows), 9)
+
+        # Check parsing of premise-window parameter
+        self.assertEqual(parse_premise_windows("1, 2, 3"), [1, 2, 3])
+        self.assertEqual(parse_premise_windows("2,1"), [1, 2])
+        self.assertEqual(parse_premise_windows("invalid"), [1, 2, 3])
+
+    def test_threshold_sweep_selection(self):
+        """Verify calibration sweep selects the threshold satisfying pass rule with largest margin."""
+        mock_ce = Mock()
+        mock_ce.config = Mock(id2label={0: "contradiction", 1: "entailment", 2: "neutral"})
+        mock_ce.tokenizer = None
+
+        def side_effect(pairs, batch_size=32):
+            results = []
+            for premise, hyp in pairs:
+                if "Quantum" in hyp:
+                    results.append([2.0, -1.0, 0.0])
+                else:
+                    results.append([0.0, 1.5, 0.0])
+            return np.array(results)
+
+        mock_ce.predict.side_effect = side_effect
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dev_json = os.path.join(tmpdir, "dev_answers.json")
+            heldout_json = os.path.join(tmpdir, "heldout_answers.json")
+            out_json = os.path.join(tmpdir, "val_out.json")
+
+            dev_data = [
+                {"id": "ref_1", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
+                {"id": "neg_1", "question": "What is high availability?", "answer": "Quantum failure sentence.", "is_negative_control": True},
+            ]
+            heldout_data = [
+                {"id": "href_1", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
+                {"id": "hneg_1", "question": "What is high availability?", "answer": "Quantum heldout failure sentence.", "is_negative_control": True},
+            ]
+            with open(dev_json, "w", encoding="utf-8") as f:
+                json.dump(dev_data, f)
+            with open(heldout_json, "w", encoding="utf-8") as f:
+                json.dump(heldout_data, f)
+
+            res = validate_judge(
+                answers_path=dev_json,
+                heldout_answers_path=heldout_json,
+                pdf_path="eval/fixtures/ci_fixture.pdf",
+                output_path=out_json,
+                judge_type="nli",
+                cross_encoder=mock_ce,
+            )
+
+            # Sweep should be populated with 13 thresholds (0.30 to 0.90 in 0.05 steps)
+            self.assertEqual(len(res["calibration_sweep"]), 13)
+            valid_sw = [s for s in res["calibration_sweep"] if s["passed"]]
+            self.assertTrue(len(valid_sw) > 0)
+            best_sw = max(valid_sw, key=lambda s: (s["margin"], s["threshold"]))
+            self.assertEqual(res["entail_threshold"], best_sw["threshold"])
+            self.assertEqual(res["status"], "VALID")
+
+    def test_heldout_never_used_in_calibration(self):
+        """Verify held-out items are strictly evaluated once and never included in threshold calibration sweep."""
+        mock_ce = Mock()
+        mock_ce.config = Mock(id2label={0: "contradiction", 1: "entailment", 2: "neutral"})
+        mock_ce.tokenizer = None
+
+        def side_effect(pairs, batch_size=32):
+            results = []
+            for premise, hyp in pairs:
+                if "Bogus" in hyp:
+                    results.append([3.0, -2.0, -1.0])
+                else:
+                    results.append([-1.0, 3.0, -1.0])
+            return np.array(results)
+
+        mock_ce.predict.side_effect = side_effect
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dev_json = os.path.join(tmpdir, "dev_answers.json")
+            heldout_json = os.path.join(tmpdir, "heldout_answers.json")
+            out_json = os.path.join(tmpdir, "val_out.json")
+
+            dev_data = [
+                {"id": "dev_ref", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
+                {"id": "dev_neg", "question": "What is high availability?", "answer": "Bogus fail.", "is_negative_control": True},
+            ]
+            heldout_data = [
+                {"id": "heldout_ref", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
+                {"id": "heldout_neg", "question": "What is high availability?", "answer": "Bogus fail.", "is_negative_control": True},
+            ]
+            with open(dev_json, "w", encoding="utf-8") as f:
+                json.dump(dev_data, f)
+            with open(heldout_json, "w", encoding="utf-8") as f:
+                json.dump(heldout_data, f)
+
+            res = validate_judge(
+                answers_path=dev_json,
+                heldout_answers_path=heldout_json,
+                pdf_path="eval/fixtures/ci_fixture.pdf",
+                output_path=out_json,
+                judge_type="nli",
+                cross_encoder=mock_ce,
+            )
+
+            # Both dev and heldout sections must exist in results
+            self.assertIn("dev", res)
+            self.assertIn("heldout", res)
+
+            # Dev section contains only dev IDs
+            dev_ids = [r["id"] for r in res["dev"]["reference_results"] + res["dev"]["negative_control_results"]]
+            self.assertIn("dev_ref", dev_ids)
+            self.assertIn("dev_neg", dev_ids)
+            self.assertNotIn("heldout_ref", dev_ids)
+            self.assertNotIn("heldout_neg", dev_ids)
+
+            # Heldout section contains only heldout IDs
+            heldout_ids = [r["id"] for r in res["heldout"]["reference_results"] + res["heldout"]["negative_control_results"]]
+            self.assertIn("heldout_ref", heldout_ids)
+            self.assertIn("heldout_neg", heldout_ids)
+            self.assertNotIn("dev_ref", heldout_ids)
+            self.assertNotIn("dev_neg", heldout_ids)
+
     def test_validate_judge_verdicts(self):
         """Verify validate_judge pass rules: reference mean >= 0.80, neg controls <= 0.50, 0 unscorable references."""
         # 1. Successful validation (VALID)
@@ -254,7 +394,7 @@ class TestFaithfulness(unittest.TestCase):
         mock_ce_valid.config = Mock(id2label={0: "contradiction", 1: "entailment", 2: "neutral"})
         mock_ce_valid.tokenizer = None
 
-        def side_effect_valid(pairs):
+        def side_effect_valid(pairs, batch_size=32):
             results = []
             for premise, hyp in pairs:
                 if "Quantum" in hyp or "interstellar" in hyp:
@@ -289,6 +429,7 @@ class TestFaithfulness(unittest.TestCase):
 
             res = validate_judge(
                 answers_path=ans_file,
+                heldout_answers_path=ans_file,
                 pdf_path="eval/fixtures/ci_fixture.pdf",
                 output_path=out_json,
                 judge_type="nli",
@@ -297,6 +438,16 @@ class TestFaithfulness(unittest.TestCase):
             self.assertEqual(res["status"], "VALID")
             self.assertTrue(res["passed"])
             self.assertEqual(res["unscorable_references_count"], 0)
+            # Verify explicit error rates
+            self.assertIn("reference_accept_rate", res["dev"])
+            self.assertIn("negative_control_false_accept_rate", res["dev"])
+            self.assertIn("negative_control_fully_accepted_rate", res["dev"])
+            self.assertEqual(res["dev"]["reference_accept_rate"], 1.0)
+            self.assertEqual(res["dev"]["negative_control_false_accept_rate"], 0.0)
+            self.assertEqual(res["dev"]["negative_control_fully_accepted_rate"], 0.0)
+            self.assertEqual(res["heldout"]["reference_accept_rate"], 1.0)
+            self.assertEqual(res["heldout"]["negative_control_false_accept_rate"], 0.0)
+            self.assertEqual(res["heldout"]["negative_control_fully_accepted_rate"], 0.0)
 
         # 2. Failed validation: reference coverage failure (unscorable reference)
         mock_judge_unscorable = Mock()
@@ -310,6 +461,7 @@ class TestFaithfulness(unittest.TestCase):
 
             res_fail = validate_judge(
                 answers_path=ans_file,
+                heldout_answers_path=ans_file,
                 pdf_path="eval/fixtures/ci_fixture.pdf",
                 output_path=out_json,
                 judge_type="llm",
@@ -346,6 +498,40 @@ class TestFaithfulness(unittest.TestCase):
             rec = summary["questions"][q_id]
             self.assertFalse(rec["applicable"])
             self.assertIsNone(rec["faithfulness"])
+
+    def test_report_header_and_unvalidated_judge_label(self):
+        """Verify report outputs and saves judge validation status, error rates, and unvalidated label."""
+        mock_gen = Mock()
+        mock_gen.generate_answer.return_value = "Replication provides high availability."
+        mock_ce = Mock()
+        mock_ce.config = Mock(id2label={0: "contradiction", 1: "entailment", 2: "neutral"})
+        mock_ce.tokenizer = None
+        mock_ce.predict.return_value = np.array([[-1.0, 3.0, -1.0]])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_json = os.path.join(tmpdir, "faithfulness_unvalidated.json")
+
+            summary = run_faithfulness_evaluation(
+                golden_path="eval/golden_ci.json",
+                pdf_path="eval/fixtures/ci_fixture.pdf",
+                output_path=out_json,
+                n=1,
+                judge_type="nli",
+                nli_model="mock-unvalidated-model",
+                resume=False,
+                cross_encoder=mock_ce,
+                gen_client=mock_gen,
+            )
+
+            # Since no judge_validation_mock-unvalidated-model.json exists, verdict must be UNVALIDATED
+            self.assertEqual(summary["judge_validation_verdict"], "UNVALIDATED")
+            self.assertIn("heldout_reference_accept_rate", summary)
+            self.assertIn("heldout_negative_control_false_accept_rate", summary)
+
+            with open(out_json, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+            self.assertEqual(saved["judge_validation_verdict"], "UNVALIDATED")
+
 
 
 if __name__ == "__main__":

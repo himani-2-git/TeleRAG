@@ -34,10 +34,10 @@ class LLMClient:
         self.model = model
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        if isinstance(timeout, (int, float)):
-            self.timeout: tuple[float, float] = (5.0, float(timeout))
+        if isinstance(timeout, tuple):
+            self.timeout: tuple[float, float] = (float(timeout[0]), float(timeout[1]))
         else:
-            self.timeout = timeout
+            self.timeout = (5.0, float(timeout))
         self.max_tokens = max_tokens
         self.prompt_config = prompt_config or load_prompt_config()
 
@@ -70,7 +70,8 @@ class LLMClient:
             short_msg = response.text[:200].strip()
             return False, response.status_code, short_msg
         except requests.RequestException as e:
-            return False, None, str(e)
+            logger.warning("LLM availability check failed: %s", e)
+            return False, None, "Service unavailable"
 
     def send_request(
         self,

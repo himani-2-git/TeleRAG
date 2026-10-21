@@ -47,7 +47,7 @@ def fetch_pdf_bytes(url: str, max_bytes: int, timeout: int = 30) -> bytes:
         except requests.exceptions.Timeout as e:
             raise ValueError("Download timeout. The file took too long to download.") from e
         except requests.exceptions.RequestException as e:
-            raise ValueError(f"Failed to download PDF: {e}") from e
+            raise ValueError("Failed to download PDF. Please check the URL and try again.") from e
 
         if response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
             redirect_count += 1

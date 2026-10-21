@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import socket  # noqa: F401
 
 from telegram import Update
 from telegram.ext import ContextTypes

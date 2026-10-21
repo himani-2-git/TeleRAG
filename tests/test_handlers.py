@@ -52,7 +52,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(is_safe, f"URL {url} should be rejected")
             self.assertIn("forbidden", error.lower())
 
-    @patch("src.bot.handlers.socket.getaddrinfo")
+    @patch("src.processors.web_processor.socket.getaddrinfo")
     def test_domain_resolving_to_private_ip_rejected(self, mock_getaddrinfo):
         """Test that domain names resolving to internal IPs are rejected."""
         mock_getaddrinfo.return_value = [(2, 1, 0, "", ("127.0.0.1", 80))]

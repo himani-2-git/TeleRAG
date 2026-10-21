@@ -1,0 +1,1179 @@
+{
+  "cache_key": "nli:cross-encoder/nli-deberta-v3-base:qwen2.5:3b:v1:book.pdf:20:42",
+  "judge_type": "nli",
+  "judge_model": "cross-encoder/nli-deberta-v3-base",
+  "judge": "cross-encoder/nli-deberta-v3-base",
+  "judge_validation_verdict": "JUDGE NOT TRUSTWORTHY",
+  "heldout_reference_accept_rate": 0.875,
+  "heldout_negative_control_false_accept_rate": 0.0,
+  "gen_model": "qwen2.5:3b",
+  "generator": "qwen2.5:3b",
+  "prompt_version": "v1",
+  "pdf_name": "book.pdf",
+  "n": 20,
+  "seed": 42,
+  "sample_size": 20,
+  "questions": {
+    "q41": {
+      "id": "q41",
+      "question": "What is memoization and how can a dictionary memo speed up recursive calculations like Fibonacci?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "Memoization is a technique used to speed up applications by caching the results of expensive function calls and reusing them when the same inputs occur again. In the context of the Fibonacci function, memoization is used to store previously computed Fibonacci numbers in a dictionary, named `known`. This dictionary, `known = {0:0, 1:1}`, serves as a memo for already computed Fibonacci numbers. \n\nWhen the `fibonacci` function is called with a value `n`, it first checks if `n` is already in the `known` dictionary. If `n` is found, the function returns the stored value directly. If not, it computes the Fibonacci number as it normally would (by recursively calling `fibonacci(n-1)` and `fibonacci(n-2)`), stores this result in the `known` dictionary, and then returns the computed value. This way, subsequent calls with the same argument `n` can be returned immediately from the `known` dictionary, thus avoiding redundant calculations and significantly improving performance for recursive functions like Fibonacci where the function is called with the same argument multiple times.",
+      "total_items": 7,
+      "supported_items": 4,
+      "faithfulness": 0.571,
+      "details": [
+        {
+          "sentence": "Memoization is a technique used to speed up applications by caching the results of expensive function calls and reusing them when the same inputs occur again.",
+          "supported": false,
+          "best_window_index": 61,
+          "best_window": "Exercises 113 11.10 Exercises Exercise 11.1.Write a function that reads the words inwords.txtand stores them as keys in a dictionary. It doesn\u2019t matter what the values are. Then you can use theinoperator as a fast way to check whether a string is in the dictionary.",
+          "entailment_prob": 0.0094,
+          "contradiction_prob": 0.0003,
+          "reason": "Win 61: entail=0.009, contra=0.000"
+        },
+        {
+          "sentence": "In the context of the Fibonacci function, memoization is used to store previously computed Fibonacci numbers in a dictionary, named `known`.",
+          "supported": true,
+          "best_window_index": 17,
+          "best_window": "A previously computed value that is stored for later use is called amemo. Here is a \u201cmemoized\u201d version offibonacci: known = {0:0, 1:1} def fibonacci(n): if n in known: return known[n] res = fibonacci(n-1) + fibonacci(n-2) known[n] = res return res knownis a dictionary that keeps track of the Fibonacci numbers we already know.",
+          "entailment_prob": 0.9981,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 17: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "This dictionary, `known = {0:0, 1:1}`, serves as a memo for already computed Fibonacci numbers.",
+          "supported": true,
+          "best_window_index": 17,
+          "best_window": "A previously computed value that is stored for later use is called amemo. Here is a \u201cmemoized\u201d version offibonacci: known = {0:0, 1:1} def fibonacci(n): if n in known: return known[n] res = fibonacci(n-1) + fibonacci(n-2) known[n] = res return res knownis a dictionary that keeps track of the Fibonacci numbers we already know.",
+          "entailment_prob": 0.9979,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 17: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "When the `fibonacci` function is called with a value `n`, it first checks if `n` is already in the `known` dictionary.",
+          "supported": true,
+          "best_window_index": 6,
+          "best_window": "Here is a \u201cmemoized\u201d version offibonacci: known = {0:0, 1:1} def fibonacci(n): if n in known: return known[n] res = fibonacci(n-1) + fibonacci(n-2) known[n] = res return res knownis a dictionary that keeps track of the Fibonacci numbers we already know.",
+          "entailment_prob": 0.9938,
+          "contradiction_prob": 0.0,
+          "reason": "Win 6: entail=0.994, contra=0.000"
+        },
+        {
+          "sentence": "If `n` is found, the function returns the stored value directly.",
+          "supported": true,
+          "best_window_index": 21,
+          "best_window": "Dictionaries Wheneverfibonacciis called, it checksknown. If the result is already there, it can return immediately.",
+          "entailment_prob": 0.9796,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 21: entail=0.980, contra=0.000"
+        },
+        {
+          "sentence": "If not, it computes the Fibonacci number as it normally would (by recursively calling `fibonacci(n-1)` and `fibonacci(n-2)`), stores this result in the `known` dictionary, and then returns the computed value.",
+          "supported": false,
+          "best_window_index": 11,
+          "best_window": "Otherwise it has to compute the new value, add it to the dictionary, and return it.",
+          "entailment_prob": 0.1147,
+          "contradiction_prob": 0.2996,
+          "reason": "Win 11: entail=0.115, contra=0.300"
+        },
+        {
+          "sentence": "This way, subsequent calls with the same argument `n` can be returned immediately from the `known` dictionary, thus avoiding redundant calculations and significantly improving performance for recursive functions like Fibonacci where the function is called with the same argument multiple times.",
+          "supported": false,
+          "best_window_index": 18,
+          "best_window": "Here is a \u201cmemoized\u201d version offibonacci: known = {0:0, 1:1} def fibonacci(n): if n in known: return known[n] res = fibonacci(n-1) + fibonacci(n-2) known[n] = res return res knownis a dictionary that keeps track of the Fibonacci numbers we already know. It starts with two items: 0 maps to 0 and 1 maps to 1.",
+          "entailment_prob": 0.0006,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 18: entail=0.001, contra=0.000"
+        }
+      ]
+    },
+    "q08": {
+      "id": "q08",
+      "question": "How does string concatenation using the + operator and string repetition using the * operator work in Python?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "In Python, the + operator performs string concatenation by joining two or more strings together, linking them end-to-end. For instance, if you have two strings 'throat' and 'warbler', concatenating them would result in 'throatwarbler'.\n\nThe * operator in Python performs string repetition. This means it repeats the string as many times as specified by the second value. For example, repeating the string 'Spam' three times would result in 'SpamSpamSpam'. In the case where one value is a string and the other is an integer, the integer determines how many times the string is repeated.",
+      "total_items": 6,
+      "supported_items": 2,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "In Python, the + operator performs string concatenation by joining two or more strings together, linking them end-to-end.",
+          "supported": false,
+          "best_window_index": 23,
+          "best_window": "The+operator performsstring concatenation, which means it joins the strings by linking them end-to-end. For example: >>> first ='throat' >>> second ='warbler' >>> first + second throatwarbler The*operator also works on strings; it performs repetition. For example,'Spam'*3is 'SpamSpamSpam'.",
+          "entailment_prob": 0.0032,
+          "contradiction_prob": 0.0005,
+          "reason": "Win 23: entail=0.003, contra=0.000"
+        },
+        {
+          "sentence": "For instance, if you have two strings 'throat' and 'warbler', concatenating them would result in 'throatwarbler'.",
+          "supported": false,
+          "best_window_index": 24,
+          "best_window": "For example: >>> first ='throat' >>> second ='warbler' >>> first + second throatwarbler The*operator also works on strings; it performs repetition. For example,'Spam'*3is 'SpamSpamSpam'. If one of the values is a string, the other has to be an integer.",
+          "entailment_prob": 0.0452,
+          "contradiction_prob": 0.0201,
+          "reason": "Win 24: entail=0.045, contra=0.020"
+        },
+        {
+          "sentence": "The * operator in Python performs string repetition.",
+          "supported": false,
+          "best_window_index": 33,
+          "best_window": "These notes are calledcomments, and they start with the#symbol: # compute the percentage of the hour that has elapsed percentage = (minute * 100) / 60 In this case, the comment appears on a line by itself.",
+          "entailment_prob": 0.0094,
+          "contradiction_prob": 0.0419,
+          "reason": "Win 33: entail=0.009, contra=0.042"
+        },
+        {
+          "sentence": "This means it repeats the string as many times as specified by the second value.",
+          "supported": false,
+          "best_window_index": 25,
+          "best_window": "For example,'Spam'*3is 'SpamSpamSpam'. If one of the values is a string, the other has to be an integer. This use of+and*makes sense by analogy with addition and multiplication.",
+          "entailment_prob": 0.0147,
+          "contradiction_prob": 0.0053,
+          "reason": "Win 25: entail=0.015, contra=0.005"
+        },
+        {
+          "sentence": "For example, repeating the string 'Spam' three times would result in 'SpamSpamSpam'.",
+          "supported": true,
+          "best_window_index": 15,
+          "best_window": "For example: >>> first ='throat' >>> second ='warbler' >>> first + second throatwarbler The*operator also works on strings; it performs repetition. For example,'Spam'*3is 'SpamSpamSpam'.",
+          "entailment_prob": 0.9921,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 15: entail=0.992, contra=0.000"
+        },
+        {
+          "sentence": "In the case where one value is a string and the other is an integer, the integer determines how many times the string is repeated.",
+          "supported": true,
+          "best_window_index": 24,
+          "best_window": "For example: >>> first ='throat' >>> second ='warbler' >>> first + second throatwarbler The*operator also works on strings; it performs repetition. For example,'Spam'*3is 'SpamSpamSpam'. If one of the values is a string, the other has to be an integer.",
+          "entailment_prob": 0.9847,
+          "contradiction_prob": 0.0003,
+          "reason": "Win 24: entail=0.985, contra=0.000"
+        }
+      ]
+    },
+    "q02": {
+      "id": "q02",
+      "question": "What is the role of the Python interpreter and how does the prompt indicate it is ready for code?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "The Python interpreter plays a critical role in executing and running Python code. It translates the code into actions that the computer can understand and perform. The prompt '>>> ' indicates that the interpreter is prepared and ready for the user to input Python code. When you type your code and hit Enter, the interpreter responds with the result of the executed code, allowing immediate feedback on the correctness and output of your program.",
+      "total_items": 4,
+      "supported_items": 2,
+      "faithfulness": 0.5,
+      "details": [
+        {
+          "sentence": "The Python interpreter plays a critical role in executing and running Python code.",
+          "supported": false,
+          "best_window_index": 25,
+          "best_window": "interpreter:A program that reads another program and executes it prompt:Characters displayed by the interpreter to indicate that it is ready to take input from the user. program:A set of instructions that specifies a computation. Exercises 7 print statement:An instruction that causes the Python interpreter to display a value on the screen.",
+          "entailment_prob": 0.0394,
+          "contradiction_prob": 0.0,
+          "reason": "Win 25: entail=0.039, contra=0.000"
+        },
+        {
+          "sentence": "It translates the code into actions that the computer can understand and perform.",
+          "supported": true,
+          "best_window_index": 23,
+          "best_window": "low-level language:A programming language that is designed to be easy for a computer to run; also called \u201cmachine language\u201d or \u201cassembly language\u201d. portability:A property of a program that can run on more than one kind of computer. interpreter:A program that reads another program and executes it prompt:Characters displayed by the interpreter to indicate that it is ready to take input from the user.",
+          "entailment_prob": 0.9635,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 23: entail=0.964, contra=0.000"
+        },
+        {
+          "sentence": "The prompt '>>> ' indicates that the interpreter is prepared and ready for the user to input Python code.",
+          "supported": true,
+          "best_window_index": 48,
+          "best_window": "If it begins with 2, you are running (you guessed it) Python 2. The last line is apromptthat indicates that the interpreter is ready for you to enter code. If you type a line of code and hit Enter, the interpreter displays the result: >>> 1 + 1 2 Now you\u2019re ready to get started.",
+          "entailment_prob": 0.9978,
+          "contradiction_prob": 0.0,
+          "reason": "Win 48: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "When you type your code and hit Enter, the interpreter responds with the result of the executed code, allowing immediate feedback on the correctness and output of your program.",
+          "supported": false,
+          "best_window_index": 5,
+          "best_window": "portability:A property of a program that can run on more than one kind of computer.",
+          "entailment_prob": 0.0209,
+          "contradiction_prob": 0.0005,
+          "reason": "Win 5: entail=0.021, contra=0.001"
+        }
+      ]
+    },
+    "q18": {
+      "id": "q18",
+      "question": "What are chained conditionals using elif and when should they be used instead of nested conditionals?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "Chained conditionals are used when there are more than two possibilities and you need more than two branches to handle the flow of execution. They are a form of conditional that follows the structure of \"if, elif, elif... else\". The \"elif\" keyword is used to specify additional conditions, with each subsequent elif clause checking for a specific condition, and the final else clause serving as a catch-all for any conditions not met by the previous elifs. These should be used instead of nested conditionals when the conditions are logically independent and the structure is simple and clear. Nested conditionals, on the other hand, are when one conditional statement is placed inside another. They can be confusing and difficult to read, especially with multiple layers of conditions. Thus, it's often better to use chained conditionals for clearer structure and simplicity.",
+      "total_items": 8,
+      "supported_items": 3,
+      "faithfulness": 0.375,
+      "details": [
+        {
+          "sentence": "Chained conditionals are used when there are more than two possibilities and you need more than two branches to handle the flow of execution.",
+          "supported": true,
+          "best_window_index": 11,
+          "best_window": "The alternatives are calledbranches, because they are branches in the flow of execution. 5.6 Chained conditionals Sometimes there are more than two possibilities and we need more than two branches.",
+          "entailment_prob": 0.9908,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 11: entail=0.991, contra=0.000"
+        },
+        {
+          "sentence": "They are a form of conditional that follows the structure of \"if, elif, elif...",
+          "supported": true,
+          "best_window_index": 27,
+          "best_window": "If there is anelseclause, it has to be at the end, but there doesn\u2019t have to be one. if choice =='a': draw_a() elif choice =='b': draw_b() elif choice =='c': draw_c() Each condition is checked in order. If the first is false, the next is checked, and so on.",
+          "entailment_prob": 0.9631,
+          "contradiction_prob": 0.0029,
+          "reason": "Win 27: entail=0.963, contra=0.003"
+        },
+        {
+          "sentence": "else\".",
+          "supported": true,
+          "best_window_index": 32,
+          "best_window": "We could have written the example in the previous section like this: if x == y: print('x and y are equal') else: if x < y: print('x is less than y') else: print('x is greater than y') The outer conditional contains two branches.",
+          "entailment_prob": 0.9737,
+          "contradiction_prob": 0.0028,
+          "reason": "Win 32: entail=0.974, contra=0.003"
+        },
+        {
+          "sentence": "The \"elif\" keyword is used to specify additional conditions, with each subsequent elif clause checking for a specific condition, and the final else clause serving as a catch-all for any conditions not met by the previous elifs.",
+          "supported": false,
+          "best_window_index": 27,
+          "best_window": "If there is anelseclause, it has to be at the end, but there doesn\u2019t have to be one. if choice =='a': draw_a() elif choice =='b': draw_b() elif choice =='c': draw_c() Each condition is checked in order. If the first is false, the next is checked, and so on.",
+          "entailment_prob": 0.1847,
+          "contradiction_prob": 0.0043,
+          "reason": "Win 27: entail=0.185, contra=0.004"
+        },
+        {
+          "sentence": "These should be used instead of nested conditionals when the conditions are logically independent and the structure is simple and clear.",
+          "supported": false,
+          "best_window_index": 45,
+          "best_window": "Those two branches are both simple statements, although they could have been conditional statements as well. Although the indentation of the statements makes the structure apparent,nested condi- tionalsbecome difficult to read very quickly.",
+          "entailment_prob": 0.0033,
+          "contradiction_prob": 0.0016,
+          "reason": "Win 45: entail=0.003, contra=0.002"
+        },
+        {
+          "sentence": "Nested conditionals, on the other hand, are when one conditional statement is placed inside another.",
+          "supported": false,
+          "best_window_index": 41,
+          "best_window": "5.7 Nested conditionals One conditional can also be nested within another. We could have written the example in the previous section like this: if x == y: print('x and y are equal') else: if x < y: print('x is less than y') else: print('x is greater than y') The outer conditional contains two branches.",
+          "entailment_prob": 0.0588,
+          "contradiction_prob": 0.0164,
+          "reason": "Win 41: entail=0.059, contra=0.016"
+        },
+        {
+          "sentence": "They can be confusing and difficult to read, especially with multiple layers of conditions.",
+          "supported": false,
+          "best_window_index": 45,
+          "best_window": "Those two branches are both simple statements, although they could have been conditional statements as well. Although the indentation of the statements makes the structure apparent,nested condi- tionalsbecome difficult to read very quickly.",
+          "entailment_prob": 0.0172,
+          "contradiction_prob": 0.001,
+          "reason": "Win 45: entail=0.017, contra=0.001"
+        },
+        {
+          "sentence": "Thus, it's often better to use chained conditionals for clearer structure and simplicity.",
+          "supported": false,
+          "best_window_index": 38,
+          "best_window": "Logical operators often provide a way to simplify nested conditional statements.",
+          "entailment_prob": 0.0266,
+          "contradiction_prob": 0.0009,
+          "reason": "Win 38: entail=0.027, contra=0.001"
+        }
+      ]
+    },
+    "q16": {
+      "id": "q16",
+      "question": "How does floor division // differ from standard division / in Python 3?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "In Python 3, the division operator / performs floating-point division if either of the operands is a float. For integers, it performs floor division, which means the result is the largest integer less than or equal to the division result.",
+      "total_items": 2,
+      "supported_items": 1,
+      "faithfulness": 0.5,
+      "details": [
+        {
+          "sentence": "In Python 3, the division operator / performs floating-point division if either of the operands is a float.",
+          "supported": false,
+          "best_window_index": 31,
+          "best_window": "\u2022 Laurent Rosenfeld and Mihaela Rotaru translated this book into French.",
+          "entailment_prob": 0.1594,
+          "contradiction_prob": 0.8171,
+          "reason": "Win 31: entail=0.159, contra=0.817"
+        },
+        {
+          "sentence": "For integers, it performs floor division, which means the result is the largest integer less than or equal to the division result.",
+          "supported": true,
+          "best_window_index": 28,
+          "best_window": "\u2022 Xavier Van Aubel made several useful corrections in the second edition.",
+          "entailment_prob": 0.8817,
+          "contradiction_prob": 0.0264,
+          "reason": "Win 28: entail=0.882, contra=0.026"
+        }
+      ]
+    },
+    "q15": {
+      "id": "q15",
+      "question": "What is a docstring and how is it used to explain the interface and contract of a Python function?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "A docstring in Python is a string at the beginning of a function that explains the interface or contract of the function. It provides essential information about what the function does without delving into the specifics of how it performs its task. Docstrings are particularly useful for explaining the parameters and their types, and the behavior the function exhibits with respect to each parameter. They help in understanding the expected input and output of a function, making it easier for users and other developers to work with the function. In the context provided, the example docstring for a function named `polyline` explains its purpose and details about its inputs (n, length, and angle), making it easier to use. Docstrings are often written in a triple-quoted format, known as multiline strings, to allow for spanning multiple lines and better readability.",
+      "total_items": 6,
+      "supported_items": 2,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "A docstring in Python is a string at the beginning of a function that explains the interface or contract of the function.",
+          "supported": false,
+          "best_window_index": 32,
+          "best_window": "36 Chapter 4.",
+          "entailment_prob": 0.0454,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 32: entail=0.045, contra=0.000"
+        },
+        {
+          "sentence": "It provides essential information about what the function does without delving into the specifics of how it performs its task.",
+          "supported": true,
+          "best_window_index": 43,
+          "best_window": "Case study: interface design It is terse, but it contains the essential information someone would need to use this func- tion. It explains concisely what the function does (without getting into the details of how it does it).",
+          "entailment_prob": 0.9981,
+          "contradiction_prob": 0.0,
+          "reason": "Win 43: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "Docstrings are particularly useful for explaining the parameters and their types, and the behavior the function exhibits with respect to each parameter.",
+          "supported": true,
+          "best_window_index": 54,
+          "best_window": "It explains what effect each parameter has on the behavior of the function and what type each parameter should be (if it is not obvious). Writing this kind of documentation is an important part of interface design. A well- designed interface should be simple to explain; if you have a hard time explaining one of your functions, maybe the interface could be improved.",
+          "entailment_prob": 0.9958,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 54: entail=0.996, contra=0.000"
+        },
+        {
+          "sentence": "They help in understanding the expected input and output of a function, making it easier for users and other developers to work with the function.",
+          "supported": false,
+          "best_window_index": 47,
+          "best_window": "A well- designed interface should be simple to explain; if you have a hard time explaining one of your functions, maybe the interface could be improved. 4.10 Debugging An interface is like a contract between a function and a caller.",
+          "entailment_prob": 0.0079,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 47: entail=0.008, contra=0.000"
+        },
+        {
+          "sentence": "In the context provided, the example docstring for a function named `polyline` explains its purpose and details about its inputs (n, length, and angle), making it easier to use.",
+          "supported": false,
+          "best_window_index": 27,
+          "best_window": "This approach lets you design as you go along. 4.9 docstring Adocstringis a string at the beginning of a function that explains the interface (\u201cdoc\u201d is short for \u201cdocumentation\u201d). Here is an example: def polyline(t, n, length, angle): \"\"\"Draws n line segments with the given length and angle (in degrees) between them.",
+          "entailment_prob": 0.0477,
+          "contradiction_prob": 0.0,
+          "reason": "Win 27: entail=0.048, contra=0.000"
+        },
+        {
+          "sentence": "Docstrings are often written in a triple-quoted format, known as multiline strings, to allow for spanning multiple lines and better readability.",
+          "supported": false,
+          "best_window_index": 32,
+          "best_window": "36 Chapter 4.",
+          "entailment_prob": 0.0088,
+          "contradiction_prob": 0.001,
+          "reason": "Win 32: entail=0.009, contra=0.001"
+        }
+      ]
+    },
+    "q09": {
+      "id": "q09",
+      "question": "What built-in functions in Python convert values from one type to int, float, or str?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "In Python, the built-in functions that convert values from one type to int, float, or str are int(), float(), and str().",
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "In Python, the built-in functions that convert values from one type to int, float, or str are int(), float(), and str().",
+          "supported": true,
+          "best_window_index": 2,
+          "best_window": "Functions Finally,strconverts its argument to a string: >>> str(32) '32' >>> str(3.14159) '3.14159' 3.2 Math functions Python has a math module that provides most of the familiar mathematical functions.",
+          "entailment_prob": 0.9817,
+          "contradiction_prob": 0.0,
+          "reason": "Win 2: entail=0.982, contra=0.000"
+        }
+      ]
+    },
+    "q07": {
+      "id": "q07",
+      "question": "What is the order of operations followed by Python expressions (PEMDAS)?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "Python expressions follow the order of operations as defined by the acronym PEMDAS:\n\n1. Parentheses\n2. Exponents\n3. Multiplication and Division (from left to right)\n4. Addition and Subtraction (from left to right)\n\nThis order ensures consistent evaluation of complex expressions.",
+      "total_items": 6,
+      "supported_items": 5,
+      "faithfulness": 0.833,
+      "details": [
+        {
+          "sentence": "Python expressions follow the order of operations as defined by the acronym PEMDAS:",
+          "supported": true,
+          "best_window_index": 24,
+          "best_window": "For mathematical operators, Python follows mathematical convention. The acronymPEMDASis a useful way to remember the rules: 12 Chapter 2. Variables, expressions and statements \u2022Parentheses have the highest precedence and can be used to force an expression to evaluate in the order you want.",
+          "entailment_prob": 0.9898,
+          "contradiction_prob": 0.0012,
+          "reason": "Win 24: entail=0.990, contra=0.001"
+        },
+        {
+          "sentence": "Parentheses",
+          "supported": true,
+          "best_window_index": 37,
+          "best_window": "comment:Information in a program that is meant for other programmers (or anyone read- ing the source code) and has no effect on the execution of the program.",
+          "entailment_prob": 0.9851,
+          "contradiction_prob": 0.0018,
+          "reason": "Win 37: entail=0.985, contra=0.002"
+        },
+        {
+          "sentence": "Exponents",
+          "supported": true,
+          "best_window_index": 27,
+          "best_window": "s that represents a single re- sult.",
+          "entailment_prob": 0.8344,
+          "contradiction_prob": 0.0929,
+          "reason": "Win 27: entail=0.834, contra=0.093"
+        },
+        {
+          "sentence": "Multiplication and Division (from left to right)",
+          "supported": true,
+          "best_window_index": 8,
+          "best_window": "Since expressions in parentheses are evaluated first, 2 * (3-1)is 4, and(1+1)**(5-2)is 8.",
+          "entailment_prob": 0.955,
+          "contradiction_prob": 0.0116,
+          "reason": "Win 8: entail=0.955, contra=0.012"
+        },
+        {
+          "sentence": "Addition and Subtraction (from left to right)",
+          "supported": true,
+          "best_window_index": 8,
+          "best_window": "Since expressions in parentheses are evaluated first, 2 * (3-1)is 4, and(1+1)**(5-2)is 8.",
+          "entailment_prob": 0.4481,
+          "contradiction_prob": 0.2226,
+          "reason": "Win 8: entail=0.448, contra=0.223"
+        },
+        {
+          "sentence": "This order ensures consistent evaluation of complex expressions.",
+          "supported": false,
+          "best_window_index": 2,
+          "best_window": "What is the output?",
+          "entailment_prob": 0.0009,
+          "contradiction_prob": 0.0023,
+          "reason": "Win 2: entail=0.001, contra=0.002"
+        }
+      ]
+    },
+    "q35": {
+      "id": "q35",
+      "question": "What is the difference between the append and extend methods on a Python list?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "The append method adds a single element to the end of a list, modifying the original list and returning None. On the other hand, the extend method takes another list as an argument and appends all the elements of that list to the original list, also modifying the original list but without returning any value.",
+      "total_items": 2,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "The append method adds a single element to the end of a list, modifying the original list and returning None.",
+          "supported": false,
+          "best_window_index": 29,
+          "best_window": "Here\u2019s an example usingappend: >>> t1 = [1, 2] >>> t2 = t1.append(3) >>> t1 [1, 2, 3] >>> t2 None 98 Chapter 10. Lists The return value fromappendisNone.",
+          "entailment_prob": 0.176,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 29: entail=0.176, contra=0.000"
+        },
+        {
+          "sentence": "On the other hand, the extend method takes another list as an argument and appends all the elements of that list to the original list, also modifying the original list but without returning any value.",
+          "supported": false,
+          "best_window_index": 11,
+          "best_window": "f an assignment can update multiple elements: >>> t = ['a','b','c','d','e','f'] >>> t[1:3] = ['x','y'] >>> t ['a','x','y','d','e','f'] 10.6 List methods Python provides methods that operate on lists. For example,appendadds a new element to the end of a list: >>> t = ['a','b','c'] >>> t.append('d') >>> t ['a','b','c','d'] extendtakes a list as an argument and appends all of the elements: >>> t1 = ['a','b','c'] >>> t2 = ['d','e'] >>> t1.extend(t2) >>> t1 ['a','b','c','d','e'] This example leavest2unmodified. sortarranges the elements of the list from low to high: >>> t = ['d','c','e','b','a'] >>> t.sort() >>> t ['a','b','c','d','e'] Most list methods are void; they modify the list and returnNone.",
+          "entailment_prob": 0.009,
+          "contradiction_prob": 0.1308,
+          "reason": "Win 11: entail=0.009, contra=0.131"
+        }
+      ]
+    },
+    "q06": {
+      "id": "q06",
+      "question": "How does the modulus operator % work in Python and what does it compute?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "In Python, the modulus operator % computes the remainder of one number divided by another. For example, if you use 105 % 60, it calculates how many minutes are left after dividing the total minutes by the number of minutes in an hour. In this case, since 105 divided by 60 equals 1 with a remainder of 45, % operation returns 45, indicating there are 45 minutes remaining. This operation is useful for determining the remainder after division.",
+      "total_items": 4,
+      "supported_items": 3,
+      "faithfulness": 0.75,
+      "details": [
+        {
+          "sentence": "In Python, the modulus operator % computes the remainder of one number divided by another.",
+          "supported": false,
+          "best_window_index": 21,
+          "best_window": "t you know how to start the Python interpreter and run code.",
+          "entailment_prob": 0.0316,
+          "contradiction_prob": 0.8484,
+          "reason": "Win 21: entail=0.032, contra=0.848"
+        },
+        {
+          "sentence": "For example, if you use 105 % 60, it calculates how many minutes are left after dividing the total minutes by the number of minutes in an hour.",
+          "supported": true,
+          "best_window_index": 16,
+          "best_window": "For example, suppose the run time of a movie is 105 minutes. You might want to know how long that is in hours. Conventional division returns a floating-point number: >>> minutes = 105 >>> minutes / 60 1.75 But we don\u2019t normally write hours with decimal points.",
+          "entailment_prob": 0.9862,
+          "contradiction_prob": 0.0015,
+          "reason": "Win 16: entail=0.986, contra=0.002"
+        },
+        {
+          "sentence": "In this case, since 105 divided by 60 equals 1 with a remainder of 45, % operation returns 45, indicating there are 45 minutes remaining.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "Floor division returns the integer number of hours, rounding down: >>> minutes = 105 >>> hours = minutes // 60 >>> hours 1 To get the remainder, you could subtract off one hour in minutes: >>> remainder = minutes - hours * 60 >>> remainder 45 An alternative is to use themodulus operator,%, which divides two numbers and returns the remainder.",
+          "entailment_prob": 0.3481,
+          "contradiction_prob": 0.001,
+          "reason": "Win 4: entail=0.348, contra=0.001"
+        },
+        {
+          "sentence": "This operation is useful for determining the remainder after division.",
+          "supported": true,
+          "best_window_index": 19,
+          "best_window": "Floor division returns the integer number of hours, rounding down: >>> minutes = 105 >>> hours = minutes // 60 >>> hours 1 To get the remainder, you could subtract off one hour in minutes: >>> remainder = minutes - hours * 60 >>> remainder 45 An alternative is to use themodulus operator,%, which divides two numbers and returns the remainder. >>> remainder = minutes % 60 >>> remainder 45 The modulus operator is more useful than it seems. For example, you can check whether one number is divisible by another\u2014ifx % yis zero, thenxis divisible byy.",
+          "entailment_prob": 0.9511,
+          "contradiction_prob": 0.0003,
+          "reason": "Win 19: entail=0.951, contra=0.000"
+        }
+      ]
+    },
+    "q38": {
+      "id": "q38",
+      "question": "What is aliasing in Python lists and why can modifying an aliased list cause unexpected side effects?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "In Python lists, aliasing occurs when one list variable references the same object as another list variable. This means that changes made to one list through one variable are reflected in the other list through the other variable, as they both point to the same object. This can lead to unexpected side effects because modifications to one list affect the other. For instance, if you modify the first list, the second list, which is an alias, will also be changed.",
+      "total_items": 4,
+      "supported_items": 2,
+      "faithfulness": 0.5,
+      "details": [
+        {
+          "sentence": "In Python lists, aliasing occurs when one list variable references the same object as another list variable.",
+          "supported": true,
+          "best_window_index": 22,
+          "best_window": "10.11 Aliasing Ifarefers to an object and you assignb = a, then both variables refer to the same object: >>> a = [1, 2, 3] >>> b = a >>> b is a True The state diagram looks like Figure 10.4. The association of a variable with an object is called areference. In this example, there are two references to the same object.",
+          "entailment_prob": 0.9469,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 22: entail=0.947, contra=0.000"
+        },
+        {
+          "sentence": "This means that changes made to one list through one variable are reflected in the other list through the other variable, as they both point to the same object.",
+          "supported": false,
+          "best_window_index": 22,
+          "best_window": "10.11 Aliasing Ifarefers to an object and you assignb = a, then both variables refer to the same object: >>> a = [1, 2, 3] >>> b = a >>> b is a True The state diagram looks like Figure 10.4. The association of a variable with an object is called areference. In this example, there are two references to the same object.",
+          "entailment_prob": 0.0107,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 22: entail=0.011, contra=0.000"
+        },
+        {
+          "sentence": "This can lead to unexpected side effects because modifications to one list affect the other.",
+          "supported": false,
+          "best_window_index": 26,
+          "best_window": "If the aliased object is mutable, changes made with one alias affect the other: 10.12. List arguments 97 0 1 2\u2019a\u2019 \u2019b\u2019 \u2019c\u2019list tletters delete_head__main__ Figure 10.5: Stack diagram. >>> b[0] = 42 >>> a [42, 2, 3] Although this behavior can be useful, it is error-prone.",
+          "entailment_prob": 0.0794,
+          "contradiction_prob": 0.0,
+          "reason": "Win 26: entail=0.079, contra=0.000"
+        },
+        {
+          "sentence": "For instance, if you modify the first list, the second list, which is an alias, will also be changed.",
+          "supported": true,
+          "best_window_index": 22,
+          "best_window": "10.11 Aliasing Ifarefers to an object and you assignb = a, then both variables refer to the same object: >>> a = [1, 2, 3] >>> b = a >>> b is a True The state diagram looks like Figure 10.4. The association of a variable with an object is called areference. In this example, there are two references to the same object.",
+          "entailment_prob": 0.9248,
+          "contradiction_prob": 0.0012,
+          "reason": "Win 22: entail=0.925, contra=0.001"
+        }
+      ]
+    },
+    "q28": {
+      "id": "q28",
+      "question": "How does the break statement allow you to exit from a loop prematurely?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "The break statement allows you to exit from a loop prematurely by allowing you to specify an exit condition anywhere within the loop, rather than just at the top. When the condition to break the loop is met, the loop immediately terminates, regardless of how many times it has already been executed. This is useful for situations where you want the loop to stop as soon as a certain condition is satisfied, such as receiving \"done\" as input from the user in the example provided.",
+      "total_items": 3,
+      "supported_items": 1,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "The break statement allows you to exit from a loop prematurely by allowing you to specify an exit condition anywhere within the loop, rather than just at the top.",
+          "supported": false,
+          "best_window_index": 53,
+          "best_window": "Here\u2019s a sample run: > not done not done > done Done! This way of writingwhileloops is common because you can check the condition anywhere in the loop (not just at the top) and you can express the stop condition affirmatively (\u201cstop when this happens\u201d) rather than negatively (\u201ckeep going until that happens\u201d). 7.5 Square roots Loops are often used in programs that compute numerical results by starting with an ap- proximate answer and iteratively improving it.",
+          "entailment_prob": 0.0986,
+          "contradiction_prob": 0.0014,
+          "reason": "Win 53: entail=0.099, contra=0.001"
+        },
+        {
+          "sentence": "When the condition to break the loop is met, the loop immediately terminates, regardless of how many times it has already been executed.",
+          "supported": false,
+          "best_window_index": 22,
+          "best_window": "Each time through, it prompts the user with an angle bracket. If the user typesdone, the breakstatement exits the loop.",
+          "entailment_prob": 0.0028,
+          "contradiction_prob": 0.0025,
+          "reason": "Win 22: entail=0.003, contra=0.002"
+        },
+        {
+          "sentence": "This is useful for situations where you want the loop to stop as soon as a certain condition is satisfied, such as receiving \"done\" as input from the user in the example provided.",
+          "supported": true,
+          "best_window_index": 30,
+          "best_window": "In that case you can use thebreakstatement to jump out of the loop. For example, suppose you want to take input from the user until they typedone. You could write: while True: line = input('>') if line =='done': break print(line) print('Done!') The loop condition isTrue, which is always true, so the loop runs until it hits the break statement.",
+          "entailment_prob": 0.9958,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 30: entail=0.996, contra=0.000"
+        }
+      ]
+    },
+    "q03": {
+      "id": "q03",
+      "question": "What arithmetic operators are provided in Python and what does the ** operator compute?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "Python provides several arithmetic operators including +, -, and * for addition, subtraction, and multiplication respectively. The / operator performs division, and the ** operator is used for exponentiation, raising a number to a specified power.",
+      "total_items": 2,
+      "supported_items": 2,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "Python provides several arithmetic operators including +, -, and * for addition, subtraction, and multiplication respectively.",
+          "supported": true,
+          "best_window_index": 17,
+          "best_window": "1.4 Arithmetic operators After \u201cHello, World\u201d, the next step is arithmetic. Python providesoperators, which are special symbols that represent computations like addition and multiplication. The operators+,-, and*perform addition, subtraction, and multiplication, as in the fol- lowing examples: >>> 40 + 2 42 >>> 43 - 1 42 >>> 6 * 7 42 The operator/performs division: >>> 84 / 2 42.0 You might wonder why the result is42.0instead of42.",
+          "entailment_prob": 0.9982,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 17: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "The / operator performs division, and the ** operator is used for exponentiation, raising a number to a specified power.",
+          "supported": true,
+          "best_window_index": 19,
+          "best_window": "The operators+,-, and*perform addition, subtraction, and multiplication, as in the fol- lowing examples: >>> 40 + 2 42 >>> 43 - 1 42 >>> 6 * 7 42 The operator/performs division: >>> 84 / 2 42.0 You might wonder why the result is42.0instead of42. I\u2019ll explain in the next section. Finally, the operator**performs exponentiation; that is, it raises a number to a power: >>> 6**2 + 6 42 In some other languages,^is used for exponentiation, but in Python it is a bitwise operator called XOR.",
+          "entailment_prob": 0.997,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 19: entail=0.997, contra=0.000"
+        }
+      ]
+    },
+    "q48": {
+      "id": "q48",
+      "question": "What is the difference between shallow copy and deep copy when copying objects with the copy module?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "The copy module in Python provides the `copy` function for performing a shallow copy, which duplicates the content of the object and any embedded objects but does not create copies of these embedded objects. On the other hand, a `deepcopy` operation creates a copy that includes all levels of the object hierarchy, including copying any embedded objects themselves, resulting in a completely separate object. This distinction is crucial for accurately duplicating objects, especially when they contain references to other objects.",
+      "total_items": 3,
+      "supported_items": 1,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "The copy module in Python provides the `copy` function for performing a shallow copy, which duplicates the content of the object and any embedded objects but does not create copies of these embedded objects.",
+          "supported": true,
+          "best_window_index": 25,
+          "best_window": "The class object can be used to create instances of the type. instance:An object that belongs to a class. instantiate:To create a new object.",
+          "entailment_prob": 0.9698,
+          "contradiction_prob": 0.0016,
+          "reason": "Win 25: entail=0.970, contra=0.002"
+        },
+        {
+          "sentence": "On the other hand, a `deepcopy` operation creates a copy that includes all levels of the object hierarchy, including copying any embedded objects themselves, resulting in a completely separate object.",
+          "supported": false,
+          "best_window_index": 53,
+          "best_window": "Fortunately, thecopymodule provides a method nameddeepcopythat copies not only the object but also the objects it refers to, and the objectstheyrefer to, and so on. You will not be surprised to learn that this operation is called adeep copy. >>> box3 = copy.deepcopy(box) >>> box3 is box False >>> box3.corner is box.corner False box3andboxare completely separate objects.",
+          "entailment_prob": 0.0028,
+          "contradiction_prob": 0.9332,
+          "reason": "Win 53: entail=0.003, contra=0.933"
+        },
+        {
+          "sentence": "This distinction is crucial for accurately duplicating objects, especially when they contain references to other objects.",
+          "supported": false,
+          "best_window_index": 43,
+          "best_window": "This behavior is confusing and error-prone. Fortunately, thecopymodule provides a method nameddeepcopythat copies not only the object but also the objects it refers to, and the objectstheyrefer to, and so on.",
+          "entailment_prob": 0.0005,
+          "contradiction_prob": 0.0005,
+          "reason": "Win 43: entail=0.001, contra=0.001"
+        }
+      ]
+    },
+    "q50": {
+      "id": "q50",
+      "question": "What is polymorphism in Python and how does it allow functions to work with arguments of different types?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "Polymorphism in Python is the ability of a function to work with different types of arguments. It allows functions to behave differently based on the type of the object being passed to them. In the context of classes and methods, polymorphism is seen through the use of type-based dispatch, where the type of the operand determines which function to invoke. This can be useful but often unnecessary, as polymorphism can also be achieved by writing functions that correctly handle arguments of different types, as demonstrated in the example of the `histogram` function that works with strings and other sequence types.",
+      "total_items": 4,
+      "supported_items": 3,
+      "faithfulness": 0.75,
+      "details": [
+        {
+          "sentence": "Polymorphism in Python is the ability of a function to work with different types of arguments.",
+          "supported": true,
+          "best_window_index": 29,
+          "best_window": "polymorphic:Pertaining to a function that can work with more than one type. 170 Chapter 17. Classes and methods 17.13 Exercises Exercise 17.1.Download the code from this chapter fromhttps: // thinkpython.",
+          "entailment_prob": 0.7053,
+          "contradiction_prob": 0.0023,
+          "reason": "Win 29: entail=0.705, contra=0.002"
+        },
+        {
+          "sentence": "It allows functions to behave differently based on the type of the object being passed to them.",
+          "supported": true,
+          "best_window_index": 5,
+          "best_window": "type-based dispatch:A programming pattern that checks the type of an operand and in- vokes different functions for different types.",
+          "entailment_prob": 0.9831,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 5: entail=0.983, contra=0.000"
+        },
+        {
+          "sentence": "In the context of classes and methods, polymorphism is seen through the use of type-based dispatch, where the type of the operand determines which function to invoke.",
+          "supported": true,
+          "best_window_index": 40,
+          "best_window": "Classes and methods else: d[c] = d[c]+1 return d",
+          "entailment_prob": 0.8886,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 40: entail=0.889, contra=0.000"
+        },
+        {
+          "sentence": "This can be useful but often unnecessary, as polymorphism can also be achieved by writing functions that correctly handle arguments of different types, as demonstrated in the example of the `histogram` function that works with strings and other sequence types.",
+          "supported": false,
+          "best_window_index": 51,
+          "best_window": "Often you can avoid it by writing functions that work correctly for arguments with different types. Many of the functions we wrote for strings also work for other sequence types. For exam- ple, in Section 11.2 we usedhistogramto count the number of times each letter appears in a word.",
+          "entailment_prob": 0.044,
+          "contradiction_prob": 0.0,
+          "reason": "Win 51: entail=0.044, contra=0.000"
+        }
+      ]
+    },
+    "q14": {
+      "id": "q14",
+      "question": "What is generalization and how does adding parameters make a function more general?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "Generalization in programming refers to the process of adding parameters to a function, making it more versatile and adaptable to different scenarios. By introducing parameters, a function can handle a broader range of inputs or situations, thus becoming more general. \n\nIn the context provided, adding a parameter for the length to the square function makes it more general. Previously, the square function was fixed at a specific size. With the introduction of the length parameter, the function can now draw squares of any size, not just the original fixed size. This demonstrates that generalization allows the function to be used in various contexts, enhancing its utility. Similarly, adding a parameter for the number of sides in the polygon function means it can now draw regular polygons with any number of sides, not just squares, making it more general and versatile.",
+      "total_items": 7,
+      "supported_items": 6,
+      "faithfulness": 0.857,
+      "details": [
+        {
+          "sentence": "Generalization in programming refers to the process of adding parameters to a function, making it more versatile and adaptable to different scenarios.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "Here is a solution: def square(t, length): for i in range(4): t.fd(length) t.lt(90) square(bob, 100) Adding a parameter to a function is calledgeneralizationbecause it makes the function more general: in the previous version, the square is always the same size; in this version it can be any size.",
+          "entailment_prob": 0.98,
+          "contradiction_prob": 0.0,
+          "reason": "Win 4: entail=0.980, contra=0.000"
+        },
+        {
+          "sentence": "By introducing parameters, a function can handle a broader range of inputs or situations, thus becoming more general.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "Here is a solution: def square(t, length): for i in range(4): t.fd(length) t.lt(90) square(bob, 100) Adding a parameter to a function is calledgeneralizationbecause it makes the function more general: in the previous version, the square is always the same size; in this version it can be any size.",
+          "entailment_prob": 0.9872,
+          "contradiction_prob": 0.0,
+          "reason": "Win 4: entail=0.987, contra=0.000"
+        },
+        {
+          "sentence": "In the context provided, adding a parameter for the length to the square function makes it more general.",
+          "supported": true,
+          "best_window_index": 11,
+          "best_window": "4.5 Generalization The next step is to add alengthparameter tosquare. Here is a solution: def square(t, length): for i in range(4): t.fd(length) t.lt(90) square(bob, 100) Adding a parameter to a function is calledgeneralizationbecause it makes the function more general: in the previous version, the square is always the same size; in this version it can be any size.",
+          "entailment_prob": 0.9977,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 11: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "Previously, the square function was fixed at a specific size.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "Here is a solution: def square(t, length): for i in range(4): t.fd(length) t.lt(90) square(bob, 100) Adding a parameter to a function is calledgeneralizationbecause it makes the function more general: in the previous version, the square is always the same size; in this version it can be any size.",
+          "entailment_prob": 0.9973,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 4: entail=0.997, contra=0.000"
+        },
+        {
+          "sentence": "With the introduction of the length parameter, the function can now draw squares of any size, not just the original fixed size.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "Here is a solution: def square(t, length): for i in range(4): t.fd(length) t.lt(90) square(bob, 100) Adding a parameter to a function is calledgeneralizationbecause it makes the function more general: in the previous version, the square is always the same size; in this version it can be any size.",
+          "entailment_prob": 0.9959,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 4: entail=0.996, contra=0.000"
+        },
+        {
+          "sentence": "This demonstrates that generalization allows the function to be used in various contexts, enhancing its utility.",
+          "supported": false,
+          "best_window_index": 47,
+          "best_window": "Writing this kind of documentation is an important part of interface design. A well- designed interface should be simple to explain; if you have a hard time explaining one of your functions, maybe the interface could be improved. 4.10 Debugging An interface is like a contract between a function and a caller.",
+          "entailment_prob": 0.0018,
+          "contradiction_prob": 0.002,
+          "reason": "Win 47: entail=0.002, contra=0.002"
+        },
+        {
+          "sentence": "Similarly, adding a parameter for the number of sides in the polygon function means it can now draw regular polygons with any number of sides, not just squares, making it more general and versatile.",
+          "supported": true,
+          "best_window_index": 20,
+          "best_window": "The next step is also a generalization. Instead of drawing squares,polygondraws regular polygons with any number of sides. Here is a solution: def polygon(t, n, length): angle = 360 / n for i in range(n): t.fd(length) t.lt(angle) polygon(bob, 7, 70) 4.6.",
+          "entailment_prob": 0.981,
+          "contradiction_prob": 0.0,
+          "reason": "Win 20: entail=0.981, contra=0.000"
+        }
+      ]
+    },
+    "q45": {
+      "id": "q45",
+      "question": "How does the dbm module work in Python to create and store persistent key-value databases on disk?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "The dbm module in Python works by providing an interface for creating and updating key-value databases stored on disk. This module creates a database file where keys are stored as strings and values are stored as bytes. To use the dbm module, you first import it and then open a database file. You can create the database file if it doesn't already exist by setting the mode parameter to 'c'. This file acts as a persistent storage after the program ends. For each item, you can create or update a key-value pair by assigning a value to a key using the database object. Values are stored as bytes. Reading from the database retrieves the stored bytes as a bytes object, which is similar to a string. The module handles exceptions gracefully, allowing the program to continue running even if a database operation fails.",
+      "total_items": 9,
+      "supported_items": 5,
+      "faithfulness": 0.556,
+      "details": [
+        {
+          "sentence": "The dbm module in Python works by providing an interface for creating and updating key-value databases stored on disk.",
+          "supported": false,
+          "best_window_index": 52,
+          "best_window": "Many databases are organized like a dictionary in the sense that they map from keys to values. The biggest difference between a database and a dictionary is that the database is on disk (or other permanent storage), so it persists after the program ends. The moduledbmprovides an interface for creating and updating database files.",
+          "entailment_prob": 0.0081,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 52: entail=0.008, contra=0.000"
+        },
+        {
+          "sentence": "This module creates a database file where keys are stored as strings and values are stored as bytes.",
+          "supported": false,
+          "best_window_index": 15,
+          "best_window": ">>> db['cleese.png'] ='Photo of John Cleese.' When you access one of the items,dbmreads the file: >>> db['cleese.png'] b'Photo of John Cleese.' The result is abytes object, which is why it begins withb. A bytes object is similar to a string in many ways.",
+          "entailment_prob": 0.0035,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 15: entail=0.003, contra=0.000"
+        },
+        {
+          "sentence": "To use the dbm module, you first import it and then open a database file.",
+          "supported": true,
+          "best_window_index": 20,
+          "best_window": "Opening a database is similar to opening other files: >>> import dbm >>> db = dbm.open('captions','c') The mode'c'means that the database should be created if it doesn\u2019t already exist. The result is a database object that can be used (for most operations) like a dictionary. When you create a new item,dbmupdates the database file.",
+          "entailment_prob": 0.9917,
+          "contradiction_prob": 0.0016,
+          "reason": "Win 20: entail=0.992, contra=0.002"
+        },
+        {
+          "sentence": "You can create the database file if it doesn't already exist by setting the mode parameter to 'c'.",
+          "supported": true,
+          "best_window_index": 18,
+          "best_window": "The moduledbmprovides an interface for creating and updating database files. As an example, I\u2019ll create a database that contains captions for image files. Opening a database is similar to opening other files: >>> import dbm >>> db = dbm.open('captions','c') The mode'c'means that the database should be created if it doesn\u2019t already exist.",
+          "entailment_prob": 0.9981,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 18: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "This file acts as a persistent storage after the program ends.",
+          "supported": true,
+          "best_window_index": 51,
+          "best_window": "14.6 Databases Adatabaseis a file that is organized for storing data. Many databases are organized like a dictionary in the sense that they map from keys to values. The biggest difference between a database and a dictionary is that the database is on disk (or other permanent storage), so it persists after the program ends.",
+          "entailment_prob": 0.9867,
+          "contradiction_prob": 0.0008,
+          "reason": "Win 51: entail=0.987, contra=0.001"
+        },
+        {
+          "sentence": "For each item, you can create or update a key-value pair by assigning a value to a key using the database object.",
+          "supported": false,
+          "best_window_index": 5,
+          "best_window": "When you create a new item,dbmupdates the database file.",
+          "entailment_prob": 0.036,
+          "contradiction_prob": 0.0034,
+          "reason": "Win 5: entail=0.036, contra=0.003"
+        },
+        {
+          "sentence": "Values are stored as bytes.",
+          "supported": true,
+          "best_window_index": 6,
+          "best_window": ">>> db['cleese.png'] ='Photo of John Cleese.' When you access one of the items,dbmreads the file: >>> db['cleese.png'] b'Photo of John Cleese.' The result is abytes object, which is why it begins withb.",
+          "entailment_prob": 0.9939,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 6: entail=0.994, contra=0.000"
+        },
+        {
+          "sentence": "Reading from the database retrieves the stored bytes as a bytes object, which is similar to a string.",
+          "supported": true,
+          "best_window_index": 23,
+          "best_window": ">>> db['cleese.png'] ='Photo of John Cleese.' When you access one of the items,dbmreads the file: >>> db['cleese.png'] b'Photo of John Cleese.' The result is abytes object, which is why it begins withb. A bytes object is similar to a string in many ways. When you get farther into Python, the difference becomes important, but for now we can ignore it.",
+          "entailment_prob": 0.9928,
+          "contradiction_prob": 0.0,
+          "reason": "Win 23: entail=0.993, contra=0.000"
+        },
+        {
+          "sentence": "The module handles exceptions gracefully, allowing the program to continue running even if a database operation fails.",
+          "supported": false,
+          "best_window_index": 45,
+          "best_window": "Databases 141 Python starts by executing thetryclause. If all goes well, it skips theexceptclause and proceeds. If an exception occurs, it jumps out of thetryclause and runs theexceptclause.",
+          "entailment_prob": 0.0083,
+          "contradiction_prob": 0.0031,
+          "reason": "Win 45: entail=0.008, contra=0.003"
+        }
+      ]
+    },
+    "q33": {
+      "id": "q33",
+      "question": "How does the in operator check whether a character or substring appears inside a string in Python?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "The in operator in Python checks whether a character or a substring appears inside a string by performing a linear search. It iterates through each character of the string, comparing it with the character or substring being searched for. If a match is found, it immediately returns True. If the iteration completes without finding a match, it returns False, indicating the character or substring is not present in the string. This process is efficient for short substrings or when the search is performed multiple times, as it only requires a single traversal of the string. For longer substrings, this method is less efficient compared to more advanced string searching algorithms.",
+      "total_items": 6,
+      "supported_items": 1,
+      "faithfulness": 0.167,
+      "details": [
+        {
+          "sentence": "The in operator in Python checks whether a character or a substring appears inside a string by performing a linear search.",
+          "supported": false,
+          "best_window_index": 18,
+          "best_window": "In this chapter you\u2019ll see how to access the characters that make up a string, and you\u2019ll learn about some of the methods strings provide. 8.1 A string is a sequence A string is a sequence of characters.",
+          "entailment_prob": 0.1037,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 18: entail=0.104, contra=0.000"
+        },
+        {
+          "sentence": "It iterates through each character of the string, comparing it with the character or substring being searched for.",
+          "supported": false,
+          "best_window_index": 25,
+          "best_window": "Solution:https: // thinkpython. com/ code/ pi. Chapter 8 Strings Strings are not like integers, floats, and booleans.",
+          "entailment_prob": 0.1613,
+          "contradiction_prob": 0.0518,
+          "reason": "Win 25: entail=0.161, contra=0.052"
+        },
+        {
+          "sentence": "If a match is found, it immediately returns True.",
+          "supported": false,
+          "best_window_index": 56,
+          "best_window": "Looping and counting 75 In a sense,findis the inverse of the[]operator. Instead of taking an index and extracting the corresponding character, it takes a character and finds the index where that character appears. If the character is not found, the function returns-1.",
+          "entailment_prob": 0.0014,
+          "contradiction_prob": 0.0018,
+          "reason": "Win 56: entail=0.001, contra=0.002"
+        },
+        {
+          "sentence": "If the iteration completes without finding a match, it returns False, indicating the character or substring is not present in the string.",
+          "supported": false,
+          "best_window_index": 18,
+          "best_window": "In this chapter you\u2019ll see how to access the characters that make up a string, and you\u2019ll learn about some of the methods strings provide. 8.1 A string is a sequence A string is a sequence of characters.",
+          "entailment_prob": 0.0115,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 18: entail=0.012, contra=0.000"
+        },
+        {
+          "sentence": "This process is efficient for short substrings or when the search is performed multiple times, as it only requires a single traversal of the string.",
+          "supported": true,
+          "best_window_index": 7,
+          "best_window": "8.1 A string is a sequence A string is a sequence of characters.",
+          "entailment_prob": 0.9657,
+          "contradiction_prob": 0.0003,
+          "reason": "Win 7: entail=0.966, contra=0.000"
+        },
+        {
+          "sentence": "For longer substrings, this method is less efficient compared to more advanced string searching algorithms.",
+          "supported": false,
+          "best_window_index": 7,
+          "best_window": "8.1 A string is a sequence A string is a sequence of characters.",
+          "entailment_prob": 0.0344,
+          "contradiction_prob": 0.0,
+          "reason": "Win 7: entail=0.034, contra=0.000"
+        }
+      ]
+    },
+    "q37": {
+      "id": "q37",
+      "question": "How do pop, del, and remove differ when removing elements from a list in Python?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "In Python, to remove elements from a list, you have three main methods: pop, del, and remove. \n\n- pop() method requires an index, removes the element at that index, and returns it. If no index is specified, it removes and returns the last element. Using pop() modifies the list directly by removing the element.\n  \n- del is used to delete elements by specifying their index. It requires the index position and removes the element from the list. Unlike pop, del does not return the value that was removed.\n\n- remove() method is used when you don't know the index but you know the value of the element you want to remove. It searches for the element in the list and removes it. Unlike pop and del, remove() modifies the list in place and does not return anything.\n\nIn summary, the methods differ in how they provide the index (pop and del) or the element to remove (remove), and in whether they modify or return the removed value.",
+      "total_items": 11,
+      "supported_items": 9,
+      "faithfulness": 0.818,
+      "details": [
+        {
+          "sentence": "In Python, to remove elements from a list, you have three main methods: pop, del, and remove.",
+          "supported": true,
+          "best_window_index": 38,
+          "best_window": "If you know the index of the element you want, you can usepop: >>> t = ['a','b','c'] >>> x = t.pop(1) >>> t ['a','c'] >>> x 'b' popmodifies the list and returns the element that was removed. If you don\u2019t provide an index, it deletes and returns the last element. If you don\u2019t need the removed value, you can use thedeloperator: >>> t = ['a','b','c'] >>> del t[1] >>> t ['a','c'] If you know the element you want to remove (but not the index), you can useremove: >>> t = ['a','b','c'] >>> t.remove('b') >>> t ['a','c']",
+          "entailment_prob": 0.7488,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 38: entail=0.749, contra=0.000"
+        },
+        {
+          "sentence": "- pop() method requires an index, removes the element at that index, and returns it.",
+          "supported": true,
+          "best_window_index": 23,
+          "best_window": "If you know the index of the element you want, you can usepop: >>> t = ['a','b','c'] >>> x = t.pop(1) >>> t ['a','c'] >>> x 'b' popmodifies the list and returns the element that was removed.",
+          "entailment_prob": 0.9879,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 23: entail=0.988, contra=0.000"
+        },
+        {
+          "sentence": "If no index is specified, it removes and returns the last element.",
+          "supported": true,
+          "best_window_index": 24,
+          "best_window": "If you don\u2019t provide an index, it deletes and returns the last element.",
+          "entailment_prob": 0.9984,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 24: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "Using pop() modifies the list directly by removing the element.",
+          "supported": true,
+          "best_window_index": 37,
+          "best_window": "10.8 Deleting elements There are several ways to delete elements from a list. If you know the index of the element you want, you can usepop: >>> t = ['a','b','c'] >>> x = t.pop(1) >>> t ['a','c'] >>> x 'b' popmodifies the list and returns the element that was removed. If you don\u2019t provide an index, it deletes and returns the last element.",
+          "entailment_prob": 0.99,
+          "contradiction_prob": 0.0012,
+          "reason": "Win 37: entail=0.990, contra=0.001"
+        },
+        {
+          "sentence": "- del is used to delete elements by specifying their index.",
+          "supported": true,
+          "best_window_index": 1,
+          "best_window": "To remove more than one element, you can usedelwith a slice index: >>> t = ['a','b','c','d','e','f'] >>> del t[1:5] >>> t ['a','f'] As usual, the slice selects all the elements up to but not including the second index.",
+          "entailment_prob": 0.9971,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 1: entail=0.997, contra=0.000"
+        },
+        {
+          "sentence": "It requires the index position and removes the element from the list.",
+          "supported": true,
+          "best_window_index": 23,
+          "best_window": "If you know the index of the element you want, you can usepop: >>> t = ['a','b','c'] >>> x = t.pop(1) >>> t ['a','c'] >>> x 'b' popmodifies the list and returns the element that was removed.",
+          "entailment_prob": 0.9879,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 23: entail=0.988, contra=0.000"
+        },
+        {
+          "sentence": "Unlike pop, del does not return the value that was removed.",
+          "supported": false,
+          "best_window_index": 13,
+          "best_window": "operator: >>> t = ['a','b','c'] >>> del t[1] >>> t ['a','c'] If you know the element you want to remove (but not the index), you can useremove: >>> t = ['a','b','c'] >>> t.remove('b') >>> t ['a','c'] The return value fromremoveisNone. To remove more than one element, you can usedelwith a slice index: >>> t = ['a','b','c','d','e','f'] >>> del t[1:5] >>> t ['a','f'] As usual, the slice selects all the elements up to but not including the second index. 10.9 Lists and strings A string is a sequence of characters and a list is a sequence of values, but a list of characters is not the same as a string.",
+          "entailment_prob": 0.0053,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 13: entail=0.005, contra=0.000"
+        },
+        {
+          "sentence": "- remove() method is used when you don't know the index but you know the value of the element you want to remove.",
+          "supported": true,
+          "best_window_index": 25,
+          "best_window": "If you don\u2019t need the removed value, you can use thedeloperator: >>> t = ['a','b','c'] >>> del t[1] >>> t ['a','c'] If you know the element you want to remove (but not the index), you can useremove: >>> t = ['a','b','c'] >>> t.remove('b') >>> t ['a','c']",
+          "entailment_prob": 0.9955,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 25: entail=0.996, contra=0.000"
+        },
+        {
+          "sentence": "It searches for the element in the list and removes it.",
+          "supported": true,
+          "best_window_index": 31,
+          "best_window": "If you know the index of the element you want, you can usepop: >>> t = ['a','b','c'] >>> x = t.pop(1) >>> t ['a','c'] >>> x 'b' popmodifies the list and returns the element that was removed. If you don\u2019t provide an index, it deletes and returns the last element.",
+          "entailment_prob": 0.9814,
+          "contradiction_prob": 0.0003,
+          "reason": "Win 31: entail=0.981, contra=0.000"
+        },
+        {
+          "sentence": "Unlike pop and del, remove() modifies the list in place and does not return anything.",
+          "supported": false,
+          "best_window_index": 13,
+          "best_window": "operator: >>> t = ['a','b','c'] >>> del t[1] >>> t ['a','c'] If you know the element you want to remove (but not the index), you can useremove: >>> t = ['a','b','c'] >>> t.remove('b') >>> t ['a','c'] The return value fromremoveisNone. To remove more than one element, you can usedelwith a slice index: >>> t = ['a','b','c','d','e','f'] >>> del t[1:5] >>> t ['a','f'] As usual, the slice selects all the elements up to but not including the second index. 10.9 Lists and strings A string is a sequence of characters and a list is a sequence of values, but a list of characters is not the same as a string.",
+          "entailment_prob": 0.0079,
+          "contradiction_prob": 0.9459,
+          "reason": "Win 13: entail=0.008, contra=0.946"
+        },
+        {
+          "sentence": "In summary, the methods differ in how they provide the index (pop and del) or the element to remove (remove), and in whether they modify or return the removed value.",
+          "supported": true,
+          "best_window_index": 32,
+          "best_window": "If you don\u2019t provide an index, it deletes and returns the last element. If you don\u2019t need the removed value, you can use thedeloperator: >>> t = ['a','b','c'] >>> del t[1] >>> t ['a','c'] If you know the element you want to remove (but not the index), you can useremove: >>> t = ['a','b','c'] >>> t.remove('b') >>> t ['a','c']",
+          "entailment_prob": 0.9779,
+          "contradiction_prob": 0.0009,
+          "reason": "Win 32: entail=0.978, contra=0.001"
+        }
+      ]
+    },
+    "q47": {
+      "id": "q47",
+      "question": "What is a programmer-defined type or class in Python and how do you instantiate an object from it?",
+      "applicable": true,
+      "abstained": false,
+      "unscorable": false,
+      "answer": "A programmer-defined type, also known as a class in Python, is a type that a programmer creates to define a set of data and the functions (methods) that operate on that data. To instantiate an object from a class, you define an instance of the class. This involves creating an object that belongs to a class, which can be done using the class name followed by parentheses, typically like this: `object_name = ClassName()`. For example, if you have defined a class `Point`, you can instantiate a new point object as `point_instance = Point()`. This creates an object that represents a point in 2D space according to the class definition.",
+      "total_items": 5,
+      "supported_items": 1,
+      "faithfulness": 0.2,
+      "details": [
+        {
+          "sentence": "A programmer-defined type, also known as a class in Python, is a type that a programmer creates to define a set of data and the functions (methods) that operate on that data.",
+          "supported": false,
+          "best_window_index": 25,
+          "best_window": "The class object can be used to create instances of the type. instance:An object that belongs to a class. instantiate:To create a new object.",
+          "entailment_prob": 0.0212,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 25: entail=0.021, contra=0.000"
+        },
+        {
+          "sentence": "To instantiate an object from a class, you define an instance of the class.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "The class object can be used to create instances of the type.",
+          "entailment_prob": 0.9952,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 4: entail=0.995, contra=0.000"
+        },
+        {
+          "sentence": "This involves creating an object that belongs to a class, which can be done using the class name followed by parentheses, typically like this: `object_name = ClassName()`.",
+          "supported": false,
+          "best_window_index": 30,
+          "best_window": "oints are often written in parentheses with a comma separating the coordinates.",
+          "entailment_prob": 0.0114,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 30: entail=0.011, contra=0.000"
+        },
+        {
+          "sentence": "For example, if you have defined a class `Point`, you can instantiate a new point object as `point_instance = Point()`.",
+          "supported": false,
+          "best_window_index": 39,
+          "best_window": "The header indicates that the new class is calledPoint.",
+          "entailment_prob": 0.2082,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 39: entail=0.208, contra=0.000"
+        },
+        {
+          "sentence": "This creates an object that represents a point in 2D space according to the class definition.",
+          "supported": false,
+          "best_window_index": 56,
+          "best_window": "Creating a new type is more complicated than the other options, but it has advantages that will be apparent soon. A programmer-defined type is also called aclass. A class definition looks like this: class Point: \"\"\"Represents a point in 2-D space.\"\"\" 148 Chapter 15.",
+          "entailment_prob": 0.0126,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 56: entail=0.013, contra=0.000"
+        }
+      ]
+    }
+  },
+  "mean_faithfulness": 0.535
+}

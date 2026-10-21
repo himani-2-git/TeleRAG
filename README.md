@@ -183,7 +183,7 @@ Measured results using Ollama on a **Dell Inspiron i5 with 16 GB RAM (CPU only)*
 * **Earlier 7B Baseline**: The earlier default `qwen2:7b` yielded ~3 tokens/s generation, taking 10 to 20 minutes per answer on this laptop CPU, and answered "RAG" wrongly.
 
 > [!NOTE]
-> This benchmark measures answered-vs-refused behaviour and latency, not answer correctness; faithfulness evaluation is future work.
+> This benchmark measures answered-vs-refused behaviour and latency, not answer correctness; faithfulness evaluation is reported under Faithfulness evaluation below.
 
 #### Optional: use a hosted provider (OpenRouter, Groq, Google AI Studio)
 To route to a hosted OpenAI-compatible endpoint instead of running locally:
@@ -261,6 +261,55 @@ python -m eval.run_faithfulness --judge-type nli --n 20 --output eval/results/fa
 >   3. Zero unscorable references (coverage requirement).
 >   Otherwise, the runner outputs `JUDGE NOT TRUSTWORTHY` and flags the judge as `UNVALIDATED JUDGE: treat scores as directional`. Validation results are saved to `eval/results/judge_validation_<judge>.json`.
 
+### Faithfulness Evaluation
+
+#### Think Python 2e Benchmark Results
+
+Empirical faithfulness evaluation was conducted on 20 answerable questions sampled from *Think Python 2e* (`eval/fixtures/book.pdf`, saved in `eval/results/faithfulness.json`):
+
+| Parameter / Metric | Measured Value |
+| :--- | :--- |
+| Sample Size ($n$) | 20 answerable questions |
+| Random Seed | 42 |
+| Generator Model | `qwen2.5:3b` |
+| Prompt Version | `v1` |
+| Judge Model | `cross-encoder/nli-deberta-v3-base` (premise windows 1, 2, 3; threshold 0.30) |
+| Mean Answer Faithfulness | **0.535** (53.5%) |
+| Unscorable Answers | 0 |
+| Judge Validation Verdict | **`JUDGE NOT TRUSTWORTHY`** (`UNVALIDATED JUDGE: treat scores as directional`) |
+
+#### Judge Error Rates & Validation Status
+
+The default judge model (`cross-encoder/nli-deberta-v3-base`) was benchmarked using `--validate-judge` against ground-truth reference answers and hand-written negative controls on both DEV and HELD-OUT sets (saved in `eval/results/judge_validation_cross-encoder_nli-deberta-v3-base.json`):
+
+* **DEV Set Error Rates**:
+  * **Reference Accept Rate**: **9 / 12 (75.0%)** (mean faithfulness: 0.750; failed the $\ge 0.800$ passing requirement).
+  * **Negative-Control False-Accept Rate**: **0 / 6 (0.0%)** (mean faithfulness: 0.111, max negative control score: 0.333).
+* **HELD-OUT Set Error Rates**:
+  * **Reference Accept Rate**: **7 / 8 (87.5%)** (mean faithfulness: 0.875; passed $\ge 0.800$).
+  * **Negative-Control False-Accept Rate**: **0 / 8 (0.0%)** (mean faithfulness: 0.250, max negative control score: 0.500).
+
+Because the judge achieved a DEV reference accept rate of 75.0% (falling short of the required 80.0%), the judge did **NOT** pass the validation gate and is explicitly labelled **`UNVALIDATED JUDGE: treat scores as directional`** (`JUDGE NOT TRUSTWORTHY`). Reported faithfulness scores must be treated as conservative and directional.
+
+#### Interpreting the 0.535 Score (Not a Hallucination Rate)
+
+The measured mean answer faithfulness of **0.535** combines three distinct sources of unsupported sentences and **must NOT be interpreted as a 46.5% hallucination rate**:
+1. **Strict Judge Over-Rejection**: The NLI cross-encoder model applies strict premise-sentence entailment and frequently assigns `neutral` to factually correct claims when phrasing deviates from the text or requires implicit bridging commonsense knowledge. This is demonstrated by the judge's 25.0% error rate on human-verified ground truth reference answers in the DEV benchmark (accepting only 9 of 12 references).
+2. **Generator Unsupported Content**: The lightweight 3B parameter local generator (`qwen2.5:3b`) occasionally includes introductory framing, high-level summaries, or general programming explanations that, while plausible, are not directly asserted within the retrieved passage.
+3. **Retrieval Misses**: Context retrieval is limited to the top-2 chunks (`TOP_K_RESULTS=2`). When a multi-faceted question requires context across multiple pages or when hybrid retrieval omits a supporting sentence, even an accurate generation cannot be entailed from the retrieved snippets alone (e.g. `ci_06`, where retrieval missed the key passage, resulting in a 0.00 score on a true reference answer).
+
+#### Dataset Item Counts & Evaluation Filtering
+
+* **DEV Set (`eval/fixtures/ci_answers.json`)**: 12 reference answers and 6 negative controls (18 scored items).
+  * *Why the validation log displayed 21 items but only 18 were scored*: `ci_answers.json` contains 21 total fixture entries: 12 reference answers, 6 negative controls, and 3 unanswerable questions (`ci_u01`–`ci_u03`) where the expected answer is `"INSUFFICIENT_CONTEXT"`. In `eval/run_faithfulness.py`, `if ans_text.strip() == "INSUFFICIENT_CONTEXT": continue` bypasses unanswerable refusal items from NLI claim verification, leaving exactly 18 scored items.
+* **HELD-OUT Set (`eval/fixtures/ci_answers_heldout.json`)**: 8 reference answers and 8 negative controls (16 scored items).
+
+#### Judge Validation Limitations
+
+1. **Whole-Answer vs Sentence-Level False-Accept Rate**: The negative-control false-accept rate is calculated at the whole-answer level (requiring aggregate answer faithfulness $> 0.50$ to register as a false accept). Partially supported negative controls (where 1 of 3 sentences or 1 of 2 sentences happens to be true) score 0.333 or 0.500; they count as non-false-accepts under the $\le 0.50$ rule despite individual sentences being classified as entailed.
+2. **Boundary Sensitivity on Held-Out Negative Controls**: 4 of the 8 HELD-OUT negative controls (`heldout_neg_05`, `heldout_neg_06`, `heldout_neg_07`, and `heldout_neg_08`) scored exactly **0.500** (1 of 2 sentences supported). Consequently, the pass status on the held-out set strictly depends on the non-strict `<=` boundary criterion (`score <= 0.50`); a strict `< 0.50` rule would have failed all 4 items and resulted in a FAIL verdict on held-out.
+3. **Post-Hoc Model Selection**: The `cross-encoder/nli-deberta-v3-base` judge model was selected post-hoc after the smaller `cross-encoder/nli-deberta-v3-small` failed the held-out evaluation due to entity-swap vulnerability on `heldout_neg_02`. Because model selection was guided by performance on the held-out set, the held-out validation is not fully independent.
+
 ### Judge Validation Findings
 
 Validation scores reference answers against **retrieved context** (not raw ground-truth fixture text). Consequently, a retrieval miss counts against the reference. For example, on `ci_06` (*What RPCs are used by the Raft leader to replicate log entries across followers?*), the true reference answer was scored `0.00` across all judges because hybrid retrieval's top-2 chunks did not contain the sentence explaining `AppendEntries`, demonstrating that end-to-end judge validation tests the joint retrieval-and-judge pipeline.
@@ -320,6 +369,7 @@ Validation scores reference answers against **retrieved context** (not raw groun
 7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `PyPDF2`.
 8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use rather than untrusted multi-tenant host environments.
 9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias. For example, on `heldout_neg_02` (*Which database systems favor availability and low latency according to the PACELC classification?*), the subtly inverted answer `Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.` was assigned entailment `0.7545` (scored 1.000) against the PACELC premise window because all mentioned entities (Spanner, Bigtable, PA/EL, availability, low latency) co-occur in the same sentence window even though the passage assigns PA/EL to Dynamo/Cassandra and PC/EC to Bigtable/Spanner. Testing the larger `cross-encoder/nli-deberta-v3-base` resolved this specific entity-swap error (rejecting `heldout_neg_02` with score 0.00 and 0.0% false-accept rate on held-out), but under-scored certain dev references (`ci_04`, `ci_12`), leaving both NLI models marked as unvalidated judges.
+10. **Faithfulness Evaluation & Judge Validation Caveats**: The Think Python 2e faithfulness score (mean 0.535) is directional and conservative. It conflates strict NLI judge rejections (DEV reference accept rate 75.0%), 3B generator unsupported phrasing, and top-2 retrieval context misses, and must not be interpreted as a hallucination rate. Furthermore, the judge's 0.0% negative-control false-accept rate is whole-answer level (> 0.50), half of the held-out negative controls scored right at the boundary (0.500), and the base judge was selected post-hoc.
 
 ---
 

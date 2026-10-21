@@ -76,6 +76,30 @@ python main.py
 
 For full deployment and configuration options, see [docs/setup.md](docs/setup.md).
 
+## Measured Retrieval Results
+
+Retrieval evaluation reports two complementary metrics to evaluate physical page citations:
+- **Span metric**: A retrieval is counted as a hit if the chunk's physical page interval `[page_start, page_end]` overlaps any target ground-truth page.
+- **Strict metric**: A retrieval is counted as a hit only if the chunk's starting page `page_start` strictly matches a target ground-truth page.
+
+### Real-Document Golden Set (*Think Python 2e*)
+Evaluated on *Think Python (2nd Edition)* (`eval/fixtures/book.pdf`, 240 pages, 582 chunks of 1,000 characters with 200 overlap) across 70 queries: 50 answerable questions spanning all 19 chapters, 10 easy unanswerable off-topic questions, and 10 hard unanswerable Python questions absent from the book.
+
+| Strategy | Mode | Hit@1 (Span) | Hit@1 (Strict) | Hit@5 (Span) | Hit@5 (Strict) | MRR (Span) | MRR (Strict) | Easy Abst. | Hard Abst. | Mean Latency |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline Dense** | `all-MiniLM-L6-v2` | 66.0% (33/50) | 46.0% (23/50) | **100.0%** (50/50) | 90.0% (45/50) | 0.7897 | 0.6243 | **100%** (10/10) | 0.0% (0/10) | **56.9 ms** |
+| **Hybrid (Default)** | BM25 + Dense RRF ($k=60$) | 70.0% (35/50) | 52.0% (26/50) | 96.0% (48/50) | 84.0% (42/50) | 0.8073 | 0.6490 | **100%** (10/10) | 0.0% (0/10) | 57.8 ms |
+| **Hybrid + Reranker** | Cross-Encoder MiniLM | **76.0%** (38/50) | **62.0%** (31/50) | 98.0% (49/50) | **92.0%** (46/50) | **0.8507** | **0.7323** | **100%** (10/10) | 0.0% (0/10) | 2,020.6 ms |
+
+### CI Synthetic Fixture Gate
+Evaluated on the synthetic distributed systems document (`eval/fixtures/ci_fixture.pdf`, 8 pages, 10 chunks) across 15 queries (`eval/golden_ci.json`): 12 answerable questions and 3 easy unanswerable off-topic questions (0 hard unanswerable).
+
+| Strategy | Mode | Hit@1 (Span) | Hit@1 (Strict) | Hit@5 (Span) | Hit@5 (Strict) | MRR (Span) | MRR (Strict) | Easy Abst. | Hard Abst. | Mean Latency |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Hybrid (CI Gate)** | BM25 + Dense RRF ($k=60$) | 100.0% (12/12) | 16.7% (2/12) | 100.0% (12/12) | 83.3% (10/12) | 1.0000 | 0.4861 | 100% (3/3) | n/a (0/0) | 30.4 ms |
+
+For detailed breakdown, latency benchmarks, ablation experiments, and faithfulness analysis, see [docs/technical-report.md](docs/technical-report.md).
+
 ## Running Tests and Evaluations
 
 ```bash

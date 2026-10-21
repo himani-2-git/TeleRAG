@@ -232,25 +232,97 @@ Once the bot is running, open Telegram and search for your bot's username.
 | `/start` | Bot Introduction | Sends a welcome overview and basic instructions. |
 | `/help` | Detailed Help | Explains document upload options and question syntax. |
 | `/list` | Show Documents | Lists all active documents in your library with file sizes and chunk counts. |
+| `/addurl <url>` | Ingest Web Page | Ingests a public web page with SSRF protection and extracts article content. |
 | `/delete <filename>` | Delete Specific File | Deletes a document, its database chunks, and its vector embeddings. |
 | `/clear` | Wipe Library | Removes all uploaded documents and embeddings for your user account. |
 
-### 6.2 Uploading Documents
+### 6.2 Uploading Documents and Ingesting Content
 
-#### Option A: Direct File Upload
+#### Option A: Direct File Upload (PDF, Markdown, Plain Text)
 1. Click the attachment icon (paperclip) in Telegram.
-2. Select a text-based PDF file (under 20 MB).
+2. Select a document file (under 20 MB):
+   - **PDF (`.pdf`)**: Extracted page by page, preserving page-level citations (`(p. X)` or `(pp. X-Y)`).
+   - **Markdown (`.md`)**: Structure-aware parsing splits content along heading boundaries (`#`, `##`, `###`), preserving full section paths in citations (e.g., `guide.md > Installation`). Sections exceeding chunk size are split with 20% overlap.
+   - **Plain Text (`.txt`)**: Clean sliding-window chunking, cited as chunk indices (`doc.txt (chunk 1)`).
 3. Send it to the bot.
 4. The bot responds:
-   - *"Processing your PDF..."*
+   - *"Processing your document..."*
    - *"✅ Successfully processed <filename> | 📊 Created N chunks"*
 
-#### Option B: Public URL Upload
+#### Option B: Public PDF URL Upload
 1. Send a direct link to any public PDF file in chat:
    ```text
    https://greenteapress.com/thinkpython2/thinkpython2.pdf
    ```
 2. The bot validates the URL, downloads it with streaming size bounds, parses chunks, and saves embeddings.
+
+#### Option C: Web Page Ingestion (`/addurl <url>`)
+1. Send `/addurl <url>` with any public web article:
+   ```text
+   /addurl https://en.wikipedia.org/wiki/Raft_(algorithm)
+   ```
+2. **Content Extraction**: Strips non-content boilerplate tags (`<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`, `<aside>`), extracts title and semantic body text, and chunks it cleanly.
+3. **SSRF Protection**:
+   - Only `http` and `https` schemes are accepted; dangerous protocols (`file://`, `ftp://`, `gopher://`, etc.) are rejected immediately.
+   - Resolves hostnames and strictly blocks private, loopback, link-local, multicast, and cloud metadata addresses (e.g. `127.0.0.1`, `10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`, `169.254.169.254`).
+   - Downloads stream with a hard 20 MB size ceiling and a 10-second timeout.
+
+---
+
+## 7. Vector Backend Options
+
+TeleRAG supports modular vector store backends configured via `VECTOR_BACKEND` in `.env`:
+
+### 7.1 NumPy Vector Store (`VECTOR_BACKEND=numpy` — Default)
+- **Zero Extra Dependencies**: Backed by the built-in SQLite metadata store (`data/documents.db`) and JSON embedding files (`data/embeddings/`).
+- **In-Process Similarity**: Uses standard NumPy cosine similarity with zero server overhead. Ideal for lightweight deployments, low-memory embedded machines, and standard CI environments.
+
+### 7.2 ChromaDB Vector Store (`VECTOR_BACKEND=chroma` — Optional)
+- **Persistent Vector Store**: Backed by ChromaDB with cosine distance metric (`hnsw:space: cosine`).
+- **Strict Per-User Scoping**: Every query filters chunks using Chroma metadata (`{"user_id": user_id}`), guaranteeing strict cross-user data isolation.
+- **Enabling Chroma**:
+  1. Install the optional dependency:
+     ```bash
+     pip install -r requirements-chroma.txt
+     ```
+  2. Set environment variables in `.env`:
+     ```bash
+     VECTOR_BACKEND=chroma
+     CHROMA_PATH=data/chroma
+     ```
+  3. If `VECTOR_BACKEND=chroma` is specified without `chromadb` installed, TeleRAG logs a warning and gracefully falls back to `NumPyVectorStore` without crashing.
+
+---
+
+## 8. Pipeline Orchestration Options
+
+TeleRAG supports modular RAG orchestration configured via `ORCHESTRATOR` in `.env`:
+
+### 8.1 Plain Orchestrator (`ORCHESTRATOR=plain` — Default)
+- Executes the 4 pipeline steps sequentially in pure Python:
+  1. `retrieve`: Queries vector store and BM25 for candidate chunks.
+  2. `abstain_or_generate`: Checks similarity threshold; either abstains with refusal or invokes LLM.
+  3. `grounding`: Evaluates semantic entailment coverage between answer and chunks.
+  4. `format_reply`: Formats citations and the Sources footer.
+
+### 8.2 LangGraph Orchestrator (`ORCHESTRATOR=langgraph` — Optional)
+- Compiles the identical 4 nodes into an executable LangGraph `StateGraph`:
+  ```
+  [retrieve] ──> [abstain_or_generate] ──> [grounding] ──> [format_reply] ──> [END]
+  ```
+- **Parity Guarantee**: Uses the same component methods, ensuring 100% identical answer text, refusal behavior, and citation footers.
+- **Enabling LangGraph**:
+  1. Install the optional dependency:
+     ```bash
+     pip install -r requirements-graph.txt
+     ```
+  2. Set environment variable in `.env`:
+     ```bash
+     ORCHESTRATOR=langgraph
+     ```
+  3. If `ORCHESTRATOR=langgraph` is set without `langgraph` installed, TeleRAG logs a warning and gracefully falls back to `plain` execution without crashing.
+
+---
 
 ### 6.3 Asking Questions
 Once at least one document is uploaded, simply send natural language questions:
@@ -265,7 +337,7 @@ Once at least one document is uploaded, simply send natural language questions:
 
 ---
 
-## 7. Troubleshooting & Common Issues
+## 9. Troubleshooting & Common Issues
 
 ### 1. HTTP 406 "Not Acceptable" on URL Uploads
 * **Symptom**: The bot reports a 406 Client Error when downloading a PDF from an institutional or hosting server.

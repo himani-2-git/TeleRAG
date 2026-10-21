@@ -2,6 +2,8 @@
 
 A lightweight Telegram bot for grounded question answering over PDF documents, running on local embeddings without external vector databases.
 
+**Project status**: v1.1.0: versioned prompts, grounding gate, faithfulness evaluation (experimental, unvalidated judge), markdown/text/web ingestion, optional Chroma and LangGraph
+
 [![Python Version](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI Quality Gate](https://github.com/himani-2-git/TeleRAG/actions/workflows/ci.yml/badge.svg)](https://github.com/himani-2-git/TeleRAG/actions/workflows/ci.yml)
@@ -27,7 +29,7 @@ Retrieval was evaluated on a 70-question set over *Think Python 2e*, a smaller s
 
 ## Why I Built It & What I Learned
 
-I built TeleRAG to understand how a production-style RAG pipeline behaves end-to-end without relying on managed vector database services or opaque framework abstractions. Building this project taught me that chunk boundaries frequently split physical pages—causing citation errors unless tracked as intervals—and that combining BM25 with dense retrieval via Reciprocal Rank Fusion provides a practical hedge against vocabulary mismatch. Measuring each change against a verified 70-question golden set showed that dense and hybrid differ by only 1–2 questions on a 50-question set (within noise), whereas the real precision jump came from cross-encoder reranking at the cost of CPU inference latency.
+I built TeleRAG to learn what it takes to make a document question-answering bot that I can actually trust, not just one that sounds confident. It answers questions about PDFs, markdown files and web pages on Telegram, cites its sources, and refuses when the answer isn't in the document. I run it on my own laptop with a small local model, which was slow at first: a 7B model took 10-20 minutes per answer, so I moved to a 3B model and now get answers in about 20-40 seconds. The most useful thing I learned is that measuring is harder than building. My first faithfulness score was a perfect 1.00 and I didn't believe it, so I tested the judge with deliberately wrong answers and found it was too lenient. After trying several judges I still don't have one I can fully trust, and the README says so. Next I want to compare my small local model against a stronger hosted one using the same tests.
 
 ---
 
@@ -427,19 +429,15 @@ TeleRAG decouples the question-answering workflow into 4 single-responsibility n
 
 ## Chunk-Size Ablation Study
 
-To evaluate optimal passage granularity, a chunk-size ablation study was conducted using `eval/run_chunk_ablation.py` over `eval/fixtures/ci_fixture.pdf` across candidate character chunk sizes with fixed 20% overlap (saved in `eval/results/chunk_ablation.json`):
+To evaluate passage granularity, a chunk-size ablation study was run using `eval/run_chunk_ablation.py` over `eval/fixtures/ci_fixture.pdf` across candidate character chunk sizes with fixed 20% overlap (saved in `eval/results/chunk_ablation.json`):
 
 | Chunk Size | Overlap | Chunks | Mean Chars | Mean Toks | % > 256 Toks | Hit@2 (Span) | MRR (Span) | Hit@2 (Strict) | MRR (Strict) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **500** | 100 | 19 | 433.4 | 89.9 | **0.0%** | **1.0000** | **1.0000** | **1.0000** | **0.9583** |
-| **1000 (Default)** | 200 | 10 | 824.4 | 173.1 | **0.0%** | **1.0000** | **1.0000** | 0.7500 | 0.4861 |
-| **1500** | 300 | 7 | 1178.3 | 243.7 | 71.4% | **1.0000** | **1.0000** | 0.6667 | 0.6042 |
+| **500** | 100 | 19 | 433.4 | 89.9 | 0.0% | 1.0000 | 1.0000 | 1.0000 | 0.9583 |
+| **1000 (Default)** | 200 | 10 | 824.4 | 173.1 | 0.0% | 1.0000 | 1.0000 | 0.7500 | 0.4861 |
+| **1500** | 300 | 7 | 1178.3 | 243.7 | 71.43% | 1.0000 | 1.0000 | 0.6667 | 0.6042 |
 
-### Decision Rule & Findings
-* **1000 Chars (Kept Default)**: Achieves 100% span Hit@2 (1.0000) and 100% span MRR (1.0000) with zero chunks exceeding the 256-token MiniLM embedding limit.
-* **500 Chars**: Achieves identical span retrieval quality (1.0000 / 1.0000) and higher strict start-page MRR (0.9583 vs 0.4861) due to single-page containment, but almost doubles total chunk count (+90%, 19 vs 10 chunks), increasing embedding overhead and SQLite storage without net span recall improvements.
-* **1500 Chars**: 71.4% of chunks exceed 256 tokens, suffering position-embedding truncation penalties and degraded strict Hit@2 (0.6667).
-* **Verdict**: In accordance with the decision rule (*"do not change for marginal or mixed gains"*), the default remains **`CHUNK_SIZE=1000`** with **`CHUNK_OVERLAP=200`**.
+The test fixture is small (8 pages, 12 test questions) and both 500 and 1000 characters scored the same on span Hit@2 (1.0000) and span MRR (1.0000), so the ablation does not show that 1000 "wins". The only clear finding is that 1500 characters exceeds the embedder's 256-token window and is partly truncated (71.43% of chunks exceed 256 tokens). Chunk size 1000 is kept as the default because it fits within the embedding model's context window (0.0% exceeding 256 tokens) and produces fewer chunks than 500 (10 chunks vs. 19 chunks), not because it scored better on retrieval metrics.
 
 ---
 

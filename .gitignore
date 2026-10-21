@@ -69,5 +69,4 @@ htmlcov/
 *.tmp
 *.bak
 *.log
-.kiro/
 desktop.ini

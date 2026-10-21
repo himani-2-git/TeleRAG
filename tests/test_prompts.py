@@ -3,6 +3,7 @@
 import os
 import tempfile
 import unittest
+
 import yaml
 
 from src.rag.prompts import PromptConfig, load_prompt_config
@@ -50,7 +51,9 @@ class TestPrompts(unittest.TestCase):
             "Be concise and accurate. Answer in at most 150 words unless the user explicitly asks for detail."
         )
         expected_user = "Context:\n{context}\n\nQuestion: {question}\n\nAnswer:"
-        expected_refusal = "🤔 I couldn't find relevant information in your documents to answer this question."
+        expected_refusal = (
+            "🤔 I couldn't find relevant information in your documents to answer this question."
+        )
         expected_marker = "INSUFFICIENT_CONTEXT"
 
         self.assertEqual(config.system_prompt, expected_system)

@@ -2,6 +2,7 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
+
 from src.rag.reranker import CrossEncoderReranker
 
 
@@ -12,8 +13,18 @@ class TestCrossEncoderReranker(unittest.TestCase):
         self.reranker = CrossEncoderReranker()
         self.sample_candidates = [
             {"chunk_index": 0, "content": "Python is dynamic.", "page": 1, "dense_score": 0.8},
-            {"chunk_index": 1, "content": "Functions use def keyword.", "page": 2, "dense_score": 0.7},
-            {"chunk_index": 2, "content": "Lists are mutable sequences.", "page": 3, "dense_score": 0.6},
+            {
+                "chunk_index": 1,
+                "content": "Functions use def keyword.",
+                "page": 2,
+                "dense_score": 0.7,
+            },
+            {
+                "chunk_index": 2,
+                "content": "Lists are mutable sequences.",
+                "page": 3,
+                "dense_score": 0.6,
+            },
         ]
 
     def test_empty_candidates(self):
@@ -36,9 +47,7 @@ class TestCrossEncoderReranker(unittest.TestCase):
         mock_get_model.return_value = mock_model
 
         results = self.reranker.rerank(
-            query="How to define functions in Python?",
-            candidates=self.sample_candidates,
-            top_k=2
+            query="How to define functions in Python?", candidates=self.sample_candidates, top_k=2
         )
 
         self.assertEqual(len(results), 2)

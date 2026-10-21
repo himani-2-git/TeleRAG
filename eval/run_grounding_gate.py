@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -36,7 +36,7 @@ def run_grounding_gate(
     grounding_threshold: float = 0.45,
 ) -> bool:
     """Run post-retrieval grounding checks across reference answers and negative controls.
-    
+
     Returns:
         True if all threshold assertions pass, False otherwise.
     """
@@ -44,6 +44,7 @@ def run_grounding_gate(
         config = get_config(require_telegram=False)
     except Exception:
         from src.config import Config
+
         config = Config(
             telegram_bot_token="",
             embedding_model="all-MiniLM-L6-v2",
@@ -53,7 +54,7 @@ def run_grounding_gate(
         )
 
     # 1. Load thresholds
-    with open(thresholds_path, "r", encoding="utf-8") as f:
+    with open(thresholds_path, encoding="utf-8") as f:
         thresholds = json.load(f)
 
     min_mean_coverage = thresholds.get("min_grounding_mean_coverage", 0.85)
@@ -68,7 +69,7 @@ def run_grounding_gate(
     logger.info("Generating embeddings for %d chunks...", len(chunks))
     contents = [c.get("content", "") for c in chunks]
     embeddings = embedder.generate_embeddings(contents)
-    for chunk, emb in zip(chunks, embeddings):
+    for chunk, emb in zip(chunks, embeddings, strict=False):
         chunk["embedding"] = emb
 
     retriever = DocumentRetriever(
@@ -78,8 +79,8 @@ def run_grounding_gate(
     )
 
     # 4. Load answers
-    with open(answers_path, "r", encoding="utf-8") as f:
-        items: List[Dict[str, Any]] = json.load(f)
+    with open(answers_path, encoding="utf-8") as f:
+        items: list[dict[str, Any]] = json.load(f)
 
     logger.info("Loaded %d test items from %s", len(items), answers_path)
 
@@ -125,7 +126,9 @@ def run_grounding_gate(
         results_table.append(
             {
                 "id": q_id,
-                "type": "NEG_CTRL" if is_neg else ("REFUSAL" if not report.applicable else "REFERENCE"),
+                "type": "NEG_CTRL"
+                if is_neg
+                else ("REFUSAL" if not report.applicable else "REFERENCE"),
                 "coverage": f"{report.citation_coverage:.2f}",
                 "supported": f"{report.supported_sentences}/{report.total_sentences}",
                 "status": item_status,
@@ -135,29 +138,43 @@ def run_grounding_gate(
 
     # Print summary table
     print("\n" + "=" * 95)
-    print(f"{'ID':<8} | {'Type':<10} | {'Coverage':<9} | {'Supported':<10} | {'Status':<30} | {'Answer Preview'}")
+    print(
+        f"{'ID':<8} | {'Type':<10} | {'Coverage':<9} | {'Supported':<10} | {'Status':<30} | {'Answer Preview'}"
+    )
     print("-" * 95)
     for r in results_table:
-        print(f"{r['id']:<8} | {r['type']:<10} | {r['coverage']:<9} | {r['supported']:<10} | {r['status']:<30} | {r['preview']}")
+        print(
+            f"{r['id']:<8} | {r['type']:<10} | {r['coverage']:<9} | {r['supported']:<10} | {r['status']:<30} | {r['preview']}"
+        )
     print("=" * 95)
 
     mean_ref_coverage = float(np.mean(reference_coverages)) if reference_coverages else 0.0
     max_observed_neg = float(np.max(negative_coverages)) if negative_coverages else 0.0
 
-    print(f"\nGrounding Gate Metrics:")
-    print(f"  Mean Reference Coverage:     {mean_ref_coverage:.3f} (Required >= {min_mean_coverage:.3f})")
-    print(f"  Max Negative Control Score:  {max_observed_neg:.3f} (Required <= {max_neg_coverage:.3f})")
+    print("\nGrounding Gate Metrics:")
+    print(
+        f"  Mean Reference Coverage:     {mean_ref_coverage:.3f} (Required >= {min_mean_coverage:.3f})"
+    )
+    print(
+        f"  Max Negative Control Score:  {max_observed_neg:.3f} (Required <= {max_neg_coverage:.3f})"
+    )
 
     if mean_ref_coverage < min_mean_coverage:
-        logger.error(f"FAIL: Mean reference coverage {mean_ref_coverage:.3f} < threshold {min_mean_coverage:.3f}")
+        logger.error(
+            f"FAIL: Mean reference coverage {mean_ref_coverage:.3f} < threshold {min_mean_coverage:.3f}"
+        )
         gate_passed = False
 
     if max_observed_neg > max_neg_coverage:
-        logger.error(f"FAIL: Negative control score {max_observed_neg:.3f} > threshold {max_neg_coverage:.3f}")
+        logger.error(
+            f"FAIL: Negative control score {max_observed_neg:.3f} > threshold {max_neg_coverage:.3f}"
+        )
         gate_passed = False
 
     if gate_passed:
-        print("\n[PASS] GROUNDING GATE PASSED: All reference answers grounded and hallucinations rejected.")
+        print(
+            "\n[PASS] GROUNDING GATE PASSED: All reference answers grounded and hallucinations rejected."
+        )
     else:
         print("\n[FAIL] GROUNDING GATE FAILED.")
 
@@ -166,10 +183,21 @@ def run_grounding_gate(
 
 def main():
     parser = argparse.ArgumentParser(description="Run CI grounding gate.")
-    parser.add_argument("--pdf", type=str, default="eval/fixtures/ci_fixture.pdf", help="Path to PDF fixture")
-    parser.add_argument("--answers", type=str, default="eval/fixtures/ci_answers.json", help="Path to answers JSON")
-    parser.add_argument("--thresholds", type=str, default="eval/thresholds.json", help="Path to thresholds JSON")
-    parser.add_argument("--threshold", type=float, default=0.45, help="Sentence grounding cosine similarity threshold")
+    parser.add_argument(
+        "--pdf", type=str, default="eval/fixtures/ci_fixture.pdf", help="Path to PDF fixture"
+    )
+    parser.add_argument(
+        "--answers", type=str, default="eval/fixtures/ci_answers.json", help="Path to answers JSON"
+    )
+    parser.add_argument(
+        "--thresholds", type=str, default="eval/thresholds.json", help="Path to thresholds JSON"
+    )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.45,
+        help="Sentence grounding cosine similarity threshold",
+    )
     args = parser.parse_args()
 
     passed = run_grounding_gate(

@@ -1,5 +1,0 @@
-# Evaluation-only dependencies (for local faithfulness evaluation, never installed in CI)
-# NLI Judge uses CrossEncoder from sentence-transformers (already in requirements.txt)
-# Default NLI model: cross-encoder/nli-deberta-v3-small (lighter alternative: cross-encoder/nli-MiniLM2-L6-H768)
-pydantic>=2.0.0
-ragas>=0.1.0

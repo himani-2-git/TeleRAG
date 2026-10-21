@@ -1,24 +1,25 @@
 """Web page processor with SSRF protection, size caps, and static HTML extraction."""
 
-import re
-import socket
 import ipaddress
 import logging
-from typing import Tuple, List, Optional
-from urllib.parse import urlparse, urljoin
+import re
+import socket
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
+
 from .text_chunker import TextChunk, TextChunker
 
 logger = logging.getLogger(__name__)
 
 
-def validate_url_ssrf(url: str) -> Tuple[bool, str]:
+def validate_url_ssrf(url: str) -> tuple[bool, str]:
     """Validate URL against SSRF threats, non-HTTP schemes, and private IP ranges.
-    
+
     Args:
         url: URL string to check.
-        
+
     Returns:
         Tuple of (is_safe, error_message).
     """
@@ -49,7 +50,10 @@ def validate_url_ssrf(url: str) -> Tuple[bool, str]:
                 or direct_ip.is_reserved
                 or direct_ip.is_unspecified
             ):
-                return False, f"Access to private, loopback, or restricted network address ({lower_host}) is forbidden."
+                return (
+                    False,
+                    f"Access to private, loopback, or restricted network address ({lower_host}) is forbidden.",
+                )
         except ValueError:
             pass  # Hostname is a domain name, proceed to DNS resolution
 
@@ -80,20 +84,23 @@ def validate_url_ssrf(url: str) -> Tuple[bool, str]:
                 or ip.is_reserved
                 or ip.is_unspecified
             ):
-                return False, f"Access to private, loopback, or restricted network address ({ip_str}) is forbidden."
+                return (
+                    False,
+                    f"Access to private, loopback, or restricted network address ({ip_str}) is forbidden.",
+                )
 
         return True, ""
     except Exception as e:
         return False, f"URL validation failed: {e}"
 
 
-def extract_html_content(html: str, url: str) -> Tuple[str, str, str]:
+def extract_html_content(html: str, url: str) -> tuple[str, str, str]:
     """Extract clean title, domain, and main text from HTML string.
-    
+
     Args:
         html: Raw HTML content.
         url: Original URL for fallback domain and title derivation.
-        
+
     Returns:
         Tuple of (title, domain, clean_text).
     """
@@ -112,13 +119,15 @@ def extract_html_content(html: str, url: str) -> Tuple[str, str, str]:
         title = domain
 
     # Remove non-content and layout tags
-    for tag in soup(["script", "style", "nav", "footer", "header", "aside", "noscript", "svg", "iframe"]):
+    for tag in soup(
+        ["script", "style", "nav", "footer", "header", "aside", "noscript", "svg", "iframe"]
+    ):
         tag.decompose()
 
     # Prioritize semantic main content containers
     main_elem = soup.find("main") or soup.find("article") or soup.body or soup
     raw_text = main_elem.get_text(separator="\n", strip=True)
-    clean_text = re.sub(r'\n{3,}', '\n\n', raw_text).strip()
+    clean_text = re.sub(r"\n{3,}", "\n\n", raw_text).strip()
 
     return title, domain, clean_text
 
@@ -126,23 +135,29 @@ def extract_html_content(html: str, url: str) -> Tuple[str, str, str]:
 class WebProcessor:
     """Handles fetching web pages with SSRF prevention and content chunking."""
 
-    def __init__(self, chunk_size: int = 1000, overlap: int = 200, timeout: int = 15, max_bytes: int = 2 * 1024 * 1024):
+    def __init__(
+        self,
+        chunk_size: int = 1000,
+        overlap: int = 200,
+        timeout: int = 15,
+        max_bytes: int = 2 * 1024 * 1024,
+    ):
         self.chunk_size = chunk_size
         self.overlap = overlap
         self.timeout = timeout
         self.max_bytes = max_bytes
         self.chunker = TextChunker(chunk_size=chunk_size, overlap=overlap)
 
-    def fetch_url(self, url: str, max_redirects: int = 3) -> Tuple[str, str, str, bytes]:
+    def fetch_url(self, url: str, max_redirects: int = 3) -> tuple[str, str, str, bytes]:
         """Fetch URL enforcing SSRF validation, size caps, and redirect hop checking.
-        
+
         Args:
             url: URL to fetch.
             max_redirects: Maximum allowed redirect hops (default 3).
-            
+
         Returns:
             Tuple of (title, domain, clean_text, raw_bytes).
-            
+
         Raises:
             ValueError: If URL fails security validation, size caps, or content type constraints.
         """
@@ -196,7 +211,9 @@ class WebProcessor:
         content_type = response.headers.get("content-type", "").lower()
         if "text/html" not in content_type:
             response.close()
-            raise ValueError(f"Unsupported content type '{content_type}'. Only text/html is supported.")
+            raise ValueError(
+                f"Unsupported content type '{content_type}'. Only text/html is supported."
+            )
 
         # Check content-length header if provided
         cl_header = response.headers.get("content-length")
@@ -204,7 +221,9 @@ class WebProcessor:
             try:
                 if int(cl_header) > self.max_bytes:
                     response.close()
-                    raise ValueError(f"Content length exceeds {self.max_bytes // (1024 * 1024)} MB limit.")
+                    raise ValueError(
+                        f"Content length exceeds {self.max_bytes // (1024 * 1024)} MB limit."
+                    )
             except ValueError:
                 pass
 
@@ -215,7 +234,9 @@ class WebProcessor:
                 if chunk:
                     downloaded.extend(chunk)
                     if len(downloaded) > self.max_bytes:
-                        raise ValueError(f"Downloaded content exceeds {self.max_bytes // (1024 * 1024)} MB limit.")
+                        raise ValueError(
+                            f"Downloaded content exceeds {self.max_bytes // (1024 * 1024)} MB limit."
+                        )
         finally:
             response.close()
 
@@ -228,12 +249,12 @@ class WebProcessor:
 
         return title, domain, clean_text, raw_bytes
 
-    def process_url(self, url: str) -> Tuple[str, str, bytes, List[TextChunk]]:
+    def process_url(self, url: str) -> tuple[str, str, bytes, list[TextChunk]]:
         """Fetch, extract, and chunk web page content.
-        
+
         Args:
             url: Web page URL.
-            
+
         Returns:
             Tuple of (citation_label, clean_text, raw_bytes, chunks).
         """
@@ -241,7 +262,7 @@ class WebProcessor:
         citation_label = f"{title} ({domain})"
         raw_chunks = self.chunker.create_chunks(clean_text)
 
-        chunks: List[TextChunk] = []
+        chunks: list[TextChunk] = []
         for i, rc in enumerate(raw_chunks):
             chunk = TextChunk(
                 content=rc.content,

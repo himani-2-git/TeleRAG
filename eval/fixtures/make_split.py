@@ -6,7 +6,7 @@ from collections import defaultdict
 
 random.seed(42)
 
-with open("eval/golden.json", "r", encoding="utf-8") as f:
+with open("eval/golden.json", encoding="utf-8") as f:
     golden_data = json.load(f)
 
 # Stratified split: split each group
@@ -57,7 +57,7 @@ split_data = {
     "dev_ids": dev_ids,
     "test_ids": test_ids,
     "dev": dev_items,
-    "test": test_items
+    "test": test_items,
 }
 
 with open("eval/split.json", "w", encoding="utf-8") as f:

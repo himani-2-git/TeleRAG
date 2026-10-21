@@ -1,25 +1,21 @@
 """Tests for Plain and LangGraph pipeline orchestration."""
 
+import importlib.util
 import os
 import unittest
+from typing import Any
 from unittest.mock import MagicMock
-from typing import Any, Dict, List
 
-from src.rag.retriever import DocumentRetriever
-from src.rag.prompts import load_prompt_config
 from src.rag.pipeline import (
-    RAGPipeline,
-    PlainOrchestrator,
     LangGraphOrchestrator,
+    PlainOrchestrator,
+    RAGPipeline,
     get_orchestrator,
-    format_source_footer
 )
+from src.rag.prompts import load_prompt_config
+from src.rag.retriever import DocumentRetriever
 
-try:
-    import langgraph
-    HAS_LANGGRAPH = True
-except ImportError:
-    HAS_LANGGRAPH = False
+HAS_LANGGRAPH = importlib.util.find_spec("langgraph") is not None
 
 
 class MockEmbeddingGenerator:
@@ -28,11 +24,12 @@ class MockEmbeddingGenerator:
     def __init__(self):
         try:
             from sentence_transformers import SentenceTransformer
+
             self.model = SentenceTransformer("all-MiniLM-L6-v2")
         except Exception:
             self.model = None
 
-    def generate_query_embedding(self, query: str) -> List[float]:
+    def generate_query_embedding(self, query: str) -> list[float]:
         if self.model is not None:
             return self.model.encode(query, convert_to_numpy=True).tolist()
         return [0.1] * 384
@@ -52,7 +49,9 @@ class TestPipelinePlain(unittest.TestCase):
     """Test plain pipeline execution."""
 
     def setUp(self):
-        self.retriever = DocumentRetriever(top_k=2, similarity_threshold=0.3, retrieval_mode="hybrid")
+        self.retriever = DocumentRetriever(
+            top_k=2, similarity_threshold=0.3, retrieval_mode="hybrid"
+        )
         self.embedder = MockEmbeddingGenerator()
         self.llm = MockLLMClient()
         self.prompt_config = load_prompt_config("v1")
@@ -60,7 +59,7 @@ class TestPipelinePlain(unittest.TestCase):
             retriever=self.retriever,
             llm_client=self.llm,
             embedding_generator=self.embedder,
-            prompt_config=self.prompt_config
+            prompt_config=self.prompt_config,
         )
         self.orchestrator = PlainOrchestrator(self.pipeline)
 
@@ -71,15 +70,13 @@ class TestPipelinePlain(unittest.TestCase):
                 "content": "Raft consensus algorithm manages replicated log.",
                 "chunk_index": 0,
                 "filename": "raft.pdf",
-                "embedding": self.embedder.generate_query_embedding("Raft consensus algorithm manages replicated log.")
+                "embedding": self.embedder.generate_query_embedding(
+                    "Raft consensus algorithm manages replicated log."
+                ),
             }
         ]
         unanswerable_q = "How do pneumatic disc brakes operate in heavy vehicles?"
-        result = self.orchestrator.run(
-            question=unanswerable_q,
-            user_id=1,
-            user_chunks=chunks
-        )
+        result = self.orchestrator.run(question=unanswerable_q, user_id=1, user_chunks=chunks)
         self.assertTrue(result["refused"])
         self.assertEqual(result["final_response"], self.prompt_config.refusal_message)
 
@@ -89,9 +86,10 @@ class TestLangGraphParity(unittest.TestCase):
     """Test identical behavior between Plain and LangGraph orchestrators on ci_fixture.pdf."""
 
     def setUp(self):
+        from sentence_transformers import SentenceTransformer
+
         from src.processors.pdf_processor import PDFProcessor
         from src.processors.text_chunker import TextChunker
-        from sentence_transformers import SentenceTransformer
 
         pdf_path = "eval/fixtures/ci_fixture.pdf"
         self.assertTrue(os.path.exists(pdf_path), f"Missing {pdf_path}")
@@ -102,22 +100,26 @@ class TestLangGraphParity(unittest.TestCase):
         raw_chunks = chunker.create_chunks_with_pages(pages_data)
 
         model = SentenceTransformer("all-MiniLM-L6-v2")
-        self.chunks: List[Dict[str, Any]] = []
+        self.chunks: list[dict[str, Any]] = []
         for i, c in enumerate(raw_chunks):
             emb = model.encode(c.content, convert_to_numpy=True).tolist()
-            self.chunks.append({
-                "chunk_index": i,
-                "content": c.content,
-                "char_count": c.char_count,
-                "page": c.page,
-                "page_start": c.page_start,
-                "page_end": c.page_end,
-                "filename": "ci_fixture.pdf",
-                "source_type": "pdf",
-                "embedding": emb
-            })
+            self.chunks.append(
+                {
+                    "chunk_index": i,
+                    "content": c.content,
+                    "char_count": c.char_count,
+                    "page": c.page,
+                    "page_start": c.page_start,
+                    "page_end": c.page_end,
+                    "filename": "ci_fixture.pdf",
+                    "source_type": "pdf",
+                    "embedding": emb,
+                }
+            )
 
-        self.retriever = DocumentRetriever(top_k=2, similarity_threshold=0.3, retrieval_mode="hybrid")
+        self.retriever = DocumentRetriever(
+            top_k=2, similarity_threshold=0.3, retrieval_mode="hybrid"
+        )
         self.embedder = MockEmbeddingGenerator()
         self.llm = MockLLMClient()
         self.prompt_config = load_prompt_config("v1")
@@ -126,7 +128,7 @@ class TestLangGraphParity(unittest.TestCase):
             retriever=self.retriever,
             llm_client=self.llm,
             embedding_generator=self.embedder,
-            prompt_config=self.prompt_config
+            prompt_config=self.prompt_config,
         )
         self.plain_orch = PlainOrchestrator(self.pipeline)
         self.graph_orch = LangGraphOrchestrator(self.pipeline)

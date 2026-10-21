@@ -1,23 +1,18 @@
 """Tests for VectorStore abstraction, NumPy backend, Chroma backend, and parity."""
 
+import importlib.util
 import os
 import shutil
 import tempfile
 import unittest
-import numpy as np
 
 from src.storage.vector_store import (
-    VectorStore,
-    NumPyVectorStore,
     ChromaVectorStore,
-    get_vector_store
+    NumPyVectorStore,
+    get_vector_store,
 )
 
-try:
-    import chromadb
-    HAS_CHROMADB = True
-except ImportError:
-    HAS_CHROMADB = False
+HAS_CHROMADB = importlib.util.find_spec("chromadb") is not None
 
 
 class TestNumPyVectorStore(unittest.TestCase):
@@ -38,13 +33,18 @@ class TestNumPyVectorStore(unittest.TestCase):
         user_b = 202
 
         chunks_a = [
-            {"content": "Alpha content about distributed consensus", "chunk_index": 0, "filename": "doc_a.txt"},
-            {"content": "Beta content on replication logs", "chunk_index": 1, "filename": "doc_a.txt"}
+            {
+                "content": "Alpha content about distributed consensus",
+                "chunk_index": 0,
+                "filename": "doc_a.txt",
+            },
+            {
+                "content": "Beta content on replication logs",
+                "chunk_index": 1,
+                "filename": "doc_a.txt",
+            },
         ]
-        embeddings_a = [
-            [0.1, 0.2, 0.3, 0.4],
-            [0.2, 0.1, 0.4, 0.3]
-        ]
+        embeddings_a = [[0.1, 0.2, 0.3, 0.4], [0.2, 0.1, 0.4, 0.3]]
         self.store.add(chunks_a, embeddings_a, user_id=user_a)
 
         # User B queries with identical embedding
@@ -100,7 +100,9 @@ class TestChromaVectorStore(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         self.chroma_path = os.path.join(self.temp_dir, "chroma")
-        self.store = ChromaVectorStore(persist_directory=self.chroma_path, collection_name="test_coll")
+        self.store = ChromaVectorStore(
+            persist_directory=self.chroma_path, collection_name="test_coll"
+        )
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
@@ -111,13 +113,18 @@ class TestChromaVectorStore(unittest.TestCase):
         user_b = 202
 
         chunks_a = [
-            {"content": "Alpha content about distributed consensus", "chunk_index": 0, "filename": "doc_a.txt"},
-            {"content": "Beta content on replication logs", "chunk_index": 1, "filename": "doc_a.txt"}
+            {
+                "content": "Alpha content about distributed consensus",
+                "chunk_index": 0,
+                "filename": "doc_a.txt",
+            },
+            {
+                "content": "Beta content on replication logs",
+                "chunk_index": 1,
+                "filename": "doc_a.txt",
+            },
         ]
-        embeddings_a = [
-            [0.1, 0.2, 0.3, 0.4],
-            [0.2, 0.1, 0.4, 0.3]
-        ]
+        embeddings_a = [[0.1, 0.2, 0.3, 0.4], [0.2, 0.1, 0.4, 0.3]]
         self.store.add(chunks_a, embeddings_a, user_id=user_a)
 
         query_emb = [0.1, 0.2, 0.3, 0.4]
@@ -133,8 +140,22 @@ class TestChromaVectorStore(unittest.TestCase):
         user_a = 101
         user_b = 202
 
-        chunks_a = [{"content": "Doc A content", "chunk_index": 0, "filename": "doc_a.txt", "document_id": 1}]
-        chunks_b = [{"content": "Doc B content", "chunk_index": 0, "filename": "doc_b.txt", "document_id": 2}]
+        chunks_a = [
+            {
+                "content": "Doc A content",
+                "chunk_index": 0,
+                "filename": "doc_a.txt",
+                "document_id": 1,
+            }
+        ]
+        chunks_b = [
+            {
+                "content": "Doc B content",
+                "chunk_index": 0,
+                "filename": "doc_b.txt",
+                "document_id": 2,
+            }
+        ]
         emb = [[0.5, 0.5, 0.5, 0.5]]
 
         self.store.add(chunks_a, emb, user_id=user_a)
@@ -155,7 +176,7 @@ class TestChromaVectorStore(unittest.TestCase):
         user_a = 101
         chunks_a = [
             {"content": "Doc A1", "chunk_index": 0, "filename": "doc_a.txt", "document_id": 1},
-            {"content": "Doc A2", "chunk_index": 1, "filename": "doc_a.txt", "document_id": 1}
+            {"content": "Doc A2", "chunk_index": 1, "filename": "doc_a.txt", "document_id": 1},
         ]
         self.store.add(chunks_a, [[0.1, 0.2], [0.3, 0.4]], user_id=user_a)
 
@@ -176,16 +197,19 @@ class TestVectorStoreParity(unittest.TestCase):
         self.chroma_path = os.path.join(self.temp_dir, "chroma")
 
         self.numpy_store = NumPyVectorStore(db_path=self.db_path, embeddings_path=self.emb_path)
-        self.chroma_store = ChromaVectorStore(persist_directory=self.chroma_path, collection_name="parity_coll")
+        self.chroma_store = ChromaVectorStore(
+            persist_directory=self.chroma_path, collection_name="parity_coll"
+        )
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_cosine_parity_on_ci_fixture(self):
         """Cosine similarities between query and chunks under numpy and chroma match within 1e-4."""
+        from sentence_transformers import SentenceTransformer
+
         from src.processors.pdf_processor import PDFProcessor
         from src.processors.text_chunker import TextChunker
-        from sentence_transformers import SentenceTransformer
 
         pdf_path = "eval/fixtures/ci_fixture.pdf"
         self.assertTrue(os.path.exists(pdf_path), f"Missing {pdf_path}")
@@ -204,7 +228,7 @@ class TestVectorStoreParity(unittest.TestCase):
                 "page": c.page,
                 "document_id": 1,
                 "filename": "ci_fixture.pdf",
-                "source_type": "pdf"
+                "source_type": "pdf",
             }
             for i, c in enumerate(chunks)
         ]
@@ -229,17 +253,19 @@ class TestVectorStoreParity(unittest.TestCase):
         self.assertEqual(len(numpy_results), top_k)
         self.assertEqual(len(chroma_results), top_k)
 
-        for rank, ((np_chunk, np_sim), (ch_chunk, ch_sim)) in enumerate(zip(numpy_results, chroma_results)):
+        for rank, ((np_chunk, np_sim), (ch_chunk, ch_sim)) in enumerate(
+            zip(numpy_results, chroma_results, strict=False)
+        ):
             diff = abs(np_sim - ch_sim)
             self.assertLess(
                 diff,
                 1e-4,
-                f"Rank {rank} similarity mismatch: NumPy={np_sim:.6f}, Chroma={ch_sim:.6f}, diff={diff:.6f}"
+                f"Rank {rank} similarity mismatch: NumPy={np_sim:.6f}, Chroma={ch_sim:.6f}, diff={diff:.6f}",
             )
             self.assertEqual(
                 np_chunk["chunk_index"],
                 ch_chunk["chunk_index"],
-                f"Rank {rank} chunk_index mismatch"
+                f"Rank {rank} chunk_index mismatch",
             )
 
 

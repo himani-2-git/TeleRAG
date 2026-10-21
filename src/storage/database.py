@@ -1,36 +1,36 @@
 """Database management for document metadata and user associations."""
 
-import sqlite3
-import os
-from datetime import datetime
-from typing import List, Optional, Dict, Any
 import logging
-import json
+import os
+import sqlite3
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
 class Database:
     """Manages SQLite database for document storage."""
-    
+
     def __init__(self, db_path: str):
         """Initialize database connection.
-        
+
         Args:
             db_path: Path to SQLite database file
         """
         self.db_path = db_path
         self._ensure_directory()
         self._initialize_schema()
-    
+
     def _ensure_directory(self):
         """Ensure database directory exists."""
         db_dir = os.path.dirname(self.db_path)
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
-    
+
     def _get_connection(self) -> sqlite3.Connection:
         """Get database connection.
-        
+
         Returns:
             SQLite connection object
         """
@@ -38,13 +38,13 @@ class Database:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
-    
+
     def _initialize_schema(self):
         """Create database tables if they don't exist."""
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            
+
             # Documents table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS documents (
@@ -59,7 +59,7 @@ class Database:
                     UNIQUE(user_id, filename)
                 )
             """)
-            
+
             # Document chunks table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS document_chunks (
@@ -78,7 +78,7 @@ class Database:
                     UNIQUE(document_id, chunk_index)
                 )
             """)
-            
+
             # Non-destructive schema migration for existing databases
             cursor.execute("PRAGMA table_info(documents)")
             existing_doc_cols = {row[1] for row in cursor.fetchall()}
@@ -96,33 +96,41 @@ class Database:
             if "section_label" not in existing_cols:
                 cursor.execute("ALTER TABLE document_chunks ADD COLUMN section_label TEXT")
             if "source_type" not in existing_cols:
-                cursor.execute("ALTER TABLE document_chunks ADD COLUMN source_type TEXT DEFAULT 'pdf'")
-            
+                cursor.execute(
+                    "ALTER TABLE document_chunks ADD COLUMN source_type TEXT DEFAULT 'pdf'"
+                )
+
             # Create indexes for efficient querying
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_documents_user_id 
                 ON documents(user_id)
             """)
-            
+
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_chunks_document_id 
                 ON document_chunks(document_id)
             """)
-            
+
             conn.commit()
             logger.info("Database schema initialized successfully")
-            
+
         except Exception as e:
             logger.error(f"Failed to initialize database schema: {e}")
             raise
         finally:
             conn.close()
-    
-    def store_document(self, user_id: int, filename: str, file_hash: str, 
-                      file_size: int, chunks: List[Dict[str, Any]],
-                      source_type: str = "pdf") -> int:
+
+    def store_document(
+        self,
+        user_id: int,
+        filename: str,
+        file_hash: str,
+        file_size: int,
+        chunks: list[dict[str, Any]],
+        source_type: str = "pdf",
+    ) -> int:
         """Store document metadata and chunks.
-        
+
         Args:
             user_id: Telegram user ID
             filename: Name of the file / document
@@ -130,195 +138,235 @@ class Database:
             file_size: Size of file in bytes
             chunks: List of chunk dictionaries
             source_type: Document source type ('pdf', 'markdown', 'text', 'web')
-            
+
         Returns:
             Document ID
         """
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            
+
             # Insert document metadata
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO documents (user_id, filename, file_hash, file_size, 
                                      chunk_count, upload_date, source_type)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, filename, file_hash, file_size, len(chunks), 
-                  datetime.now().isoformat(), source_type))
-            
+            """,
+                (
+                    user_id,
+                    filename,
+                    file_hash,
+                    file_size,
+                    len(chunks),
+                    datetime.now().isoformat(),
+                    source_type,
+                ),
+            )
+
             document_id = cursor.lastrowid
-            
+
             # Insert chunks
             for chunk in chunks:
-                chunk_source = chunk.get('source_type', source_type)
-                cursor.execute("""
+                chunk_source = chunk.get("source_type", source_type)
+                cursor.execute(
+                    """
                     INSERT INTO document_chunks (document_id, chunk_index, content, 
                                                 embedding_path, char_count,
                                                 page, page_start, page_end,
                                                 section_label, source_type)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (document_id, chunk['chunk_index'], chunk['content'],
-                      chunk.get('embedding_path'), chunk['char_count'],
-                      chunk.get('page'), chunk.get('page_start'), chunk.get('page_end'),
-                      chunk.get('section_label'), chunk_source))
-            
+                """,
+                    (
+                        document_id,
+                        chunk["chunk_index"],
+                        chunk["content"],
+                        chunk.get("embedding_path"),
+                        chunk["char_count"],
+                        chunk.get("page"),
+                        chunk.get("page_start"),
+                        chunk.get("page_end"),
+                        chunk.get("section_label"),
+                        chunk_source,
+                    ),
+                )
+
             conn.commit()
             logger.info(f"Stored document {filename} ({source_type}) with {len(chunks)} chunks")
             return document_id
-            
-        except sqlite3.IntegrityError:
+
+        except sqlite3.IntegrityError as e:
             logger.error(f"Document {filename} already exists for user {user_id}")
-            raise Exception(f"Document '{filename}' already exists")
+            raise Exception(f"Document '{filename}' already exists") from e
         except Exception as e:
             conn.rollback()
             logger.error(f"Failed to store document: {e}")
             raise
         finally:
             conn.close()
-    
-    def get_user_documents(self, user_id: int) -> List[Dict[str, Any]]:
+
+    def get_user_documents(self, user_id: int) -> list[dict[str, Any]]:
         """Get all documents for a user.
-        
+
         Args:
             user_id: Telegram user ID
-            
+
         Returns:
             List of document dictionaries
         """
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, filename, file_size, chunk_count, upload_date, source_type
                 FROM documents
                 WHERE user_id = ?
                 ORDER BY upload_date DESC
-            """, (user_id,))
-            
+            """,
+                (user_id,),
+            )
+
             documents = []
             for row in cursor.fetchall():
-                documents.append({
-                    'id': row['id'],
-                    'filename': row['filename'],
-                    'file_size': row['file_size'],
-                    'chunk_count': row['chunk_count'],
-                    'upload_date': row['upload_date'],
-                    'source_type': row['source_type'] if 'source_type' in row.keys() else 'pdf'
-                })
-            
+                documents.append(
+                    {
+                        "id": row["id"],
+                        "filename": row["filename"],
+                        "file_size": row["file_size"],
+                        "chunk_count": row["chunk_count"],
+                        "upload_date": row["upload_date"],
+                        "source_type": row["source_type"] if "source_type" in row.keys() else "pdf",
+                    }
+                )
+
             return documents
-            
+
         finally:
             conn.close()
-    
-    def get_document_chunks(self, document_id: int) -> List[Dict[str, Any]]:
+
+    def get_document_chunks(self, document_id: int) -> list[dict[str, Any]]:
         """Get all chunks for a document.
-        
+
         Args:
             document_id: Document ID
-            
+
         Returns:
             List of chunk dictionaries
         """
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, chunk_index, content, embedding_path, char_count,
                        page, page_start, page_end, section_label, source_type
                 FROM document_chunks
                 WHERE document_id = ?
                 ORDER BY chunk_index
-            """, (document_id,))
-            
+            """,
+                (document_id,),
+            )
+
             chunks = []
             for row in cursor.fetchall():
-                chunks.append({
-                    'id': row['id'],
-                    'chunk_index': row['chunk_index'],
-                    'content': row['content'],
-                    'embedding_path': row['embedding_path'],
-                    'char_count': row['char_count'],
-                    'page': row['page'],
-                    'page_start': row['page_start'],
-                    'page_end': row['page_end'],
-                    'section_label': row['section_label'] if 'section_label' in row.keys() else None,
-                    'source_type': row['source_type'] if 'source_type' in row.keys() else 'pdf'
-                })
-            
+                chunks.append(
+                    {
+                        "id": row["id"],
+                        "chunk_index": row["chunk_index"],
+                        "content": row["content"],
+                        "embedding_path": row["embedding_path"],
+                        "char_count": row["char_count"],
+                        "page": row["page"],
+                        "page_start": row["page_start"],
+                        "page_end": row["page_end"],
+                        "section_label": row["section_label"]
+                        if "section_label" in row.keys()
+                        else None,
+                        "source_type": row["source_type"] if "source_type" in row.keys() else "pdf",
+                    }
+                )
+
             return chunks
-            
+
         finally:
             conn.close()
-    
+
     def delete_document(self, user_id: int, filename: str) -> bool:
         """Delete a document and its chunks.
-        
+
         Args:
             user_id: Telegram user ID
             filename: Name of the file to delete
-            
+
         Returns:
             True if document was deleted
         """
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 DELETE FROM documents
                 WHERE user_id = ? AND filename = ?
-            """, (user_id, filename))
-            
+            """,
+                (user_id, filename),
+            )
+
             conn.commit()
             deleted = cursor.rowcount > 0
-            
+
             if deleted:
                 logger.info(f"Deleted document {filename} for user {user_id}")
-            
+
             return deleted
-            
+
         finally:
             conn.close()
-    
+
     def clear_user_documents(self, user_id: int) -> int:
         """Delete all documents for a user.
-        
+
         Args:
             user_id: Telegram user ID
-            
+
         Returns:
             Number of documents deleted
         """
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 DELETE FROM documents
                 WHERE user_id = ?
-            """, (user_id,))
-            
+            """,
+                (user_id,),
+            )
+
             conn.commit()
             count = cursor.rowcount
-            
+
             logger.info(f"Cleared {count} documents for user {user_id}")
             return count
-            
+
         finally:
             conn.close()
-    
-    def get_all_user_chunks(self, user_id: int) -> List[Dict[str, Any]]:
+
+    def get_all_user_chunks(self, user_id: int) -> list[dict[str, Any]]:
         """Get all chunks for all documents of a user.
-        
+
         Args:
             user_id: Telegram user ID
-            
+
         Returns:
             List of chunk dictionaries with document info
         """
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT dc.id, dc.chunk_index, dc.content, dc.embedding_path,
                        dc.page, dc.page_start, dc.page_end, dc.section_label,
                        dc.source_type as chunk_source_type,
@@ -328,26 +376,30 @@ class Database:
                 JOIN documents d ON dc.document_id = d.id
                 WHERE d.user_id = ?
                 ORDER BY d.id, dc.chunk_index
-            """, (user_id,))
-            
+            """,
+                (user_id,),
+            )
+
             chunks = []
             for row in cursor.fetchall():
-                src_type = row['chunk_source_type'] or row['doc_source_type'] or 'pdf'
-                chunks.append({
-                    'id': row['id'],
-                    'chunk_index': row['chunk_index'],
-                    'content': row['content'],
-                    'embedding_path': row['embedding_path'],
-                    'document_id': row['document_id'],
-                    'filename': row['filename'],
-                    'page': row['page'],
-                    'page_start': row['page_start'],
-                    'page_end': row['page_end'],
-                    'section_label': row['section_label'],
-                    'source_type': src_type
-                })
-            
+                src_type = row["chunk_source_type"] or row["doc_source_type"] or "pdf"
+                chunks.append(
+                    {
+                        "id": row["id"],
+                        "chunk_index": row["chunk_index"],
+                        "content": row["content"],
+                        "embedding_path": row["embedding_path"],
+                        "document_id": row["document_id"],
+                        "filename": row["filename"],
+                        "page": row["page"],
+                        "page_start": row["page_start"],
+                        "page_end": row["page_end"],
+                        "section_label": row["section_label"],
+                        "source_type": src_type,
+                    }
+                )
+
             return chunks
-            
+
         finally:
             conn.close()

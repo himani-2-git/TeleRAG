@@ -11,8 +11,6 @@ import json
 import logging
 import os
 import sys
-import time
-from typing import Any, Dict, List
 
 import numpy as np
 
@@ -26,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.processors.pdf_processor import PDFProcessor
 from src.processors.text_chunker import TextChunker
 from src.rag.embeddings import EmbeddingGenerator
-from src.rag.hybrid import HybridRetriever, tokenize_text
+from src.rag.hybrid import tokenize_text
 from src.rag.reranker import CrossEncoderReranker
 
 
@@ -54,15 +52,15 @@ def main():
     out_path = "eval/results/abstention_experiment.json"
 
     logger.info("Loading split from %s...", split_path)
-    with open(split_path, "r", encoding="utf-8") as f:
+    with open(split_path, encoding="utf-8") as f:
         split_data = json.load(f)
 
-    with open(golden_path, "r", encoding="utf-8") as f:
+    with open(golden_path, encoding="utf-8") as f:
         golden_data = json.load(f)
 
-    golden_by_id = {q["id"]: q for q in golden_data}
+    {q["id"]: q for q in golden_data}
     dev_ids = set(split_data["dev_ids"])
-    test_ids = set(split_data["test_ids"])
+    set(split_data["test_ids"])
 
     logger.info("Extracting and chunking %s...", pdf_path)
     chunks = extract_chunks(pdf_path)
@@ -72,7 +70,7 @@ def main():
     embedding_gen = EmbeddingGenerator(model_name="all-MiniLM-L6-v2")
     texts = [c["content"] for c in chunks]
     embeddings = embedding_gen.generate_embeddings(texts)
-    for c, emb in zip(chunks, embeddings):
+    for c, emb in zip(chunks, embeddings, strict=False):
         c["embedding"] = emb
 
     chunk_vecs = np.array([c["embedding"] for c in chunks], dtype=float)
@@ -81,6 +79,7 @@ def main():
     logger.info("Building BM25 corpus...")
     corpus_tokenized = [tokenize_text(c["content"]) for c in chunks]
     from rank_bm25 import BM25Okapi
+
     bm25 = BM25Okapi(corpus_tokenized)
 
     reranker = CrossEncoderReranker()
@@ -118,15 +117,17 @@ def main():
         reranked = reranker.rerank(query=question, candidates=candidates, top_k=5)
         top1_rerank_score = float(reranked[0]["rerank_score"]) if reranked else -999.0
 
-        scored_queries.append({
-            "id": q_id,
-            "question": question,
-            "category": category,
-            "answerable": is_answerable,
-            "split": split_set,
-            "max_dense_score": round(max_dense_score, 4),
-            "top1_rerank_score": round(top1_rerank_score, 4)
-        })
+        scored_queries.append(
+            {
+                "id": q_id,
+                "question": question,
+                "category": category,
+                "answerable": is_answerable,
+                "split": split_set,
+                "max_dense_score": round(max_dense_score, 4),
+                "top1_rerank_score": round(top1_rerank_score, 4),
+            }
+        )
 
     # Group DEV queries
     dev_queries = [q for q in scored_queries if q["split"] == "dev"]
@@ -135,26 +136,38 @@ def main():
     dev_hard = [q for q in dev_queries if q.get("category") == "unanswerable_hard"]
 
     logger.info("=== DEV SET DISTRIBUTIONS (N=35) ===")
-    logger.info("Answerable (N=%d) dense: min=%.4f, max=%.4f, mean=%.4f | rerank: min=%.4f, max=%.4f, mean=%.4f",
-                len(dev_ans),
-                min(q["max_dense_score"] for q in dev_ans), max(q["max_dense_score"] for q in dev_ans),
-                np.mean([q["max_dense_score"] for q in dev_ans]),
-                min(q["top1_rerank_score"] for q in dev_ans), max(q["top1_rerank_score"] for q in dev_ans),
-                np.mean([q["top1_rerank_score"] for q in dev_ans]))
+    logger.info(
+        "Answerable (N=%d) dense: min=%.4f, max=%.4f, mean=%.4f | rerank: min=%.4f, max=%.4f, mean=%.4f",
+        len(dev_ans),
+        min(q["max_dense_score"] for q in dev_ans),
+        max(q["max_dense_score"] for q in dev_ans),
+        np.mean([q["max_dense_score"] for q in dev_ans]),
+        min(q["top1_rerank_score"] for q in dev_ans),
+        max(q["top1_rerank_score"] for q in dev_ans),
+        np.mean([q["top1_rerank_score"] for q in dev_ans]),
+    )
 
-    logger.info("Easy Unans (N=%d) dense: min=%.4f, max=%.4f, mean=%.4f | rerank: min=%.4f, max=%.4f, mean=%.4f",
-                len(dev_easy),
-                min(q["max_dense_score"] for q in dev_easy), max(q["max_dense_score"] for q in dev_easy),
-                np.mean([q["max_dense_score"] for q in dev_easy]),
-                min(q["top1_rerank_score"] for q in dev_easy), max(q["top1_rerank_score"] for q in dev_easy),
-                np.mean([q["top1_rerank_score"] for q in dev_easy]))
+    logger.info(
+        "Easy Unans (N=%d) dense: min=%.4f, max=%.4f, mean=%.4f | rerank: min=%.4f, max=%.4f, mean=%.4f",
+        len(dev_easy),
+        min(q["max_dense_score"] for q in dev_easy),
+        max(q["max_dense_score"] for q in dev_easy),
+        np.mean([q["max_dense_score"] for q in dev_easy]),
+        min(q["top1_rerank_score"] for q in dev_easy),
+        max(q["top1_rerank_score"] for q in dev_easy),
+        np.mean([q["top1_rerank_score"] for q in dev_easy]),
+    )
 
-    logger.info("Hard Unans (N=%d) dense: min=%.4f, max=%.4f, mean=%.4f | rerank: min=%.4f, max=%.4f, mean=%.4f",
-                len(dev_hard),
-                min(q["max_dense_score"] for q in dev_hard), max(q["max_dense_score"] for q in dev_hard),
-                np.mean([q["max_dense_score"] for q in dev_hard]),
-                min(q["top1_rerank_score"] for q in dev_hard), max(q["top1_rerank_score"] for q in dev_hard),
-                np.mean([q["top1_rerank_score"] for q in dev_hard]))
+    logger.info(
+        "Hard Unans (N=%d) dense: min=%.4f, max=%.4f, mean=%.4f | rerank: min=%.4f, max=%.4f, mean=%.4f",
+        len(dev_hard),
+        min(q["max_dense_score"] for q in dev_hard),
+        max(q["max_dense_score"] for q in dev_hard),
+        np.mean([q["max_dense_score"] for q in dev_hard]),
+        min(q["top1_rerank_score"] for q in dev_hard),
+        max(q["top1_rerank_score"] for q in dev_hard),
+        np.mean([q["top1_rerank_score"] for q in dev_hard]),
+    )
 
     # Search for candidate thresholds on DEV:
     # A candidate threshold T requires: rerank_score < T => abstain
@@ -167,19 +180,25 @@ def main():
     for t in candidate_thresholds:
         ans_retained = sum(1 for q in dev_ans if q["top1_rerank_score"] >= t)
         ans_recall = ans_retained / len(dev_ans)
-        easy_abstained = sum(1 for q in dev_easy if q["top1_rerank_score"] < t)
+        sum(1 for q in dev_easy if q["top1_rerank_score"] < t)
         hard_abstained = sum(1 for q in dev_hard if q["top1_rerank_score"] < t)
-        
+
         # We only accept threshold if answerable recall on dev is at least 96% (allows at most 1 false refusal out of 25)
         if ans_recall >= 0.96:
             score_hard = hard_abstained / len(dev_hard)
-            if score_hard > best_hard_abstention or (score_hard == best_hard_abstention and ans_recall > best_ans_recall):
+            if score_hard > best_hard_abstention or (
+                score_hard == best_hard_abstention and ans_recall > best_ans_recall
+            ):
                 best_t = float(t)
                 best_hard_abstention = score_hard
                 best_ans_recall = ans_recall
 
-    logger.info("Chosen Cross-Encoder Threshold on DEV: T = %.2f (DEV Recall: %.2f, DEV Hard Abstention: %.2f)",
-                best_t, best_ans_recall, best_hard_abstention)
+    logger.info(
+        "Chosen Cross-Encoder Threshold on DEV: T = %.2f (DEV Recall: %.2f, DEV Hard Abstention: %.2f)",
+        best_t,
+        best_ans_recall,
+        best_hard_abstention,
+    )
 
     # Now evaluate strictly on TEST (N=35)
     test_queries = [q for q in scored_queries if q["split"] == "test"]
@@ -207,25 +226,47 @@ def main():
 
     # Decision rule:
     # "Keep the cosine gate as the default unless the reranker gate wins on test without lowering answerable recall by more than 5 points."
-    reranker_wins = (
-        (rerank_hard_rate > cos_hard_rate or rerank_easy_rate > cos_easy_rate)
-        and (recall_drop <= 0.05)
+    reranker_wins = (rerank_hard_rate > cos_hard_rate or rerank_easy_rate > cos_easy_rate) and (
+        recall_drop <= 0.05
     )
     selected_gate = "cross_encoder" if reranker_wins else "dense_cosine"
 
     logger.info("=== TEST SET RESULTS (N=35) ===")
-    logger.info("Baseline Cosine Gate (0.3): Ans Recall=%.2f (%d/%d), Easy Abstention=%.2f (%d/%d), Hard Abstention=%.2f (%d/%d)",
-                cos_ans_recall, cos_ans_retained, len(test_ans),
-                cos_easy_rate, cos_easy_abstained, len(test_easy),
-                cos_hard_rate, cos_hard_abstained, len(test_hard))
-    logger.info("Cross-Encoder Gate (T=%.2f): Ans Recall=%.2f (%d/%d), Easy Abstention=%.2f (%d/%d), Hard Abstention=%.2f (%d/%d)",
-                best_t, rerank_ans_recall, rerank_ans_retained, len(test_ans),
-                rerank_easy_rate, rerank_easy_abstained, len(test_easy),
-                rerank_hard_rate, rerank_hard_abstained, len(test_hard))
-    logger.info("Recall difference: %.2f percentage points (Drop: %.2f)",
-                (cos_ans_recall - rerank_ans_recall) * 100, recall_drop * 100)
-    logger.info("Decision rule outcome: Reranker wins=%s => Recommended default gate: %s",
-                reranker_wins, selected_gate)
+    logger.info(
+        "Baseline Cosine Gate (0.3): Ans Recall=%.2f (%d/%d), Easy Abstention=%.2f (%d/%d), Hard Abstention=%.2f (%d/%d)",
+        cos_ans_recall,
+        cos_ans_retained,
+        len(test_ans),
+        cos_easy_rate,
+        cos_easy_abstained,
+        len(test_easy),
+        cos_hard_rate,
+        cos_hard_abstained,
+        len(test_hard),
+    )
+    logger.info(
+        "Cross-Encoder Gate (T=%.2f): Ans Recall=%.2f (%d/%d), Easy Abstention=%.2f (%d/%d), Hard Abstention=%.2f (%d/%d)",
+        best_t,
+        rerank_ans_recall,
+        rerank_ans_retained,
+        len(test_ans),
+        rerank_easy_rate,
+        rerank_easy_abstained,
+        len(test_easy),
+        rerank_hard_rate,
+        rerank_hard_abstained,
+        len(test_hard),
+    )
+    logger.info(
+        "Recall difference: %.2f percentage points (Drop: %.2f)",
+        (cos_ans_recall - rerank_ans_recall) * 100,
+        recall_drop * 100,
+    )
+    logger.info(
+        "Decision rule outcome: Reranker wins=%s => Recommended default gate: %s",
+        reranker_wins,
+        selected_gate,
+    )
 
     results_payload = {
         "dev_set_size": len(dev_queries),
@@ -233,16 +274,24 @@ def main():
         "chosen_cross_encoder_threshold": round(best_t, 4),
         "dev_metrics": {
             "cosine_gate": {
-                "answerable_recall": round(sum(1 for q in dev_ans if q["max_dense_score"] >= 0.3) / len(dev_ans), 4),
-                "easy_abstention": round(sum(1 for q in dev_easy if q["max_dense_score"] < 0.3) / len(dev_easy), 4),
-                "hard_abstention": round(sum(1 for q in dev_hard if q["max_dense_score"] < 0.3) / len(dev_hard), 4)
+                "answerable_recall": round(
+                    sum(1 for q in dev_ans if q["max_dense_score"] >= 0.3) / len(dev_ans), 4
+                ),
+                "easy_abstention": round(
+                    sum(1 for q in dev_easy if q["max_dense_score"] < 0.3) / len(dev_easy), 4
+                ),
+                "hard_abstention": round(
+                    sum(1 for q in dev_hard if q["max_dense_score"] < 0.3) / len(dev_hard), 4
+                ),
             },
             "cross_encoder_gate": {
                 "threshold": round(best_t, 4),
                 "answerable_recall": round(best_ans_recall, 4),
-                "easy_abstention": round(sum(1 for q in dev_easy if q["top1_rerank_score"] < best_t) / len(dev_easy), 4),
-                "hard_abstention": round(best_hard_abstention, 4)
-            }
+                "easy_abstention": round(
+                    sum(1 for q in dev_easy if q["top1_rerank_score"] < best_t) / len(dev_easy), 4
+                ),
+                "hard_abstention": round(best_hard_abstention, 4),
+            },
         },
         "test_metrics": {
             "cosine_gate": {
@@ -254,7 +303,7 @@ def main():
                 "easy_total": len(test_easy),
                 "hard_abstention": round(cos_hard_rate, 4),
                 "hard_abstained": cos_hard_abstained,
-                "hard_total": len(test_hard)
+                "hard_total": len(test_hard),
             },
             "cross_encoder_gate": {
                 "threshold": round(best_t, 4),
@@ -266,8 +315,8 @@ def main():
                 "easy_total": len(test_easy),
                 "hard_abstention": round(rerank_hard_rate, 4),
                 "hard_abstained": rerank_hard_abstained,
-                "hard_total": len(test_hard)
-            }
+                "hard_total": len(test_hard),
+            },
         },
         "recall_drop_on_test": round(recall_drop, 4),
         "reranker_wins": reranker_wins,
@@ -276,9 +325,9 @@ def main():
             "Small test sample size (N=35 total, N=5 hard unanswerable queries).",
             "The threshold T=-2.80 tuned on DEV may be overfit to the dev sample.",
             "Cross-encoder scoring on CPU adds ~2s query latency.",
-            "Threshold tuned on single textbook domain (Think Python 2e) may exhibit domain shift on other corpora."
+            "Threshold tuned on single textbook domain (Think Python 2e) may exhibit domain shift on other corpora.",
         ],
-        "query_details": scored_queries
+        "query_details": scored_queries,
     }
 
     os.makedirs(os.path.dirname(out_path), exist_ok=True)

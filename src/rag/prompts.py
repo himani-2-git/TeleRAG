@@ -2,9 +2,8 @@
 
 import os
 from dataclasses import dataclass
-from typing import Optional
-import yaml
 
+import yaml
 
 REQUIRED_PROMPT_KEYS = [
     "version",
@@ -18,6 +17,7 @@ REQUIRED_PROMPT_KEYS = [
 @dataclass
 class PromptConfig:
     """Container for loaded prompt templates and markers."""
+
     version: str
     system_prompt: str
     user_template: str
@@ -40,16 +40,18 @@ def get_default_prompts_dir() -> str:
     return "prompts"
 
 
-def load_prompt_config(prompt_version: Optional[str] = None, prompts_dir: Optional[str] = None) -> PromptConfig:
+def load_prompt_config(
+    prompt_version: str | None = None, prompts_dir: str | None = None
+) -> PromptConfig:
     """Load and validate prompt configuration from YAML.
-    
+
     Args:
         prompt_version: Version identifier (e.g. 'v1'). Defaults to env PROMPT_VERSION or 'v1'.
         prompts_dir: Directory containing prompt YAML files. Defaults to project 'prompts/'.
-        
+
     Returns:
         PromptConfig object with validated fields.
-        
+
     Raises:
         FileNotFoundError: If the specified prompt YAML does not exist.
         ValueError: If required keys are missing or content is empty.
@@ -60,23 +62,27 @@ def load_prompt_config(prompt_version: Optional[str] = None, prompts_dir: Option
         version = os.getenv("PROMPT_VERSION", "v1").strip() or "v1"
     base_dir = prompts_dir or get_default_prompts_dir()
     prompt_file = os.path.join(base_dir, f"{version}.yaml")
-    
+
     if not os.path.isfile(prompt_file):
         raise FileNotFoundError(f"Prompt configuration file not found: {prompt_file}")
-        
+
     try:
-        with open(prompt_file, "r", encoding="utf-8") as f:
+        with open(prompt_file, encoding="utf-8") as f:
             data = yaml.safe_load(f)
     except Exception as e:
-        raise ValueError(f"Failed to parse YAML file {prompt_file}: {e}")
-        
+        raise ValueError(f"Failed to parse YAML file {prompt_file}: {e}") from e
+
     if not isinstance(data, dict):
-        raise ValueError(f"Prompt configuration in {prompt_file} must be a dictionary/mapping, got {type(data).__name__}")
-        
+        raise ValueError(
+            f"Prompt configuration in {prompt_file} must be a dictionary/mapping, got {type(data).__name__}"
+        )
+
     missing_keys = [k for k in REQUIRED_PROMPT_KEYS if k not in data or data[k] is None]
     if missing_keys:
-        raise ValueError(f"Prompt configuration in {prompt_file} missing required keys: {missing_keys}")
-        
+        raise ValueError(
+            f"Prompt configuration in {prompt_file} missing required keys: {missing_keys}"
+        )
+
     return PromptConfig(
         version=str(data["version"]),
         system_prompt=str(data["system_prompt"]),

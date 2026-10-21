@@ -101,6 +101,7 @@ def run_evaluation(
     mode: str = "dense",
     out_path: str | None = None,
     min_hit5: float | None = None,
+    similarity_threshold: float | None = None,
 ) -> dict[str, Any]:
     """Execute retrieval evaluation on the specified dataset.
 
@@ -110,6 +111,7 @@ def run_evaluation(
         mode: Retrieval mode ('dense', 'hybrid', 'hybrid_rerank').
         out_path: Optional path to save JSON metrics report.
         min_hit5: Optional minimum hit@5 threshold to assert.
+        similarity_threshold: Optional similarity threshold for dense retrieval abstention.
 
     Returns:
         Evaluation metrics dictionary.
@@ -118,6 +120,15 @@ def run_evaluation(
         raise FileNotFoundError(f"PDF fixture not found at {pdf_path}")
     if not os.path.exists(golden_path):
         raise FileNotFoundError(f"Golden dataset not found at {golden_path}")
+
+    if similarity_threshold is None:
+        try:
+            from src.config import get_config
+
+            config = get_config(require_telegram=False)
+            similarity_threshold = config.similarity_threshold
+        except Exception:
+            similarity_threshold = float(os.getenv("SIMILARITY_THRESHOLD", "0.3"))
 
     with open(golden_path, encoding="utf-8") as f:
         golden_data = json.load(f)
@@ -134,7 +145,7 @@ def run_evaluation(
         c["embedding"] = emb
 
     # Select retrieval strategy based on mode
-    retriever = DocumentRetriever(top_k=5, similarity_threshold=0.3)
+    retriever = DocumentRetriever(top_k=5, similarity_threshold=similarity_threshold)
     hybrid_retriever = None
     reranker = None
 
@@ -142,7 +153,7 @@ def run_evaluation(
         try:
             from src.rag.hybrid import HybridRetriever
 
-            hybrid_retriever = HybridRetriever(top_k=5, similarity_threshold=0.3)
+            hybrid_retriever = HybridRetriever(top_k=5, similarity_threshold=similarity_threshold)
             hybrid_retriever.index_corpus(chunks)
         except ImportError as err:
             raise NotImplementedError(
@@ -153,7 +164,7 @@ def run_evaluation(
             from src.rag.hybrid import HybridRetriever
             from src.rag.reranker import CrossEncoderReranker
 
-            hybrid_retriever = HybridRetriever(top_k=20, similarity_threshold=0.3)
+            hybrid_retriever = HybridRetriever(top_k=20, similarity_threshold=similarity_threshold)
             hybrid_retriever.index_corpus(chunks)
             reranker = CrossEncoderReranker()
         except ImportError as err:
@@ -450,6 +461,12 @@ def main():
         default=None,
         help="Path to JSON file with quality gate thresholds (e.g. eval/thresholds.json)",
     )
+    parser.add_argument(
+        "--similarity-threshold",
+        type=float,
+        default=None,
+        help="Minimum similarity score threshold for dense retrieval abstention",
+    )
     args = parser.parse_args()
 
     summary = run_evaluation(
@@ -458,6 +475,7 @@ def main():
         mode=args.mode,
         out_path=args.out,
         min_hit5=args.min_hit5,
+        similarity_threshold=args.similarity_threshold,
     )
 
     if args.thresholds:

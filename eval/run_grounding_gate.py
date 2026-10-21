@@ -34,6 +34,7 @@ def run_grounding_gate(
     answers_path: str,
     thresholds_path: str,
     grounding_threshold: float = 0.45,
+    similarity_threshold: float | None = None,
 ) -> bool:
     """Run post-retrieval grounding checks across reference answers and negative controls.
 
@@ -72,9 +73,13 @@ def run_grounding_gate(
     for chunk, emb in zip(chunks, embeddings, strict=False):
         chunk["embedding"] = emb
 
+    sim_threshold = (
+        similarity_threshold if similarity_threshold is not None else config.similarity_threshold
+    )
+
     retriever = DocumentRetriever(
         top_k=config.top_k_results,
-        similarity_threshold=config.similarity_threshold,
+        similarity_threshold=sim_threshold,
         retrieval_mode=getattr(config, "retrieval_mode", "hybrid"),
     )
 
@@ -198,6 +203,12 @@ def main():
         default=0.45,
         help="Sentence grounding cosine similarity threshold",
     )
+    parser.add_argument(
+        "--similarity-threshold",
+        type=float,
+        default=None,
+        help="Minimum similarity score threshold for dense retrieval abstention",
+    )
     args = parser.parse_args()
 
     passed = run_grounding_gate(
@@ -205,6 +216,7 @@ def main():
         answers_path=args.answers,
         thresholds_path=args.thresholds,
         grounding_threshold=args.threshold,
+        similarity_threshold=args.similarity_threshold,
     )
     sys.exit(0 if passed else 1)
 

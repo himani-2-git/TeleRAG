@@ -243,7 +243,15 @@ class RAGPipeline:
 
             return state_update
         except Exception as e:
-            logger.warning("Grounding check failed: %s", e)
+            if self.grounding_enforce:
+                refusal_msg = self.prompt_config.refusal_message
+                return {
+                    **state,
+                    "answer": refusal_msg,
+                    "refused": True,
+                    "refusal_reason": "GROUNDING_ERROR",
+                }
+            logger.exception("Grounding check failed: %s", e)
             return state
 
     def node_format_reply(self, state: RAGState) -> RAGState:

@@ -4,7 +4,7 @@ import importlib.util
 import os
 import unittest
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.rag.pipeline import (
     LangGraphOrchestrator,
@@ -103,6 +103,59 @@ class TestPipelinePlain(unittest.TestCase):
             )
         self.assertFalse(res["refused"])
         self.assertIn("Replication is the primary technique", res["final_response"])
+
+    @patch("src.rag.pipeline.grounding_report", side_effect=RuntimeError("Grounding service down"))
+    def test_grounding_error_refuses_when_enforce_true(self, mock_report):
+        """When grounding raises and grounding_enforce=True, refuse with GROUNDING_ERROR."""
+        pipeline = RAGPipeline(
+            retriever=self.retriever,
+            llm_client=self.llm,
+            embedding_generator=self.embedder,
+            prompt_config=self.prompt_config,
+            grounding_enforce=True,
+        )
+        orch = PlainOrchestrator(pipeline)
+        chunks = [
+            {
+                "content": "Replication is the primary technique for high availability.",
+                "chunk_index": 0,
+                "filename": "replication.pdf",
+                "embedding": self.embedder.generate_query_embedding(
+                    "Replication is the primary technique for high availability."
+                ),
+            }
+        ]
+        res = orch.run(question="What is replication?", user_id=1, user_chunks=chunks)
+        self.assertTrue(res["refused"])
+        self.assertEqual(res["refusal_reason"], "GROUNDING_ERROR")
+        self.assertEqual(res["final_response"], self.prompt_config.refusal_message)
+
+    @patch("src.rag.pipeline.grounding_report", side_effect=RuntimeError("Grounding service down"))
+    def test_grounding_error_continues_when_enforce_false(self, mock_report):
+        """When grounding raises and grounding_enforce=False, log exception and continue."""
+        pipeline = RAGPipeline(
+            retriever=self.retriever,
+            llm_client=self.llm,
+            embedding_generator=self.embedder,
+            prompt_config=self.prompt_config,
+            grounding_enforce=False,
+        )
+        orch = PlainOrchestrator(pipeline)
+        chunks = [
+            {
+                "content": "Replication is the primary technique for high availability.",
+                "chunk_index": 0,
+                "filename": "replication.pdf",
+                "embedding": self.embedder.generate_query_embedding(
+                    "Replication is the primary technique for high availability."
+                ),
+            }
+        ]
+        with self.assertLogs("src.rag.pipeline", level="ERROR") as cm:
+            res = orch.run(question="What is replication?", user_id=1, user_chunks=chunks)
+        self.assertFalse(res["refused"])
+        self.assertIn("Replication is the primary technique", res["final_response"])
+        self.assertTrue(any("Grounding check failed" in log for log in cm.output))
 
 
 @unittest.skipUnless(HAS_LANGGRAPH, "langgraph is not installed")

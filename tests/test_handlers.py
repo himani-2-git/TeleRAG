@@ -5,13 +5,8 @@ import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from src.bot.handlers import BotHandlers
-
-
-class DummyConfig:
-    """Mock configuration for testing."""
-
-    max_file_size_mb = 20
-    llm_model = "qwen2.5:3b"
+from src.config import Config
+from src.rag.pipeline import is_insufficient_context, is_summary_query
 
 
 class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
@@ -19,7 +14,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.config = DummyConfig()
+        self.config = Config(telegram_bot_token="test")
         self.handlers = BotHandlers(
             pdf_processor=Mock(),
             text_chunker=Mock(),
@@ -168,7 +163,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
     """Test question answering workflows, footer suppression, and summary handling."""
 
     def setUp(self):
-        self.config = DummyConfig()
+        self.config = Config(telegram_bot_token="test")
         self.mock_doc_store = Mock()
         self.mock_embedder = Mock()
         self.mock_retriever = Mock()
@@ -281,7 +276,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         mock_thinking_msg.delete.assert_called_once()
 
     def test_is_summary_query_patterns(self):
-        """Test _is_summary_query detects common summary/overview phrasings."""
+        """Test is_summary_query detects common summary/overview phrasings."""
         summary_queries = [
             "summarize this document",
             "Give me a summary",
@@ -293,9 +288,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             "What are the main points?",
         ]
         for q in summary_queries:
-            self.assertTrue(
-                self.handlers._is_summary_query(q), f"Failed to detect summary query: {q}"
-            )
+            self.assertTrue(is_summary_query(q), f"Failed to detect summary query: {q}")
 
         non_summary_queries = [
             "What is a variable?",
@@ -303,9 +296,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             "Explain recursion on page 42",
         ]
         for q in non_summary_queries:
-            self.assertFalse(
-                self.handlers._is_summary_query(q), f"Incorrectly flagged non-summary query: {q}"
-            )
+            self.assertFalse(is_summary_query(q), f"Incorrectly flagged non-summary query: {q}")
 
     async def test_send_typing_action_retries_on_timeout(self):
         """Test _send_typing_action retries once when telegram.error.TimedOut occurs."""
@@ -536,6 +527,49 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertIn("python_tutorial.pdf (p. 12-13)", reply)
         self.assertIn("Answered in", reply)
         mock_thinking_msg.delete.assert_called_once()
+
+    async def test_handle_message_calls_orchestrator(self):
+        """Verify handle_message routes through the orchestrator."""
+        user_id = 123
+        chunks = [{"content": "hello", "filename": "doc.pdf", "page": 1, "chunk_index": 0}]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        mock_orch = Mock()
+        mock_orch.run.return_value = {
+            "answer": "Test answer",
+            "final_response": "Test answer\n\nSources:\n• doc.pdf (p. 1)",
+            "refused": False,
+        }
+        self.handlers.orchestrator = mock_orch
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "What is hello?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        mock_orch.run.assert_called_once_with(
+            question="What is hello?",
+            user_id=user_id,
+            user_chunks=chunks,
+        )
+
+    def test_marker_only_insufficient_context(self):
+        """Verify marker-only check strips whitespace/quotes/backticks and checks prefix."""
+        self.assertTrue(is_insufficient_context("INSUFFICIENT_CONTEXT"))
+        self.assertTrue(is_insufficient_context("`INSUFFICIENT_CONTEXT`"))
+        self.assertTrue(is_insufficient_context(" 'INSUFFICIENT_CONTEXT' "))
+        self.assertTrue(is_insufficient_context('"INSUFFICIENT_CONTEXT"'))
+        self.assertTrue(is_insufficient_context("insufficient_context: cannot find it"))
+        # Non-marker phrases should not be caught
+        self.assertFalse(is_insufficient_context("I don't have enough information."))
+        self.assertFalse(is_insufficient_context("The context does not mention this."))
+        self.assertFalse(is_insufficient_context(""))
 
 
 if __name__ == "__main__":

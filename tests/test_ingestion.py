@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from src.bot.handlers import BotHandlers
+from src.config import Config
 from src.processors.markdown_processor import MarkdownProcessor
 from src.processors.text_chunker import TextChunker
 from src.processors.web_processor import (
@@ -26,7 +27,7 @@ class TestMultiFormatIngestion(unittest.TestCase):
             embedding_generator=Mock(),
             retriever=Mock(),
             llm_client=Mock(),
-            config=Mock(),
+            config=Config(telegram_bot_token="test"),
         )
 
     def test_markdown_heading_chunking_and_labels(self):

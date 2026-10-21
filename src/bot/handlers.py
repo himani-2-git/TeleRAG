@@ -16,7 +16,7 @@ from telegram.constants import ChatAction
 from telegram.error import NetworkError, TimedOut
 from telegram.ext import ContextTypes
 
-from ..rag.grounding import grounding_report
+from ..rag.pipeline import RAGPipeline, format_source_footer, get_orchestrator
 from ..rag.prompts import load_prompt_config
 
 logger = logging.getLogger(__name__)
@@ -31,32 +31,33 @@ class BotHandlers:
         text_chunker,
         document_store,
         embedding_generator,
-        retriever,
-        llm_client,
         config,
+        orchestrator=None,
+        retriever=None,
+        llm_client=None,
+        prompt_config=None,
     ):
-        """Initialize bot handlers.
-
-        Args:
-            pdf_processor: PDF processing instance
-            text_chunker: Text chunking instance
-            document_store: Document storage instance
-            embedding_generator: Embedding generation instance
-            retriever: Document retrieval instance
-            llm_client: LLM client instance
-            config: Application configuration
-        """
         self.pdf_processor = pdf_processor
         self.text_chunker = text_chunker
         self.document_store = document_store
         self.embedding_generator = embedding_generator
-        self.retriever = retriever
-        self.llm_client = llm_client
         self.config = config
-        pv = getattr(self.config, "prompt_version", "v1")
-        if not isinstance(pv, str):
-            pv = "v1"
-        self.prompt_config = load_prompt_config(pv)
+        self.prompt_config = prompt_config or load_prompt_config(config.prompt_version)
+        if orchestrator is not None:
+            self.orchestrator = orchestrator
+        elif retriever is not None and llm_client is not None:
+            pipeline = RAGPipeline(
+                retriever=retriever,
+                llm_client=llm_client,
+                embedding_generator=embedding_generator,
+                prompt_config=self.prompt_config,
+                grounding_threshold=config.grounding_threshold,
+                grounding_enforce=config.grounding_enforce,
+                grounding_min_coverage=config.grounding_min_coverage,
+            )
+            self.orchestrator = get_orchestrator(pipeline, config.orchestrator)
+        else:
+            self.orchestrator = None
         self.llm_semaphore = asyncio.Semaphore(1)
         self.active_requests = 0
 
@@ -404,129 +405,18 @@ class BotHandlers:
 
         try:
             async with self.llm_semaphore:
-                # Run blocking document loading, embedding, retrieval, and LLM generation in worker thread
-                def _blocking_pipeline():
-                    # Get all user chunks with embeddings
-                    user_chunks = self.document_store.get_user_chunks_with_embeddings(user_id)
-                    if not user_chunks:
-                        return "NO_CHUNKS", None, None, 0.0, 0.0
+                state = await asyncio.to_thread(self._run_pipeline, user_id, question)
 
-                    t_retrieval_start = time.time()
-                    # Check if this is a summary/overview question
-                    if self._is_summary_query(question):
-                        logger.info(
-                            f"Summary/overview query detected for user {user_id}: '{question[:50]}'"
-                        )
-                        sorted_chunks = sorted(
-                            user_chunks,
-                            key=lambda c: (
-                                c.get("page_start")
-                                if c.get("page_start") is not None
-                                else (c.get("page") or 0),
-                                c.get("chunk_index", 0),
-                            ),
-                        )
-                        retrieved_chunks = sorted_chunks[:8]
-                    else:
-                        query_embedding = self.embedding_generator.generate_query_embedding(
-                            question
-                        )
-                        retrieved_chunks = self.retriever.retrieve(
-                            query=question, query_embedding=query_embedding, chunks=user_chunks
-                        )
-                    retrieval_seconds = time.time() - t_retrieval_start
-
-                    if not retrieved_chunks:
-                        return "NO_RELEVANT", None, None, retrieval_seconds, 0.0
-
-                    context_text = self.retriever.format_context(retrieved_chunks)
-                    t_llm_start = time.time()
-                    raw_ans = self.llm_client.generate_answer(question, context_text)
-                    llm_seconds = time.time() - t_llm_start
-                    return "SUCCESS", raw_ans, retrieved_chunks, retrieval_seconds, llm_seconds
-
-                status, raw_answer, relevant_chunks, retrieval_s, llm_s = await asyncio.to_thread(
-                    _blocking_pipeline
-                )
-
-            # Stop typing indicator
             stop_typing.set()
             await typing_task
 
-            total_seconds = time.time() - start_time
-            logger.info(
-                f"Question timings: retrieval={retrieval_s:.2f}s, llm={llm_s:.2f}s, total={total_seconds:.2f}s"
-            )
-
-            if status == "NO_CHUNKS":
-                await self._deliver_answer(
-                    update, thinking_msg, "❌ No document content available."
-                )
-                return
-
-            if status == "NO_RELEVANT":
-                await self._deliver_answer(update, thinking_msg, self.prompt_config.refusal_message)
-                return
-
-            if not raw_answer:
-                logger.warning(f"LLM generation failed for question: {question[:50]}...")
-                answer = self.llm_client.validate_response(None)
-                await self._deliver_answer(update, thinking_msg, answer)
-                return
-
-            answer = self.llm_client.validate_response(raw_answer)
-            if self._is_insufficient_context_response(answer):
-                await self._deliver_answer(update, thinking_msg, self.prompt_config.refusal_message)
-                return
-
-            # Post-generation grounding check
-            try:
-                grounding_thresh = getattr(self.config, "grounding_threshold", 0.45)
-                if not isinstance(grounding_thresh, (int, float)):
-                    grounding_thresh = 0.45
-                report = grounding_report(
-                    answer=answer,
-                    chunks=relevant_chunks,
-                    embedder=self.embedding_generator,
-                    threshold=grounding_thresh,
-                )
-                logger.info(
-                    f"Grounding check: applicable={report.applicable}, "
-                    f"coverage={report.citation_coverage:.2f} ({report.supported_sentences}/{report.total_sentences} supported), "
-                    f"threshold={grounding_thresh}"
-                )
-
-                grounding_enforce = getattr(self.config, "grounding_enforce", False)
-                if not isinstance(grounding_enforce, bool):
-                    grounding_enforce = False
-                min_coverage = getattr(self.config, "grounding_min_coverage", 0.5)
-                if not isinstance(min_coverage, (int, float)):
-                    min_coverage = 0.5
-
-                if (
-                    grounding_enforce
-                    and report.applicable
-                    and report.citation_coverage < min_coverage
-                ):
-                    logger.warning(
-                        f"Grounding check failed enforcement: coverage={report.citation_coverage:.2f} < min_coverage={min_coverage:.2f}. "
-                        f"Refusing answer."
-                    )
-                    await self._deliver_answer(
-                        update, thinking_msg, self.prompt_config.refusal_message
-                    )
-                    return
-            except Exception as ge:
-                logger.warning(f"Grounding check evaluation error [{type(ge).__name__}]: {ge}")
-
-            footer = self._format_source_footer(relevant_chunks)
             elapsed_s = round(time.time() - start_time)
-            model_name = getattr(self.config, "llm_model", getattr(self.llm_client, "model", "LLM"))
-            timing_line = f"Answered in {elapsed_s} s with {model_name}"
-            if footer:
-                final_response = f"{answer}{footer}\n\n{timing_line}"
-            else:
-                final_response = f"{answer}\n\n{timing_line}"
+            final_response = state.get("final_response", "")
+
+            if not state.get("refused", False):
+                model_name = self.config.llm_model
+                timing_line = f"Answered in {elapsed_s} s with {model_name}"
+                final_response = f"{final_response}\n\n{timing_line}"
 
             await self._deliver_answer(update, thinking_msg, final_response)
 
@@ -536,7 +426,7 @@ class BotHandlers:
                 await typing_task
             except Exception:
                 pass
-            logger.error(f"Failed to answer question [{type(e).__name__}]: {e}")
+            logger.error("Failed to answer question [%s]: %s", type(e).__name__, e)
             await self._deliver_answer(
                 update,
                 thinking_msg,
@@ -544,6 +434,17 @@ class BotHandlers:
             )
         finally:
             self.active_requests = max(0, self.active_requests - 1)
+
+    _format_source_footer = staticmethod(format_source_footer)
+
+    def _run_pipeline(self, user_id: int, question: str) -> dict[str, Any]:
+        """Fetch user chunks and execute RAG pipeline via orchestrator."""
+        user_chunks = self.document_store.get_user_chunks_with_embeddings(user_id)
+        return self.orchestrator.run(
+            question=question,
+            user_id=user_id,
+            user_chunks=user_chunks,
+        )
 
     async def _deliver_answer(self, update: Update, thinking_msg: Any, text: str):
         """Deliver final response as a new reply to user's message, then delete thinking message."""
@@ -595,78 +496,6 @@ class BotHandlers:
         except Exception as e:
             logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}")
             return None
-
-    def _is_summary_query(self, query: str) -> bool:
-        """Check if query is asking for a summary, overview, or document-level explanation."""
-        q = query.lower().strip()
-        patterns = [
-            "summarize",
-            "summary",
-            "overview",
-            "what is this document about",
-            "what is this book about",
-            "what is the document about",
-            "what is the book about",
-            "what is this pdf about",
-            "what is the pdf about",
-            "tell me about this document",
-            "tell me about this pdf",
-            "explain this document",
-            "brief overview",
-            "main points",
-            "key takeaways",
-        ]
-        return any(pattern in q for pattern in patterns)
-
-    def _is_insufficient_context_response(self, text: str) -> bool:
-        """Check if the LLM response indicates the context does not contain the answer."""
-        if not text:
-            return False
-        clean = text.strip()
-        lower = clean.lower()
-
-        # Starts with insufficient context marker (trimmed, case-insensitive, punctuation-stripped)
-        stripped = clean.strip("`'\" \t\r\n").lower()
-        marker = (
-            getattr(self.prompt_config, "insufficient_context_marker", "INSUFFICIENT_CONTEXT")
-            .strip()
-            .lower()
-        )
-        if stripped.startswith(marker) or stripped.startswith("insufficient_context"):
-            return True
-
-        # Common phrasings where the model clearly says the context does not contain the answer
-        patterns = [
-            "insufficient_context",
-            "context does not contain",
-            "context doesn't contain",
-            "context does not provide",
-            "context doesn't provide",
-            "not mentioned in the context",
-            "not mentioned in the provided context",
-            "not provided in the context",
-            "not found in the context",
-            "not contain relevant information",
-            "no information in the context",
-            "no information in the provided context",
-            "provided context does not contain",
-            "provided context doesn't contain",
-            "provided context does not provide",
-            "provided context doesn't provide",
-            "does not contain the answer",
-            "doesn't contain the answer",
-            "cannot find the answer in the context",
-            "can't find the answer in the context",
-            "no relevant information in the context",
-            "no relevant information in the provided context",
-        ]
-        return any(pattern in lower for pattern in patterns)
-
-    def _format_source_footer(self, chunks: list[dict[str, Any]]) -> str:
-        """Format verified sources footer from retrieved chunks."""
-        from ..rag.pipeline import format_source_footer
-
-        return format_source_footer(chunks)
 
     def _is_url(self, text: str) -> bool:
         """Check if text contains a URL.

@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock
 
 from src.bot.handlers import BotHandlers
+from src.config import Config
 from src.rag.retriever import DocumentRetriever
 
 
@@ -19,7 +20,7 @@ class TestCitationsAndSources(unittest.TestCase):
             embedding_generator=Mock(),
             retriever=Mock(),
             llm_client=Mock(),
-            config=Mock(),
+            config=Config(telegram_bot_token="test"),
         )
 
     def test_format_context_with_page_span(self):

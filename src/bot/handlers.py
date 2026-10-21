@@ -54,14 +54,16 @@ class BotHandlers:
         """Handle /start command."""
         welcome_message = (
             "👋 Welcome to PDF RAG Chatbot!\n\n"
-            "I can help you analyze PDF documents and answer questions about them.\n\n"
-            "📤 Send me a PDF file to get started\n"
+            "I can help you analyze PDF, Markdown, and text documents, as well as web pages, and answer questions about them.\n\n"
+            "📤 Send me a PDF, .md, or .txt file\n"
+            "🌐 Send /addurl <url> to ingest a static web page\n"
             "🔗 Or send a direct link to a PDF\n"
             "❓ Ask questions about your uploaded documents\n\n"
             "Commands:\n"
             "/list - Show your uploaded documents\n"
             "/delete <filename> - Delete a specific document\n"
             "/clear - Delete all your documents\n"
+            "/addurl <url> - Ingest a web page\n"
             "/help - Show this message"
         )
         await update.message.reply_text(welcome_message)
@@ -132,14 +134,95 @@ class BotHandlers:
             logger.error(f"Failed to clear documents [{type(e).__name__}]: {e}")
             await update.message.reply_text("❌ Failed to clear documents.")
     
+    async def addurl_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /addurl <url> command."""
+        user_id = update.effective_user.id
+        
+        if not context.args:
+            await update.message.reply_text("❌ Please specify a URL: /addurl <url>")
+            return
+            
+        url = context.args[0].strip()
+        await self._handle_web_url_ingest(update, context, url)
+
+    async def _handle_web_url_ingest(self, update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
+        """Fetch and ingest a web page for the user."""
+        user_id = update.effective_user.id
+        
+        from ..processors.web_processor import WebProcessor, validate_url_ssrf
+        
+        is_safe, error_msg = validate_url_ssrf(url)
+        if not is_safe:
+            await update.message.reply_text(f"❌ {error_msg}")
+            return
+            
+        await update.message.reply_text("🌐 Fetching web page...")
+        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+        
+        try:
+            web_processor = WebProcessor(
+                chunk_size=self.config.chunk_size,
+                overlap=self.config.chunk_overlap,
+                timeout=15,
+                max_bytes=2 * 1024 * 1024
+            )
+            
+            citation_label, clean_text, raw_bytes, chunks = await asyncio.to_thread(
+                web_processor.process_url, url
+            )
+            
+            if not chunks:
+                await update.message.reply_text("❌ No text content could be extracted from web page.")
+                return
+                
+            chunk_texts = [chunk.content for chunk in chunks]
+            embeddings = self.embedding_generator.generate_embeddings(chunk_texts)
+            
+            chunks_data = [
+                {
+                    'chunk_index': chunk.chunk_index,
+                    'content': chunk.content,
+                    'char_count': chunk.char_count,
+                    'page': None,
+                    'page_start': None,
+                    'page_end': None,
+                    'section_label': chunk.section_label,
+                    'source_type': "web"
+                }
+                for chunk in chunks
+            ]
+            
+            self.document_store.store_document(
+                user_id=user_id,
+                filename=citation_label,
+                file_content=raw_bytes,
+                chunks=chunks_data,
+                embeddings=embeddings,
+                source_type="web"
+            )
+            
+            await update.message.reply_text(
+                f"✅ Successfully ingested web page: {citation_label}\n"
+                f"📊 Created {len(chunks)} chunks\n\n"
+                f"You can now ask questions about this page!"
+            )
+        except Exception as e:
+            logger.error(f"Failed to ingest web page [{type(e).__name__}]: {e}")
+            await update.message.reply_text(f"❌ Failed to ingest web page: {str(e)}")
+
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle PDF document uploads."""
+        """Handle document uploads (PDF, Markdown, Text)."""
         user_id = update.effective_user.id
         document = update.message.document
+        fn = document.file_name or "document"
+        fn_lower = fn.lower()
         
-        # Check if it's a PDF
-        if not document.file_name.lower().endswith('.pdf'):
-            await update.message.reply_text("❌ Please send a PDF file.")
+        is_pdf = fn_lower.endswith('.pdf')
+        is_md = fn_lower.endswith('.md')
+        is_txt = fn_lower.endswith('.txt')
+        
+        if not (is_pdf or is_md or is_txt):
+            await update.message.reply_text("❌ Please send a PDF (.pdf), Markdown (.md), or text (.txt) file.")
             return
         
         # Check file size
@@ -149,7 +232,8 @@ class BotHandlers:
             )
             return
         
-        await update.message.reply_text("📥 Processing your PDF...")
+        doc_type_label = "PDF" if is_pdf else ("Markdown" if is_md else "text")
+        await update.message.reply_text(f"📥 Processing your {doc_type_label} document...")
         await context.bot.send_chat_action(chat_id=update.effective_chat.id, 
                                           action=ChatAction.TYPING)
         
@@ -157,28 +241,51 @@ class BotHandlers:
         try:
             # Download file
             file = await document.get_file()
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            suffix = '.pdf' if is_pdf else ('.md' if is_md else '.txt')
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
             await file.download_to_drive(temp_file.name)
             
-            # Read file content for storage
             with open(temp_file.name, 'rb') as f:
                 file_content = f.read()
             
-            # Validate PDF
-            is_valid, error_msg = self.pdf_processor.validate_pdf(temp_file.name, 
-                                                                  document.file_size)
-            if not is_valid:
-                await update.message.reply_text(f"❌ {error_msg}")
-                return
-            
-            # Extract text with pages
-            pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
-            
-            # Create chunks with page bounds
-            chunks = self.text_chunker.create_chunks_with_pages(pages_data)
+            if is_pdf:
+                is_valid, error_msg = self.pdf_processor.validate_pdf(temp_file.name, document.file_size)
+                if not is_valid:
+                    await update.message.reply_text(f"❌ {error_msg}")
+                    return
+                pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
+                chunks = self.text_chunker.create_chunks_with_pages(pages_data)
+                source_type = "pdf"
+            elif is_md:
+                from ..processors.markdown_processor import MarkdownProcessor
+                md_processor = MarkdownProcessor(chunk_size=self.config.chunk_size, overlap=self.config.chunk_overlap)
+                md_text = file_content.decode('utf-8', errors='replace')
+                chunks = md_processor.process_markdown(md_text, source_name=fn)
+                source_type = "markdown"
+            else:  # is_txt
+                txt_text = file_content.decode('utf-8', errors='replace')
+                if not txt_text.strip():
+                    await update.message.reply_text("❌ No text content found in file.")
+                    return
+                raw_chunks = self.text_chunker.create_chunks(txt_text)
+                chunks = []
+                for i, rc in enumerate(raw_chunks):
+                    from ..processors.text_chunker import TextChunk
+                    c = TextChunk(
+                        content=rc.content,
+                        chunk_index=i,
+                        start_pos=rc.start_pos,
+                        end_pos=rc.end_pos,
+                        char_count=rc.char_count,
+                        source_type="text",
+                        source_name=fn,
+                        section_label=fn
+                    )
+                    chunks.append(c)
+                source_type = "text"
             
             if not chunks:
-                await update.message.reply_text("❌ No text content found in PDF.")
+                await update.message.reply_text(f"❌ No text content found in {doc_type_label} file.")
                 return
             
             # Generate embeddings
@@ -193,7 +300,9 @@ class BotHandlers:
                     'char_count': chunk.char_count,
                     'page': chunk.page,
                     'page_start': chunk.page_start,
-                    'page_end': chunk.page_end
+                    'page_end': chunk.page_end,
+                    'section_label': chunk.section_label,
+                    'source_type': chunk.source_type or source_type
                 }
                 for chunk in chunks
             ]
@@ -201,32 +310,30 @@ class BotHandlers:
             # Store document
             self.document_store.store_document(
                 user_id=user_id,
-                filename=document.file_name,
+                filename=fn,
                 file_content=file_content,
                 chunks=chunks_data,
-                embeddings=embeddings
+                embeddings=embeddings,
+                source_type=source_type
             )
             
             await update.message.reply_text(
-                f"✅ Successfully processed {document.file_name}\n"
+                f"✅ Successfully processed {fn}\n"
                 f"📊 Created {len(chunks)} chunks\n\n"
                 f"You can now ask questions about this document!"
             )
             
         except Exception as e:
             logger.error(f"Failed to process document [{type(e).__name__}]: {e}")
-            await update.message.reply_text(
-                f"❌ Failed to process PDF: {str(e)}"
-            )
-        
+            await update.message.reply_text(f"❌ Failed to process document: {str(e)}")
+            
         finally:
-            # Clean up temp file
             if temp_file and os.path.exists(temp_file.name):
                 try:
                     os.unlink(temp_file.name)
-                except:
+                except Exception:
                     pass
-    
+
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages as questions or URL uploads."""
         user_id = update.effective_user.id
@@ -522,18 +629,28 @@ class BotHandlers:
         seen = set()
         for chunk in chunks:
             filename = chunk.get("filename", "document.pdf")
+            source_type = chunk.get("source_type", "pdf")
+            section_label = chunk.get("section_label")
             p_start = chunk.get("page_start")
             p_end = chunk.get("page_end")
             page = chunk.get("page")
             
-            if p_start is not None and p_end is not None:
+            if source_type == "web":
+                entry = section_label if section_label else filename
+            elif source_type == "markdown" and section_label:
+                entry = f"{filename} ({section_label})"
+            elif p_start is not None and p_end is not None:
                 page_str = f"p. {p_start}" if p_start == p_end else f"p. {p_start}-{p_end}"
+                entry = f"{filename} ({page_str})"
             elif page is not None:
-                page_str = f"p. {page}"
+                entry = f"{filename} (p. {page})"
+            elif section_label:
+                entry = f"{filename} ({section_label})"
+            elif source_type == "text":
+                entry = f"{filename}"
             else:
-                page_str = "p. 1"
+                entry = f"{filename} (p. 1)"
                 
-            entry = f"{filename} ({page_str})"
             if entry not in seen:
                 seen.add(entry)
                 sources.append(entry)
@@ -575,34 +692,9 @@ class BotHandlers:
         return filename
     
     def _is_safe_url(self, url: str) -> Tuple[bool, str]:
-        """Validate URL to protect against SSRF and unsupported schemes.
-        
-        Args:
-            url: URL string to validate
-            
-        Returns:
-            Tuple of (is_safe, error_message)
-        """
-        try:
-            parsed = urlparse(url)
-            if parsed.scheme.lower() not in ('http', 'https'):
-                return False, "Only HTTP and HTTPS URLs are supported."
-            
-            hostname = parsed.hostname
-            if not hostname:
-                return False, "Invalid URL: missing hostname."
-            
-            # Resolve DNS and verify IP addresses are not private/loopback/link-local
-            addr_info = socket.getaddrinfo(hostname, None)
-            for addr in addr_info:
-                ip_str = addr[4][0]
-                ip = ipaddress.ip_address(ip_str)
-                if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
-                    return False, "Access to private or local network resources is forbidden."
-            
-            return True, ""
-        except Exception as e:
-            return False, f"Invalid or unresolvable URL: {str(e)}"
+        """Validate URL to protect against SSRF and unsupported schemes."""
+        from ..processors.web_processor import validate_url_ssrf
+        return validate_url_ssrf(url)
     
     async def _handle_url_upload(self, update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
         """Handle PDF upload from URL.

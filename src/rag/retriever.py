@@ -141,7 +141,7 @@ class DocumentRetriever:
         return results[:self.top_k]
     
     def format_context(self, chunks: List[Dict[str, Any]]) -> str:
-        """Format retrieved chunks into context string with page-level citations.
+        """Format retrieved chunks into context string with page- or section-level citations.
         
         Args:
             chunks: List of retrieved chunks
@@ -158,17 +158,28 @@ class DocumentRetriever:
             content = chunk.get('content', '')
             if len(content) > 1200:
                 content = content[:1200]
+                
+            source_type = chunk.get('source_type', 'pdf')
+            section_label = chunk.get('section_label')
             p_start = chunk.get('page_start')
             p_end = chunk.get('page_end')
             page = chunk.get('page')
             
-            if p_start is not None and p_end is not None:
+            if source_type == 'web':
+                citation = section_label if section_label else filename
+                context_parts.append(f"[{citation}]\n{content}")
+            elif source_type == 'markdown' and section_label:
+                context_parts.append(f"[{filename}, {section_label}]\n{content}")
+            elif p_start is not None and p_end is not None:
                 page_str = f"p. {p_start}" if p_start == p_end else f"p. {p_start}-{p_end}"
+                context_parts.append(f"[{filename}, {page_str}]\n{content}")
             elif page is not None:
-                page_str = f"p. {page}"
+                context_parts.append(f"[{filename}, p. {page}]\n{content}")
+            elif section_label:
+                context_parts.append(f"[{filename}, {section_label}]\n{content}")
+            elif source_type == 'text':
+                context_parts.append(f"[{filename}]\n{content}")
             else:
-                page_str = "p. 1"
-                
-            context_parts.append(f"[{filename}, {page_str}]\n{content}")
+                context_parts.append(f"[{filename}, p. 1]\n{content}")
         
         return "\n\n".join(context_parts)

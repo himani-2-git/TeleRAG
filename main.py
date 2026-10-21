@@ -125,7 +125,8 @@ def main():
         application.add_handler(CommandHandler("list", bot_handlers.list_command))
         application.add_handler(CommandHandler("delete", bot_handlers.delete_command))
         application.add_handler(CommandHandler("clear", bot_handlers.clear_command))
-        application.add_handler(MessageHandler(filters.Document.PDF, bot_handlers.handle_document))
+        application.add_handler(CommandHandler("addurl", bot_handlers.addurl_command))
+        application.add_handler(MessageHandler(filters.Document.ALL, bot_handlers.handle_document))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, 
                                               bot_handlers.handle_message))
         

@@ -52,15 +52,17 @@ class DocumentStore:
         return os.path.join(self.embeddings_path, f"doc_{document_id}_chunk_{chunk_index}.json")
     
     def store_document(self, user_id: int, filename: str, file_content: bytes,
-                      chunks: List[Dict[str, Any]], embeddings: List[List[float]]) -> int:
+                      chunks: List[Dict[str, Any]], embeddings: List[List[float]],
+                      source_type: str = "pdf") -> int:
         """Store document with chunks and embeddings.
         
         Args:
             user_id: Telegram user ID
-            filename: Name of the PDF file
+            filename: Name of the document / file
             file_content: Raw file content for hashing
             chunks: List of text chunks
             embeddings: List of embedding vectors
+            source_type: Source type ('pdf', 'markdown', 'text', 'web')
             
         Returns:
             Document ID
@@ -68,7 +70,7 @@ class DocumentStore:
         file_hash = self._calculate_file_hash(file_content)
         file_size = len(file_content)
         
-        # Prepare chunks with embedding paths and page metadata
+        # Prepare chunks with embedding paths, page metadata, and section labels
         chunks_data = []
         for i, chunk in enumerate(chunks):
             chunk_dict = {
@@ -78,13 +80,16 @@ class DocumentStore:
                 'page': chunk.get('page') if isinstance(chunk, dict) else getattr(chunk, 'page', None),
                 'page_start': chunk.get('page_start') if isinstance(chunk, dict) else getattr(chunk, 'page_start', None),
                 'page_end': chunk.get('page_end') if isinstance(chunk, dict) else getattr(chunk, 'page_end', None),
+                'section_label': chunk.get('section_label') if isinstance(chunk, dict) else getattr(chunk, 'section_label', None),
+                'source_type': chunk.get('source_type') if isinstance(chunk, dict) else getattr(chunk, 'source_type', source_type),
                 'embedding_path': None  # Will be set after document is created
             }
             chunks_data.append(chunk_dict)
         
         # Store in database
         document_id = self.db.store_document(user_id, filename, file_hash, 
-                                            file_size, chunks_data)
+                                            file_size, chunks_data,
+                                            source_type=source_type)
         
         # Store embeddings
         for i, embedding in enumerate(embeddings):

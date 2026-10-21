@@ -15,6 +15,9 @@ class TextChunk:
     page: Optional[int] = None
     page_start: Optional[int] = None
     page_end: Optional[int] = None
+    source_type: str = "pdf"
+    source_name: Optional[str] = None
+    section_label: Optional[str] = None
 
 class TextChunker:
     """Handles text chunking with configurable size and overlap."""
@@ -123,6 +126,11 @@ class TextChunker:
             chunk.page_start = p_start
             chunk.page_end = p_end
             chunk.page = p_start
+            chunk.source_type = "pdf"
+            if p_start == p_end:
+                chunk.section_label = f"p. {p_start}"
+            else:
+                chunk.section_label = f"p. {p_start}-{p_end}"
             
         return chunks
     

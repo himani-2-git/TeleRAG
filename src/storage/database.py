@@ -55,6 +55,7 @@ class Database:
                     file_size INTEGER NOT NULL,
                     chunk_count INTEGER NOT NULL,
                     upload_date TIMESTAMP NOT NULL,
+                    source_type TEXT DEFAULT 'pdf',
                     UNIQUE(user_id, filename)
                 )
             """)
@@ -71,12 +72,19 @@ class Database:
                     page INTEGER,
                     page_start INTEGER,
                     page_end INTEGER,
+                    section_label TEXT,
+                    source_type TEXT DEFAULT 'pdf',
                     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
                     UNIQUE(document_id, chunk_index)
                 )
             """)
             
             # Non-destructive schema migration for existing databases
+            cursor.execute("PRAGMA table_info(documents)")
+            existing_doc_cols = {row[1] for row in cursor.fetchall()}
+            if "source_type" not in existing_doc_cols:
+                cursor.execute("ALTER TABLE documents ADD COLUMN source_type TEXT DEFAULT 'pdf'")
+
             cursor.execute("PRAGMA table_info(document_chunks)")
             existing_cols = {row[1] for row in cursor.fetchall()}
             if "page" not in existing_cols:
@@ -85,6 +93,10 @@ class Database:
                 cursor.execute("ALTER TABLE document_chunks ADD COLUMN page_start INTEGER")
             if "page_end" not in existing_cols:
                 cursor.execute("ALTER TABLE document_chunks ADD COLUMN page_end INTEGER")
+            if "section_label" not in existing_cols:
+                cursor.execute("ALTER TABLE document_chunks ADD COLUMN section_label TEXT")
+            if "source_type" not in existing_cols:
+                cursor.execute("ALTER TABLE document_chunks ADD COLUMN source_type TEXT DEFAULT 'pdf'")
             
             # Create indexes for efficient querying
             cursor.execute("""
@@ -107,15 +119,17 @@ class Database:
             conn.close()
     
     def store_document(self, user_id: int, filename: str, file_hash: str, 
-                      file_size: int, chunks: List[Dict[str, Any]]) -> int:
+                      file_size: int, chunks: List[Dict[str, Any]],
+                      source_type: str = "pdf") -> int:
         """Store document metadata and chunks.
         
         Args:
             user_id: Telegram user ID
-            filename: Name of the PDF file
+            filename: Name of the file / document
             file_hash: Hash of the file content
             file_size: Size of file in bytes
             chunks: List of chunk dictionaries
+            source_type: Document source type ('pdf', 'markdown', 'text', 'web')
             
         Returns:
             Document ID
@@ -127,26 +141,29 @@ class Database:
             # Insert document metadata
             cursor.execute("""
                 INSERT INTO documents (user_id, filename, file_hash, file_size, 
-                                     chunk_count, upload_date)
-                VALUES (?, ?, ?, ?, ?, ?)
+                                     chunk_count, upload_date, source_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (user_id, filename, file_hash, file_size, len(chunks), 
-                  datetime.now().isoformat()))
+                  datetime.now().isoformat(), source_type))
             
             document_id = cursor.lastrowid
             
             # Insert chunks
             for chunk in chunks:
+                chunk_source = chunk.get('source_type', source_type)
                 cursor.execute("""
                     INSERT INTO document_chunks (document_id, chunk_index, content, 
                                                 embedding_path, char_count,
-                                                page, page_start, page_end)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                                page, page_start, page_end,
+                                                section_label, source_type)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (document_id, chunk['chunk_index'], chunk['content'],
                       chunk.get('embedding_path'), chunk['char_count'],
-                      chunk.get('page'), chunk.get('page_start'), chunk.get('page_end')))
+                      chunk.get('page'), chunk.get('page_start'), chunk.get('page_end'),
+                      chunk.get('section_label'), chunk_source))
             
             conn.commit()
-            logger.info(f"Stored document {filename} with {len(chunks)} chunks")
+            logger.info(f"Stored document {filename} ({source_type}) with {len(chunks)} chunks")
             return document_id
             
         except sqlite3.IntegrityError:
@@ -172,7 +189,7 @@ class Database:
         try:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, filename, file_size, chunk_count, upload_date
+                SELECT id, filename, file_size, chunk_count, upload_date, source_type
                 FROM documents
                 WHERE user_id = ?
                 ORDER BY upload_date DESC
@@ -185,7 +202,8 @@ class Database:
                     'filename': row['filename'],
                     'file_size': row['file_size'],
                     'chunk_count': row['chunk_count'],
-                    'upload_date': row['upload_date']
+                    'upload_date': row['upload_date'],
+                    'source_type': row['source_type'] if 'source_type' in row.keys() else 'pdf'
                 })
             
             return documents
@@ -207,7 +225,7 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, chunk_index, content, embedding_path, char_count,
-                       page, page_start, page_end
+                       page, page_start, page_end, section_label, source_type
                 FROM document_chunks
                 WHERE document_id = ?
                 ORDER BY chunk_index
@@ -223,7 +241,9 @@ class Database:
                     'char_count': row['char_count'],
                     'page': row['page'],
                     'page_start': row['page_start'],
-                    'page_end': row['page_end']
+                    'page_end': row['page_end'],
+                    'section_label': row['section_label'] if 'section_label' in row.keys() else None,
+                    'source_type': row['source_type'] if 'source_type' in row.keys() else 'pdf'
                 })
             
             return chunks
@@ -300,8 +320,10 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT dc.id, dc.chunk_index, dc.content, dc.embedding_path,
-                       dc.page, dc.page_start, dc.page_end,
-                       d.id as document_id, d.filename
+                       dc.page, dc.page_start, dc.page_end, dc.section_label,
+                       dc.source_type as chunk_source_type,
+                       d.id as document_id, d.filename,
+                       d.source_type as doc_source_type
                 FROM document_chunks dc
                 JOIN documents d ON dc.document_id = d.id
                 WHERE d.user_id = ?
@@ -310,6 +332,7 @@ class Database:
             
             chunks = []
             for row in cursor.fetchall():
+                src_type = row['chunk_source_type'] or row['doc_source_type'] or 'pdf'
                 chunks.append({
                     'id': row['id'],
                     'chunk_index': row['chunk_index'],
@@ -319,7 +342,9 @@ class Database:
                     'filename': row['filename'],
                     'page': row['page'],
                     'page_start': row['page_start'],
-                    'page_end': row['page_end']
+                    'page_end': row['page_end'],
+                    'section_label': row['section_label'],
+                    'source_type': src_type
                 })
             
             return chunks

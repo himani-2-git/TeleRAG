@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-10-21T07:15:57.006016+00:00",
+  "git_commit": "6feebf4508a7d14b7ebb005d8fabc1e7dfbc102e",
+  "pdf_fixture": "eval/fixtures/ci_fixture.pdf",
+  "golden_dataset": "eval/golden_ci.json",
+  "decision": "KEEP 1000",
+  "reasoning": "On span retrieval metrics (the primary quality gate metric in CI), chunk size 1000 achieves Hit@2=1.0000 and MRR=1.0000 with 0.0% chunks exceeding the 256-token limit. Chunk size 500 achieves identical span Hit@2 (1.0000) and MRR (1.0000) while increasing chunk count by 90% (19 vs 10 chunks). Although 500 shows higher single-page strict MRR (0.9583 vs 0.4861) due to finer chunk granularity, it does not strictly beat 1000 on span retrieval quality. Chunk size 1500 suffers 71.4% truncation beyond 256 tokens and lower strict Hit@2 (0.6667). Per decision rule ('do not change for marginal or mixed gains'), keeping default CHUNK_SIZE=1000.",
+  "table": [
+    {
+      "chunk_size": 500,
+      "chunk_overlap": 100,
+      "chunk_count": 19,
+      "mean_char_length": 433.4,
+      "mean_token_length": 89.9,
+      "exceeding_256_count": 0,
+      "pct_exceeding_256": 0.0,
+      "strict_hit_at_2": 1.0,
+      "strict_mrr": 0.9583,
+      "span_hit_at_2": 1.0,
+      "span_mrr": 1.0
+    },
+    {
+      "chunk_size": 1000,
+      "chunk_overlap": 200,
+      "chunk_count": 10,
+      "mean_char_length": 824.4,
+      "mean_token_length": 173.1,
+      "exceeding_256_count": 0,
+      "pct_exceeding_256": 0.0,
+      "strict_hit_at_2": 0.75,
+      "strict_mrr": 0.4861,
+      "span_hit_at_2": 1.0,
+      "span_mrr": 1.0
+    },
+    {
+      "chunk_size": 1500,
+      "chunk_overlap": 300,
+      "chunk_count": 7,
+      "mean_char_length": 1178.3,
+      "mean_token_length": 243.7,
+      "exceeding_256_count": 5,
+      "pct_exceeding_256": 71.43,
+      "strict_hit_at_2": 0.6667,
+      "strict_mrr": 0.6042,
+      "span_hit_at_2": 1.0,
+      "span_mrr": 1.0
+    }
+  ]
+}

@@ -27,6 +27,7 @@ class Config:
     top_k_results: int = 2
     similarity_threshold: float = 0.3
     retrieval_mode: str = "hybrid"
+    orchestrator: str = "plain"
     
     # LLM Settings (Ollama default, configurable to hosted providers)
     llm_model: str = "qwen2.5:3b"
@@ -40,9 +41,11 @@ class Config:
     grounding_enforce: bool = False
     grounding_min_coverage: float = 0.5
     
-    # Database
+    # Database & Vector Store
     database_path: str = "data/documents.db"
     embeddings_path: str = "data/embeddings"
+    vector_backend: str = "numpy"
+    chroma_path: str = "data/chroma"
     
     # Logging
     log_level: str = "INFO"
@@ -75,6 +78,7 @@ def get_config(require_telegram: bool = True) -> Config:
         top_k_results=int(os.getenv("TOP_K_RESULTS", "2")),
         similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
         retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
+        orchestrator=os.getenv("ORCHESTRATOR", "plain").lower(),
         llm_model=llm_model,
         llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
@@ -85,6 +89,8 @@ def get_config(require_telegram: bool = True) -> Config:
         grounding_min_coverage=float(os.getenv("GROUNDING_MIN_COVERAGE", "0.5")),
         database_path=os.getenv("DATABASE_PATH", "data/documents.db"),
         embeddings_path=os.getenv("EMBEDDINGS_PATH", "data/embeddings"),
+        vector_backend=os.getenv("VECTOR_BACKEND", "numpy").lower(),
+        chroma_path=os.getenv("CHROMA_PATH", "data/chroma"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         log_file=os.getenv("LOG_FILE", "logs/bot.log")
     )

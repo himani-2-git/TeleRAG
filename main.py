@@ -58,8 +58,12 @@ def main():
         pdf_processor = PDFProcessor(max_file_size_mb=config.max_file_size_mb)
         text_chunker = TextChunker(chunk_size=config.chunk_size, 
                                    overlap=config.chunk_overlap)
-        document_store = DocumentStore(db_path=config.database_path,
-                                      embeddings_path=config.embeddings_path)
+        document_store = DocumentStore(
+            db_path=config.database_path,
+            embeddings_path=config.embeddings_path,
+            vector_backend=config.vector_backend,
+            chroma_path=config.chroma_path
+        )
         embedding_generator = EmbeddingGenerator(model_name=config.embedding_model)
         retriever = DocumentRetriever(top_k=config.top_k_results,
                                      similarity_threshold=config.similarity_threshold,
@@ -125,7 +129,8 @@ def main():
         application.add_handler(CommandHandler("list", bot_handlers.list_command))
         application.add_handler(CommandHandler("delete", bot_handlers.delete_command))
         application.add_handler(CommandHandler("clear", bot_handlers.clear_command))
-        application.add_handler(MessageHandler(filters.Document.PDF, bot_handlers.handle_document))
+        application.add_handler(CommandHandler("addurl", bot_handlers.addurl_command))
+        application.add_handler(MessageHandler(filters.Document.ALL, bot_handlers.handle_document))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, 
                                               bot_handlers.handle_message))
         

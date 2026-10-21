@@ -6,22 +6,41 @@ import hashlib
 from typing import List, Dict, Any, Optional
 import logging
 from .database import Database
+from .vector_store import VectorStore, NumPyVectorStore, ChromaVectorStore, get_vector_store
 
 logger = logging.getLogger(__name__)
 
 class DocumentStore:
     """Manages document storage with embeddings."""
     
-    def __init__(self, db_path: str, embeddings_path: str):
+    def __init__(self, db_path: str, embeddings_path: str,
+                 vector_backend: str = "numpy",
+                 chroma_path: str = "data/chroma",
+                 vector_store: Optional[VectorStore] = None):
         """Initialize document store.
         
         Args:
             db_path: Path to SQLite database
             embeddings_path: Path to embeddings storage directory
+            vector_backend: 'numpy' or 'chroma'
+            chroma_path: Path to chroma persistent storage
+            vector_store: Optional pre-configured VectorStore instance
         """
         self.db = Database(db_path)
         self.embeddings_path = embeddings_path
+        self.vector_backend = vector_backend
+        self.chroma_path = chroma_path
         self._ensure_embeddings_directory()
+        if vector_store is not None:
+            self.vector_store = vector_store
+        else:
+            self.vector_store = get_vector_store(
+                backend=vector_backend,
+                db_path=db_path,
+                embeddings_path=embeddings_path,
+                chroma_path=chroma_path,
+                db=self.db
+            )
     
     def _ensure_embeddings_directory(self):
         """Ensure embeddings directory exists."""
@@ -52,15 +71,17 @@ class DocumentStore:
         return os.path.join(self.embeddings_path, f"doc_{document_id}_chunk_{chunk_index}.json")
     
     def store_document(self, user_id: int, filename: str, file_content: bytes,
-                      chunks: List[Dict[str, Any]], embeddings: List[List[float]]) -> int:
+                      chunks: List[Dict[str, Any]], embeddings: List[List[float]],
+                      source_type: str = "pdf") -> int:
         """Store document with chunks and embeddings.
         
         Args:
             user_id: Telegram user ID
-            filename: Name of the PDF file
+            filename: Name of the document / file
             file_content: Raw file content for hashing
             chunks: List of text chunks
             embeddings: List of embedding vectors
+            source_type: Source type ('pdf', 'markdown', 'text', 'web')
             
         Returns:
             Document ID
@@ -68,7 +89,7 @@ class DocumentStore:
         file_hash = self._calculate_file_hash(file_content)
         file_size = len(file_content)
         
-        # Prepare chunks with embedding paths and page metadata
+        # Prepare chunks with embedding paths, page metadata, and section labels
         chunks_data = []
         for i, chunk in enumerate(chunks):
             chunk_dict = {
@@ -78,19 +99,32 @@ class DocumentStore:
                 'page': chunk.get('page') if isinstance(chunk, dict) else getattr(chunk, 'page', None),
                 'page_start': chunk.get('page_start') if isinstance(chunk, dict) else getattr(chunk, 'page_start', None),
                 'page_end': chunk.get('page_end') if isinstance(chunk, dict) else getattr(chunk, 'page_end', None),
+                'section_label': chunk.get('section_label') if isinstance(chunk, dict) else getattr(chunk, 'section_label', None),
+                'source_type': chunk.get('source_type') if isinstance(chunk, dict) else getattr(chunk, 'source_type', source_type),
                 'embedding_path': None  # Will be set after document is created
             }
             chunks_data.append(chunk_dict)
         
         # Store in database
         document_id = self.db.store_document(user_id, filename, file_hash, 
-                                            file_size, chunks_data)
+                                            file_size, chunks_data,
+                                            source_type=source_type)
         
-        # Store embeddings
+        # Store embeddings in files
         for i, embedding in enumerate(embeddings):
             embedding_path = self._get_embedding_path(document_id, i)
             with open(embedding_path, 'w') as f:
                 json.dump({'embedding': embedding}, f)
+        
+        # Also sync to vector store
+        for c in chunks_data:
+            c['document_id'] = document_id
+            c['filename'] = filename
+        if not isinstance(self.vector_store, NumPyVectorStore):
+            try:
+                self.vector_store.add(chunks_data, embeddings, user_id)
+            except Exception as e:
+                logger.warning(f"Failed to sync to vector_store: {e}")
         
         logger.info(f"Stored document {document_id} with {len(embeddings)} embeddings")
         return document_id
@@ -140,6 +174,12 @@ class DocumentStore:
                 except Exception as e:
                     logger.warning(f"Failed to delete embedding file: {e}")
         
+        # Delete from vector store
+        try:
+            self.vector_store.delete(document_id, user_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete from vector_store: {e}")
+        
         # Delete from database
         return self.db.delete_document(user_id, filename)
     
@@ -167,6 +207,11 @@ class DocumentStore:
                         os.remove(embedding_path)
                     except Exception as e:
                         logger.warning(f"Failed to delete embedding file: {e}")
+                        
+            try:
+                self.vector_store.delete(document_id, user_id)
+            except Exception as e:
+                logger.warning(f"Failed to delete doc {document_id} from vector_store: {e}")
         
         # Delete from database
         return self.db.clear_user_documents(user_id)
@@ -180,6 +225,14 @@ class DocumentStore:
         Returns:
             List of chunks with embeddings
         """
+        if self.vector_backend == "chroma" and isinstance(self.vector_store, ChromaVectorStore):
+            try:
+                chroma_chunks = self.vector_store.get_user_chunks_with_embeddings(user_id)
+                if chroma_chunks:
+                    return chroma_chunks
+            except Exception as e:
+                logger.warning(f"Failed to fetch chunks from Chroma, falling back to SQLite: {e}")
+
         chunks = self.db.get_all_user_chunks(user_id)
         
         # Load embeddings

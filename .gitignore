@@ -31,6 +31,7 @@ wheels/
 
 # Data & Databases
 data/
+data/chroma/
 logs/
 output/
 tmp/

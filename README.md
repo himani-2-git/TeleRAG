@@ -11,9 +11,11 @@ A lightweight Telegram bot for grounded question answering over PDF documents, r
 
 ## What It Does
 
-• Ingests PDF documents via direct Telegram file uploads or public web links with multi-hop redirect verification.  
+• Ingests documents across multiple formats: PDF files, Markdown files (`.md`), plain text (`.txt`), and static web pages via `/addurl <url>` with multi-hop SSRF protection.  
 • Retrieves relevant passages using local bi-encoder embeddings and BM25 lexical search merged with Reciprocal Rank Fusion ($k=60$), with optional cross-encoder reranking.  
-• Generates answers using an instruction-tuned LLM (local Ollama or hosted provider) and appends a verified Sources footer citing retrieved physical page numbers.
+• Flexible vector backends: default zero-dependency in-process NumPy vector store (backed by SQLite and JSON files), with optional persistent ChromaDB backend (`requirements-chroma.txt`).  
+• Modular pipeline execution: default direct Python pipeline or compiled LangGraph StateGraph (`requirements-graph.txt`) with verified parity.  
+• Generates answers using an instruction-tuned LLM (local Ollama or hosted provider) and appends a verified Sources footer citing retrieved physical page numbers, markdown heading trails, chunk numbers, or web titles.
 
 Retrieval was evaluated on a 70-question set over *Think Python 2e*, a smaller synthetic fixture set runs in CI to guard against regressions, and a Sources footer lists the retrieved pages for each answer.
 
@@ -373,6 +375,74 @@ Validation scores reference answers against **retrieved context** (not raw groun
 
 ---
 
+## Multi-Format Document Ingestion
+
+TeleRAG supports four distinct document formats with format-specific parsing and source citations:
+
+| Format | Ingestion Method | Chunking Strategy | Citation Format |
+| :--- | :--- | :--- | :--- |
+| **PDF** | File upload or direct URL | Per-page extraction with sliding-window page intervals | `• doc.pdf (p. 4)` or `• doc.pdf (pp. 4-5)` |
+| **Markdown** | `.md` file upload | Heading-hierarchy-aware splitting (`#`, `##`, `###`), sub-split with 20% overlap if section > `CHUNK_SIZE` | `• guide.md (Installation)` |
+| **Plain Text** | `.txt` file upload | Sliding-window character chunking with 20% overlap | `• notes.txt` |
+| **Web Pages** | `/addurl <url>` command | HTML boilerplate removal (`<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`, `<aside>`), semantic body text chunking | `• 🌐 Wikipedia: Raft (algorithm)` |
+
+### SSRF Protection
+Public web ingestion (`/addurl <url>`) enforces multi-layered Server-Side Request Forgery (SSRF) defenses:
+1. **Scheme Validation**: Strictly restricts URLs to `http://` and `https://` (rejects `file://`, `ftp://`, `gopher://`, etc.).
+2. **Private IP & Cloud Metadata Blocking**: Resolves hostnames and rejects private addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.0/8`), link-local (`169.254.0.0/16`), multicast, and cloud instance metadata services (`169.254.169.254`).
+3. **Streaming Size Limit**: Streams responses with a hard 20 MB ceiling and a 10-second timeout.
+
+---
+
+## Modular Vector Backends: NumPy vs. ChromaDB
+
+TeleRAG abstracts vector storage behind a common `VectorStore` interface (`add`, `search`, `delete`, `list`) with per-user scoping:
+
+| Feature / Property | NumPyVectorStore (Default) | ChromaVectorStore (Optional) |
+| :--- | :--- | :--- |
+| **Configuration** | `VECTOR_BACKEND=numpy` | `VECTOR_BACKEND=chroma` |
+| **Dependencies** | Standard library SQLite + `numpy` (zero external vector DBs) | `chromadb` (`pip install -r requirements-chroma.txt`) |
+| **Storage Location** | `data/documents.db` + `data/embeddings/` JSON vectors | `data/chroma/` (HNSW persistent index) |
+| **Similarity Metric** | Cosine similarity via NumPy dot-product | Cosine distance converted to similarity ($1 - \text{distance}$) |
+| **Multi-Tenancy** | SQLite user queries (`WHERE user_id = ?`) | Chroma metadata filtering (`where={"user_id": user_id}`) |
+| **Cosine Parity** | Benchmark baseline | **Matches NumPy within $\le 1\times 10^{-4}$** on `ci_fixture.pdf` |
+| **Graceful Fallback** | Baseline | If `chromadb` is missing, logs warning and falls back to NumPy without crashing |
+
+---
+
+## Modular Pipeline Orchestration: Plain vs. LangGraph
+
+TeleRAG decouples the question-answering workflow into 4 single-responsibility nodes:
+1. **`retrieve`**: Invokes dense, hybrid (BM25 + Dense RRF), or hybrid + reranker retrieval.
+2. **`abstain_or_generate`**: Evaluates dense cosine similarity threshold (`SIMILARITY_THRESHOLD=0.3`); abstains immediately with refusal if below threshold, otherwise calls LLM.
+3. **`grounding`**: Runs post-generation semantic claim entailment checking against retrieved chunks.
+4. **`format_reply`**: Formats the response and appends the deduplicated verified Sources footer.
+
+### Orchestrators
+- **`PlainOrchestrator` (`ORCHESTRATOR=plain`, Default)**: Pure Python sequential execution with zero overhead.
+- **`LangGraphOrchestrator` (`ORCHESTRATOR=langgraph`, Optional)**: Compiles the identical 4 nodes into an executable LangGraph `StateGraph`. Requires `pip install -r requirements-graph.txt`. If `langgraph` is not installed, logs a warning and falls back to `plain` execution.
+- **Parity Verified**: Unit tests verify 100% identical outputs (answer text, refusal behavior, and citation footers) between Plain and LangGraph on answerable and unanswerable questions.
+
+---
+
+## Chunk-Size Ablation Study
+
+To evaluate optimal passage granularity, a chunk-size ablation study was conducted using `eval/run_chunk_ablation.py` over `eval/fixtures/ci_fixture.pdf` across candidate character chunk sizes with fixed 20% overlap (saved in `eval/results/chunk_ablation.json`):
+
+| Chunk Size | Overlap | Chunks | Mean Chars | Mean Toks | % > 256 Toks | Hit@2 (Span) | MRR (Span) | Hit@2 (Strict) | MRR (Strict) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **500** | 100 | 19 | 433.4 | 89.9 | **0.0%** | **1.0000** | **1.0000** | **1.0000** | **0.9583** |
+| **1000 (Default)** | 200 | 10 | 824.4 | 173.1 | **0.0%** | **1.0000** | **1.0000** | 0.7500 | 0.4861 |
+| **1500** | 300 | 7 | 1178.3 | 243.7 | 71.4% | **1.0000** | **1.0000** | 0.6667 | 0.6042 |
+
+### Decision Rule & Findings
+* **1000 Chars (Kept Default)**: Achieves 100% span Hit@2 (1.0000) and 100% span MRR (1.0000) with zero chunks exceeding the 256-token MiniLM embedding limit.
+* **500 Chars**: Achieves identical span retrieval quality (1.0000 / 1.0000) and higher strict start-page MRR (0.9583 vs 0.4861) due to single-page containment, but almost doubles total chunk count (+90%, 19 vs 10 chunks), increasing embedding overhead and SQLite storage without net span recall improvements.
+* **1500 Chars**: 71.4% of chunks exceed 256 tokens, suffering position-embedding truncation penalties and degraded strict Hit@2 (0.6667).
+* **Verdict**: In accordance with the decision rule (*"do not change for marginal or mixed gains"*), the default remains **`CHUNK_SIZE=1000`** with **`CHUNK_OVERLAP=200`**.
+
+---
+
 ## Project Structure
 
 ```
@@ -394,6 +464,7 @@ TeleRAG/
 │   ├── run_eval.py             # Retrieval evaluation harness (dense, hybrid, hybrid_rerank)
 │   ├── run_grounding_gate.py   # CI factual citation coverage & hallucination check
 │   ├── run_faithfulness.py     # Local LLM-as-judge claim entailment evaluation
+│   ├── run_chunk_ablation.py   # Chunk-size parameter ablation harness
 │   ├── run_abstention_experiment.py # Dev/Test abstention gate experiment
 │   ├── bench_llm.py            # Local model latency and refusal benchmark
 │   └── results/                # Measured benchmark outputs (JSON)
@@ -411,6 +482,8 @@ TeleRAG/
 ├── requirements.txt            # Pinned production dependencies
 ├── requirements-dev.txt        # Development & CI fixture dependencies (fpdf2)
 ├── requirements-eval.txt       # Optional local evaluation dependencies (pydantic, ragas)
+├── requirements-chroma.txt     # Optional ChromaDB vector store dependencies
+├── requirements-graph.txt      # Optional LangGraph orchestration dependencies
 ├── .env.example                # Configuration template
 ├── .gitignore                  # Git exclusion rules
 ├── INSTRUCTIONS.md             # Complete installation, configuration & user manual
@@ -424,14 +497,18 @@ TeleRAG/
 │   │   ├── handlers.py         # Telegram handlers, queueing, grounding check & footers
 │   │   └── __init__.py
 │   ├── processors/
+│   │   ├── document_model.py   # IngestedDocument dataclass & source citation formatting
+│   │   ├── markdown_processor.py # Heading-aware markdown parser and chunker
 │   │   ├── pdf_processor.py    # Page-aware extraction, validation
 │   │   ├── text_chunker.py     # Sliding-window chunker with page bounds
+│   │   ├── web_processor.py    # HTML scraper with SSRF defense & boilerplate stripping
 │   │   └── __init__.py
 │   ├── rag/
 │   │   ├── embeddings.py       # SentenceTransformers embedding generation
 │   │   ├── grounding.py        # Post-generation sentence grounding report
 │   │   ├── hybrid.py           # BM25 + dense Reciprocal Rank Fusion
 │   │   ├── llm_client.py       # OpenAI-compatible LLM client & response parsing
+│   │   ├── pipeline.py         # Sequential & LangGraph QA pipeline orchestration
 │   │   ├── prompts.py          # Versioned YAML prompt loader
 │   │   ├── reranker.py         # CrossEncoder candidate reranking
 │   │   ├── retriever.py        # Routing retriever & page citation context formatting
@@ -439,6 +516,7 @@ TeleRAG/
 │   └── storage/
 │       ├── database.py         # SQLite schema, page columns & migrations
 │       ├── document_store.py   # Document ingestion, vector storage & retrieval
+│       ├── vector_store.py     # VectorStore ABC, NumPy and Chroma persistent backends
 │       └── __init__.py
 │
 └── tests/                      # Automated unit test suite
@@ -448,11 +526,14 @@ TeleRAG/
     ├── test_grounding.py       # Tests for sentence grounding & footer stripping
     ├── test_handlers.py        # Tests for SSRF defense, redirects, queueing & answers
     ├── test_hybrid.py          # Tests for BM25, RRF fusion, and abstention invariant
+    ├── test_ingestion.py       # Tests for Markdown, Plain Text, and Web SSRF ingestion
     ├── test_pdf_processor.py   # Tests for extraction, chunking, and page boundaries
+    ├── test_pipeline.py        # Tests for plain vs. LangGraph pipeline parity
     ├── test_prompts.py         # Tests for YAML prompt loading & validation
     ├── test_rag.py             # Tests for embeddings, cosine search, 404 handling, thresholds
     ├── test_reranker.py        # Tests for cross-encoder reranking order and scores
-    └── test_storage.py         # Tests for database CRUD, page migrations, and cascades
+    ├── test_storage.py         # Tests for database CRUD, page migrations, and cascades
+    └── test_vector_store.py    # Tests for NumPy & Chroma backends, parity & isolation
 ```
 
 ---

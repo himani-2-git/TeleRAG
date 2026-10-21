@@ -34,6 +34,11 @@ class MockEmbeddingGenerator:
             return self.model.encode(query, convert_to_numpy=True).tolist()
         return [0.1] * 384
 
+    def generate_embeddings(self, texts: Any) -> list[list[float]] | list[float]:
+        if isinstance(texts, str):
+            return self.generate_query_embedding(texts)
+        return [self.generate_query_embedding(t) for t in texts]
+
 
 class MockLLMClient:
     """Mock LLM client returning deterministic responses."""
@@ -79,6 +84,25 @@ class TestPipelinePlain(unittest.TestCase):
         result = self.orchestrator.run(question=unanswerable_q, user_id=1, user_chunks=chunks)
         self.assertTrue(result["refused"])
         self.assertEqual(result["final_response"], self.prompt_config.refusal_message)
+
+    def test_answerable_question_success(self):
+        """Answerable query runs cleanly without logging pipeline warnings."""
+        chunks = [
+            {
+                "content": "Replication is the primary technique for high availability.",
+                "chunk_index": 0,
+                "filename": "replication.pdf",
+                "embedding": self.embedder.generate_query_embedding(
+                    "Replication is the primary technique for high availability."
+                ),
+            }
+        ]
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            res = self.orchestrator.run(
+                question="What is replication?", user_id=1, user_chunks=chunks
+            )
+        self.assertFalse(res["refused"])
+        self.assertIn("Replication is the primary technique", res["final_response"])
 
 
 @unittest.skipUnless(HAS_LANGGRAPH, "langgraph is not installed")
@@ -136,8 +160,9 @@ class TestLangGraphParity(unittest.TestCase):
     def test_answerable_question_parity(self):
         """For answerable question, plain and langgraph produce identical responses and citations."""
         q = "What is the primary technique for high availability in distributed systems?"
-        res_plain = self.plain_orch.run(question=q, user_id=1, user_chunks=self.chunks)
-        res_graph = self.graph_orch.run(question=q, user_id=1, user_chunks=self.chunks)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            res_plain = self.plain_orch.run(question=q, user_id=1, user_chunks=self.chunks)
+            res_graph = self.graph_orch.run(question=q, user_id=1, user_chunks=self.chunks)
 
         self.assertFalse(res_plain["refused"])
         self.assertFalse(res_graph["refused"])

@@ -173,6 +173,10 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.config = Config(telegram_bot_token="test")
         self.mock_doc_store = Mock()
         self.mock_embedder = Mock()
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_embedder.generate_embeddings.side_effect = lambda texts: (
+            [[0.1, 0.2] for _ in texts] if isinstance(texts, list) else [0.1, 0.2]
+        )
         self.mock_retriever = Mock()
         self.mock_llm = Mock()
 
@@ -219,7 +223,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         self.assertEqual("Thinking...", update.message.reply_text.call_args_list[0][0][0])
@@ -260,7 +265,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         # Retriever.retrieve should NOT be called because cutoff was skipped
         self.mock_retriever.retrieve.assert_not_called()
@@ -362,7 +368,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         # First reply is Thinking...
         self.assertEqual(update.message.reply_text.call_count, 2)
@@ -421,7 +428,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
 
         asyncio.create_task(release_later())
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         # 1. Verify queue notice was sent first (active_requests ahead was 1)
         reply_calls = [call.args[0] for call in update.message.reply_text.call_args_list]
@@ -474,7 +482,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         reply = update.message.reply_text.call_args_list[1][0][0]
@@ -524,7 +533,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         reply = update.message.reply_text.call_args_list[1][0][0]
@@ -557,7 +567,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         mock_orch.run.assert_called_once_with(
             question="What is hello?",
@@ -604,7 +615,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
 
         asyncio.create_task(release_later())
 
-        await self.handlers.handle_message(update, context)
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
 
         self.assertEqual(self.handlers.active_requests, 1)
 

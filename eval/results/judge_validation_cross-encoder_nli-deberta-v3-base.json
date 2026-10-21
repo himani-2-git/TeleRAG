@@ -1,0 +1,1461 @@
+{
+  "status": "JUDGE NOT TRUSTWORTHY",
+  "judge_type": "nli",
+  "judge_model": "cross-encoder/nli-deberta-v3-base",
+  "passed": false,
+  "entail_threshold": 0.3,
+  "premise_window": "1,2,3",
+  "dev": {
+    "passed": false,
+    "mean_reference_faithfulness": 0.75,
+    "mean_negative_control_faithfulness": 0.111,
+    "max_negative_control_faithfulness": 0.333,
+    "reference_accept_rate": 0.75,
+    "negative_control_false_accept_rate": 0.0,
+    "negative_control_fully_accepted_rate": 0.0,
+    "unscorable_references_count": 0,
+    "unscorable_negative_controls_count": 0,
+    "reference_scores": [
+      1.0,
+      1.0,
+      1.0,
+      0.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.0
+    ],
+    "negative_control_scores": [
+      0.0,
+      0.0,
+      0.0,
+      0.333,
+      0.333,
+      0.0
+    ],
+    "reference_results": [
+      {
+        "id": "ci_01",
+        "question": "What is the primary technique used for high availability in distributed systems?",
+        "answer": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+            "supported": true,
+            "best_window_index": 11,
+            "best_window": "Fault tolerance requires distinguishing between crash-stop failures, crash-recovery failures, and arbitrary Byzantine failures. Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+            "entailment_prob": 0.9948,
+            "contradiction_prob": 0.0003,
+            "reason": "Win 11: entail=0.995, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_02",
+        "question": "What does the PACELC theorem state regarding latency and consistency?",
+        "answer": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+            "supported": true,
+            "best_window_index": 3,
+            "best_window": "Daniel Abadi extended this trade-off with the PACELC theorem: If there is a Partition (P), how does the system trade off Availability (A) and Consistency (C); Else (E), when the system is running normally without partitions, how does the system trade off Latency (L) and Consistency (C)?",
+            "entailment_prob": 0.9978,
+            "contradiction_prob": 0.0004,
+            "reason": "Win 3: entail=0.998, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_03",
+        "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+        "answer": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+            "supported": true,
+            "best_window_index": 19,
+            "best_window": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted). A proposer node sends a Prepare request with a unique ballot number to a majority quorum of acceptors. If a majority responds with a Promise not to accept proposals with lower ballot numbers, the proposer issues an Accept request.",
+            "entailment_prob": 0.9976,
+            "contradiction_prob": 0.0001,
+            "reason": "Win 19: entail=0.998, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_04",
+        "question": "How does Multi-Paxos optimize basic Paxos for recurring log entries?",
+        "answer": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+            "supported": false,
+            "best_window_index": 14,
+            "best_window": "If a majority responds with a Promise not to accept proposals with lower ballot numbers, the proposer issues an Accept request. Multi-Paxos optimizes this protocol by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+            "entailment_prob": 0.0251,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 14: entail=0.025, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_05",
+        "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+        "answer": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+            "supported": true,
+            "best_window_index": 19,
+            "best_window": "Chapter 4: The Raft Consensus Algorithm Designed by Diego Ongaro and John Ousterhout, Raft was created as an understandable alternative to Multi-Paxos. Raft decomposes consensus into three independent subproblems: Leader Election, Log Replication, and Safety. At any time, a node is in one of three states: Leader, Follower, or Candidate.",
+            "entailment_prob": 0.998,
+            "contradiction_prob": 0.0001,
+            "reason": "Win 19: entail=0.998, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_06",
+        "question": "What RPCs are used by the Raft leader to replicate log entries across followers?",
+        "answer": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+            "supported": false,
+            "best_window_index": 28,
+            "best_window": "However, Lamport clocks cannot distinguish between causally related events and concurrent events.",
+            "entailment_prob": 0.0129,
+            "contradiction_prob": 0.4397,
+            "reason": "Win 28: entail=0.013, contra=0.440"
+          }
+        ]
+      },
+      {
+        "id": "ci_07",
+        "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+        "answer": "Lamport clocks cannot distinguish between causally related events and concurrent events. Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 2,
+        "supported_items": 2,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Lamport clocks cannot distinguish between causally related events and concurrent events.",
+            "supported": true,
+            "best_window_index": 12,
+            "best_window": "Lamport timestamps increment on local events and update to max(local, received) + 1 upon receiving messages. However, Lamport clocks cannot distinguish between causally related events and concurrent events.",
+            "entailment_prob": 0.9977,
+            "contradiction_prob": 0.0001,
+            "reason": "Win 12: entail=0.998, contra=0.000"
+          },
+          {
+            "sentence": "Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+            "supported": true,
+            "best_window_index": 14,
+            "best_window": "Vector clocks solve this limitation by maintaining a vector of integers, where each entry represents the local clock of a specific node. Two events are concurrent if neither vector dominates the other, enabling systems like Riak to detect conflicting updates.",
+            "entailment_prob": 0.9954,
+            "contradiction_prob": 0.0004,
+            "reason": "Win 14: entail=0.995, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_08",
+        "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+        "answer": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+            "supported": true,
+            "best_window_index": 4,
+            "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+            "entailment_prob": 0.9948,
+            "contradiction_prob": 0.0005,
+            "reason": "Win 4: entail=0.995, contra=0.001"
+          }
+        ]
+      },
+      {
+        "id": "ci_09",
+        "question": "What are the three operational phases of Practical Byzantine Fault Tolerance (PBFT)?",
+        "answer": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+            "supported": true,
+            "best_window_index": 19,
+            "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1. Miguel Castro and Barbara Liskov introduced Practical Byzantine Fault Tolerance (PBFT), which operates in an asynchronous network. PBFT uses three phases: Pre-Prepare, Prepare, and Commit, and relies on cryptographic signatures or message authentication codes (MACs).",
+            "entailment_prob": 0.9967,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 19: entail=0.997, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_10",
+        "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+        "answer": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+            "supported": true,
+            "best_window_index": 26,
+            "best_window": "In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT. A major limitation of 2PC is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+            "entailment_prob": 0.3772,
+            "contradiction_prob": 0.0004,
+            "reason": "Win 26: entail=0.377, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_11",
+        "question": "What mathematical properties of the merge operator guarantee convergence in state-based CRDTs?",
+        "answer": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+            "supported": true,
+            "best_window_index": 3,
+            "best_window": "State-based CRDTs propagate full state and merge replicas using a mathematically proven join-semilattice with a least upper bound operator. Because merge operations are associative, commutative, and idempotent, convergence is mathematically guaranteed regardless of message reordering.",
+            "entailment_prob": 0.9956,
+            "contradiction_prob": 0.0,
+            "reason": "Win 3: entail=0.996, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "ci_12",
+        "question": "What are common examples of conflict-free replicated data types such as PN-Counters and OR-Sets?",
+        "answer": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+            "supported": false,
+            "best_window_index": 24,
+            "best_window": "Because merge operations are associative, commutative, and idempotent, convergence is mathematically guaranteed regardless of message reordering. Examples include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+            "entailment_prob": 0.0103,
+            "contradiction_prob": 0.0014,
+            "reason": "Win 24: entail=0.010, contra=0.001"
+          }
+        ]
+      }
+    ],
+    "negative_control_results": [
+      {
+        "id": "neg_01",
+        "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+        "answer": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+            "supported": false,
+            "best_window_index": 0,
+            "best_window": "does the system trade off Latency (L) and Consistency (C)?",
+            "entailment_prob": 0.0045,
+            "contradiction_prob": 0.024,
+            "reason": "Win 0: entail=0.005, contra=0.024"
+          }
+        ]
+      },
+      {
+        "id": "neg_02",
+        "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+        "answer": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+            "supported": false,
+            "best_window_index": 41,
+            "best_window": "In Phase 1 (Prepare phase), the coordinator sends a PREPARE message to all participants, asking whether they can commit the transaction. Each participant checks local constraints, writes uncommitted changes to a write-ahead log (WAL), and votes either VOTE_COMMIT or VOTE_ABORT. In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT.",
+            "entailment_prob": 0.0007,
+            "contradiction_prob": 0.6079,
+            "reason": "Win 41: entail=0.001, contra=0.608"
+          }
+        ]
+      },
+      {
+        "id": "neg_03",
+        "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+        "answer": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+            "supported": false,
+            "best_window_index": 39,
+            "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1. Miguel Castro and Barbara Liskov introduced Practical Byzantine Fault Tolerance (PBFT), which operates in an asynchronous network. PBFT uses three phases: Pre-Prepare, Prepare, and Commit, and relies on cryptographic signatures or message authentication codes (MACs).",
+            "entailment_prob": 0.1387,
+            "contradiction_prob": 0.6667,
+            "reason": "Win 39: entail=0.139, contra=0.667"
+          }
+        ]
+      },
+      {
+        "id": "neg_04",
+        "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+        "answer": "Two-Phase Commit coordinates transactions across distributed nodes. The coordinator never blocks participants during crashes. Recovery is achieved through instantaneous autonomous rollback without waiting.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 3,
+        "supported_items": 1,
+        "faithfulness": 0.333,
+        "details": [
+          {
+            "sentence": "Two-Phase Commit coordinates transactions across distributed nodes.",
+            "supported": true,
+            "best_window_index": 14,
+            "best_window": "Modern blockchain consensus mechanisms, such as Tendermint and PBFT-based state machine replication, build directly upon these foundations. Chapter 7: Distributed Transactions and Two-Phase Commit When an atomic transaction spans multiple autonomous storage nodes, distributed commit protocols ensure atomicity across all participants. The Two-Phase Commit (2PC) protocol coordinates transactions using a designated coordinator and participating resource managers.",
+            "entailment_prob": 0.994,
+            "contradiction_prob": 0.0006,
+            "reason": "Win 14: entail=0.994, contra=0.001"
+          },
+          {
+            "sentence": "The coordinator never blocks participants during crashes.",
+            "supported": false,
+            "best_window_index": 20,
+            "best_window": "Chapter 8: Eventual Consistency and CRDTs Eventual consistency is a weak consistency model where, in the absence of new updates, all replicas eventually converge to the same value.",
+            "entailment_prob": 0.0002,
+            "contradiction_prob": 0.0131,
+            "reason": "Win 20: entail=0.000, contra=0.013"
+          },
+          {
+            "sentence": "Recovery is achieved through instantaneous autonomous rollback without waiting.",
+            "supported": false,
+            "best_window_index": 21,
+            "best_window": "To resolve conflicting concurrent updates without coordination or consensus locks, Conflict-free Replicated Data Types (CRDTs) were introduced.",
+            "entailment_prob": 0.0003,
+            "contradiction_prob": 0.7867,
+            "reason": "Win 21: entail=0.000, contra=0.787"
+          }
+        ]
+      },
+      {
+        "id": "neg_05",
+        "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+        "answer": "Basic Paxos requires two consecutive rounds of message exchanges. Proposers broadcast promises directly to all replicas. Acceptors subsequently finalize decisions without counting majorities.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 3,
+        "supported_items": 1,
+        "faithfulness": 0.333,
+        "details": [
+          {
+            "sentence": "Basic Paxos requires two consecutive rounds of message exchanges.",
+            "supported": true,
+            "best_window_index": 12,
+            "best_window": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted). A proposer node sends a Prepare request with a unique ballot number to a majority quorum of acceptors.",
+            "entailment_prob": 0.988,
+            "contradiction_prob": 0.0006,
+            "reason": "Win 12: entail=0.988, contra=0.001"
+          },
+          {
+            "sentence": "Proposers broadcast promises directly to all replicas.",
+            "supported": false,
+            "best_window_index": 27,
+            "best_window": "The candidate increments its current term, votes for itself, and broadcasts RequestVote RPCs to all peers.",
+            "entailment_prob": 0.1352,
+            "contradiction_prob": 0.1015,
+            "reason": "Win 27: entail=0.135, contra=0.102"
+          },
+          {
+            "sentence": "Acceptors subsequently finalize decisions without counting majorities.",
+            "supported": false,
+            "best_window_index": 29,
+            "best_window": "roposals with lower ballot numbers, the proposer issues an Accept request. Multi-Paxos optimizes this protocol by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+            "entailment_prob": 0.0006,
+            "contradiction_prob": 0.0004,
+            "reason": "Win 29: entail=0.001, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "neg_06",
+        "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+        "answer": "Byzantine fault tolerance establishes consensus in adversarial environments. A total count of 2f + 1 nodes is sufficient to guarantee agreement. Traitors are isolated by simply halving the required quorum.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 3,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Byzantine fault tolerance establishes consensus in adversarial environments.",
+            "supported": false,
+            "best_window_index": 16,
+            "best_window": "Two events are concurrent if neither vector dominates the other, enabling systems like Riak to detect conflicting updates. Chapter 6: Byzantine Fault Tolerance Byzantine fault tolerance (BFT) addresses systems where faulty nodes may exhibit arbitrary behavior, including malicious attacks and lying. The Byzantine Generals Problem illustrates the challenge of reaching agreement among commanders who may be traitors.",
+            "entailment_prob": 0.0379,
+            "contradiction_prob": 0.0009,
+            "reason": "Win 16: entail=0.038, contra=0.001"
+          },
+          {
+            "sentence": "A total count of 2f + 1 nodes is sufficient to guarantee agreement.",
+            "supported": false,
+            "best_window_index": 4,
+            "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+            "entailment_prob": 0.0025,
+            "contradiction_prob": 0.9926,
+            "reason": "Win 4: entail=0.002, contra=0.993"
+          },
+          {
+            "sentence": "Traitors are isolated by simply halving the required quorum.",
+            "supported": false,
+            "best_window_index": 35,
+            "best_window": "Unlike centralized systems, distributed systems face independent node failures, network partitions, and lack of a global clock. The fundamental model assumes message passing with arbitrary network delays and potential packet loss. System models can be synchronous, where bounds on processing and network delays are known, or asynchronous, where no timing assumptions hold.",
+            "entailment_prob": 0.0029,
+            "contradiction_prob": 0.0488,
+            "reason": "Win 35: entail=0.003, contra=0.049"
+          }
+        ]
+      }
+    ]
+  },
+  "heldout": {
+    "passed": true,
+    "mean_reference_faithfulness": 0.875,
+    "mean_negative_control_faithfulness": 0.25,
+    "max_negative_control_faithfulness": 0.5,
+    "reference_accept_rate": 0.875,
+    "negative_control_false_accept_rate": 0.0,
+    "negative_control_fully_accepted_rate": 0.0,
+    "unscorable_references_count": 0,
+    "unscorable_negative_controls_count": 0,
+    "reference_scores": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "negative_control_scores": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.5,
+      0.5,
+      0.5,
+      0.5
+    ],
+    "reference_results": [
+      {
+        "id": "heldout_ref_01",
+        "question": "What model assumptions distinguish synchronous distributed systems from asynchronous ones?",
+        "answer": "Synchronous systems assume known bounds on processing and network delays, whereas asynchronous systems operate without any timing assumptions.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Synchronous systems assume known bounds on processing and network delays, whereas asynchronous systems operate without any timing assumptions.",
+            "supported": true,
+            "best_window_index": 9,
+            "best_window": "The fundamental model assumes message passing with arbitrary network delays and potential packet loss. System models can be synchronous, where bounds on processing and network delays are known, or asynchronous, where no timing assumptions hold.",
+            "entailment_prob": 0.9943,
+            "contradiction_prob": 0.0003,
+            "reason": "Win 9: entail=0.994, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_02",
+        "question": "Which database systems favor availability and low latency according to the PACELC classification?",
+        "answer": "Dynamo and Cassandra choose the PA/EL trade-off, prioritizing availability during partitions and low latency during normal execution.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Dynamo and Cassandra choose the PA/EL trade-off, prioritizing availability during partitions and low latency during normal execution.",
+            "supported": true,
+            "best_window_index": 11,
+            "best_window": "Since network partitions are inevitable in real-world physical networks, systems must choose between consistency (CP) or availability (AP) during a partition. Daniel Abadi extended this trade-off with the PACELC theorem: If there is a Partition (P), how does the system trade off Availability (A) and Consistency (C); Else (E), when the system is running normally without partitions, how does the system trade off Latency (L) and Consistency (C)? For example, Dynamo and Cassandra choose PA/EL, optimizing for availability and low latency, whereas Bigtable and Spanner prioritize PC/EC.",
+            "entailment_prob": 0.9949,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 11: entail=0.995, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_03",
+        "question": "What must happen before a proposer issues an Accept request in basic Paxos?",
+        "answer": "A proposer must receive Promise responses from a majority quorum of acceptors pledging not to accept proposals with lower ballot numbers.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "A proposer must receive Promise responses from a majority quorum of acceptors pledging not to accept proposals with lower ballot numbers.",
+            "supported": true,
+            "best_window_index": 6,
+            "best_window": "If a majority responds with a Promise not to accept proposals with lower ballot numbers, the proposer issues an Accept request.",
+            "entailment_prob": 0.9928,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 6: entail=0.993, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_04",
+        "question": "What action does a Raft node take when it transitions into the candidate state?",
+        "answer": "When a follower transitions to a candidate, it increments its term, votes for itself, and broadcasts RequestVote RPCs to peer nodes.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "When a follower transitions to a candidate, it increments its term, votes for itself, and broadcasts RequestVote RPCs to peer nodes.",
+            "supported": true,
+            "best_window_index": 23,
+            "best_window": "If a follower detects leader election timeout, it becomes a candidate. The candidate increments its current term, votes for itself, and broadcasts RequestVote RPCs to all peers. Once elected, the leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+            "entailment_prob": 0.9964,
+            "contradiction_prob": 0.0001,
+            "reason": "Win 23: entail=0.996, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_05",
+        "question": "How do Lamport timestamps update when a message is received from another node?",
+        "answer": "Upon message reception, a node updates its Lamport timestamp to one plus the maximum of its local clock and the received clock value.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "Upon message reception, a node updates its Lamport timestamp to one plus the maximum of its local clock and the received clock value.",
+            "supported": true,
+            "best_window_index": 17,
+            "best_window": "Chapter 5: Logical Time and Vector Clocks In distributed systems, physical clocks cannot be perfectly synchronized due to clock drift and variable network latency. Leslie Lamport introduced logical clocks to define a partial ordering of events based on the happened-before relation (denoted as ->). Lamport timestamps increment on local events and update to max(local, received) + 1 upon receiving messages.",
+            "entailment_prob": 0.9848,
+            "contradiction_prob": 0.0,
+            "reason": "Win 17: entail=0.985, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_06",
+        "question": "What security mechanisms do nodes in PBFT rely on to authenticate messages in an asynchronous network?",
+        "answer": "Practical Byzantine Fault Tolerance relies on cryptographic signatures or message authentication codes to protect communication.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Practical Byzantine Fault Tolerance relies on cryptographic signatures or message authentication codes to protect communication.",
+            "supported": false,
+            "best_window_index": 25,
+            "best_window": "In Phase 1 (Prepare phase), the coordinator sends a PREPARE message to all participants, asking whether they can commit the transaction.",
+            "entailment_prob": 0.0535,
+            "contradiction_prob": 0.0096,
+            "reason": "Win 25: entail=0.054, contra=0.010"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_07",
+        "question": "What voting conditions determine whether a Two-Phase Commit coordinator decides to commit or abort?",
+        "answer": "If every participant votes VOTE_COMMIT, the coordinator issues a GLOBAL_COMMIT; otherwise, if any participant aborts, it broadcasts GLOBAL_ABORT.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "If every participant votes VOTE_COMMIT, the coordinator issues a GLOBAL_COMMIT; otherwise, if any participant aborts, it broadcasts GLOBAL_ABORT.",
+            "supported": true,
+            "best_window_index": 25,
+            "best_window": "d log (WAL), and votes either VOTE_COMMIT or VOTE_ABORT. In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT.",
+            "entailment_prob": 0.9948,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 25: entail=0.995, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_ref_08",
+        "question": "What are the two distinct categories into which Conflict-free Replicated Data Types are divided?",
+        "answer": "CRDTs are categorized into state-based CvRDTs, which transmit full state, and operation-based CmRDTs.",
+        "is_negative_control": false,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 1,
+        "faithfulness": 1.0,
+        "details": [
+          {
+            "sentence": "CRDTs are categorized into state-based CvRDTs, which transmit full state, and operation-based CmRDTs.",
+            "supported": true,
+            "best_window_index": 13,
+            "best_window": "CRDTs come in two varieties: State-based (CvRDTs) and Operation-based (CmRDTs). State-based CRDTs propagate full state and merge replicas using a mathematically proven join-semilattice with a least upper bound operator.",
+            "entailment_prob": 0.9986,
+            "contradiction_prob": 0.0001,
+            "reason": "Win 13: entail=0.999, contra=0.000"
+          }
+        ]
+      }
+    ],
+    "negative_control_results": [
+      {
+        "id": "heldout_neg_01",
+        "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+        "answer": "A Byzantine system requires at least 2f + 2 total nodes to tolerate f arbitrary failures in an asynchronous environment.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "A Byzantine system requires at least 2f + 2 total nodes to tolerate f arbitrary failures in an asynchronous environment.",
+            "supported": false,
+            "best_window_index": 19,
+            "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1. Miguel Castro and Barbara Liskov introduced Practical Byzantine Fault Tolerance (PBFT), which operates in an asynchronous network. PBFT uses three phases: Pre-Prepare, Prepare, and Commit, and relies on cryptographic signatures or message authentication codes (MACs).",
+            "entailment_prob": 0.0055,
+            "contradiction_prob": 0.9873,
+            "reason": "Win 19: entail=0.006, contra=0.987"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_02",
+        "question": "Which database systems favor availability and low latency according to the PACELC classification?",
+        "answer": "Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.",
+            "supported": false,
+            "best_window_index": 22,
+            "best_window": "Leslie Lamport introduced the Paxos family of protocols to solve consensus in the presence of crash failures. Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+            "entailment_prob": 0.0005,
+            "contradiction_prob": 0.4117,
+            "reason": "Win 22: entail=0.001, contra=0.412"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_03",
+        "question": "Who designed the Raft consensus algorithm and what protocol was it created to replace?",
+        "answer": "Leslie Lamport created Raft as an understandable replacement for Practical Byzantine Fault Tolerance.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Leslie Lamport created Raft as an understandable replacement for Practical Byzantine Fault Tolerance.",
+            "supported": false,
+            "best_window_index": 24,
+            "best_window": "of integers, where each entry represents the local clock of a specific node.",
+            "entailment_prob": 0.0009,
+            "contradiction_prob": 0.5008,
+            "reason": "Win 24: entail=0.001, contra=0.501"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_04",
+        "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+        "answer": "Two events are detected as concurrent by vector clocks when one vector clock completely dominates the other.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 1,
+        "supported_items": 0,
+        "faithfulness": 0.0,
+        "details": [
+          {
+            "sentence": "Two events are detected as concurrent by vector clocks when one vector clock completely dominates the other.",
+            "supported": false,
+            "best_window_index": 9,
+            "best_window": "Once elected, the leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum. Chapter 5: Logical Time and Vector Clocks In distributed systems, physical clocks cannot be perfectly synchronized due to clock drift and variable network latency.",
+            "entailment_prob": 0.0014,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 9: entail=0.001, contra=0.000"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_05",
+        "question": "What must happen before a proposer issues an Accept request in basic Paxos?",
+        "answer": "A proposer sends a Prepare request with a unique ballot number to acceptors. If a majority responds, the proposer immediately issues a GLOBAL_COMMIT without Phase 2.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 2,
+        "supported_items": 1,
+        "faithfulness": 0.5,
+        "details": [
+          {
+            "sentence": "A proposer sends a Prepare request with a unique ballot number to acceptors.",
+            "supported": true,
+            "best_window_index": 20,
+            "best_window": "A proposer node sends a Prepare request with a unique ballot number to a majority quorum of acceptors. If a majority responds with a Promise not to accept proposals with lower ballot numbers, the proposer issues an Accept request. Multi-Paxos optimizes this protocol by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+            "entailment_prob": 0.9971,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 20: entail=0.997, contra=0.000"
+          },
+          {
+            "sentence": "If a majority responds, the proposer immediately issues a GLOBAL_COMMIT without Phase 2.",
+            "supported": false,
+            "best_window_index": 38,
+            "best_window": "Multi-Paxos optimizes this protocol by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries. Chapter 4: The Raft Consensus Algorithm Designed by Diego Ongaro and John Ousterhout, Raft was created as an understandable alternative to Multi-Paxos. Raft decomposes consensus into three independent subproblems: Leader Election, Log Replication, and Safety.",
+            "entailment_prob": 0.0003,
+            "contradiction_prob": 0.1355,
+            "reason": "Win 38: entail=0.000, contra=0.136"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_06",
+        "question": "What action does a Raft node take when it transitions into the candidate state?",
+        "answer": "When a follower detects an election timeout, it becomes a candidate and increments its current term. The candidate then immediately assumes leadership and replicates log entries without collecting votes.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 2,
+        "supported_items": 1,
+        "faithfulness": 0.5,
+        "details": [
+          {
+            "sentence": "When a follower detects an election timeout, it becomes a candidate and increments its current term.",
+            "supported": true,
+            "best_window_index": 23,
+            "best_window": "If a follower detects leader election timeout, it becomes a candidate. The candidate increments its current term, votes for itself, and broadcasts RequestVote RPCs to all peers. Once elected, the leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+            "entailment_prob": 0.9973,
+            "contradiction_prob": 0.0002,
+            "reason": "Win 23: entail=0.997, contra=0.000"
+          },
+          {
+            "sentence": "The candidate then immediately assumes leadership and replicates log entries without collecting votes.",
+            "supported": false,
+            "best_window_index": 19,
+            "best_window": "Chapter 4: The Raft Consensus Algorithm Designed by Diego Ongaro and John Ousterhout, Raft was created as an understandable alternative to Multi-Paxos. Raft decomposes consensus into three independent subproblems: Leader Election, Log Replication, and Safety. At any time, a node is in one of three states: Leader, Follower, or Candidate.",
+            "entailment_prob": 0.0003,
+            "contradiction_prob": 0.0048,
+            "reason": "Win 19: entail=0.000, contra=0.005"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_07",
+        "question": "What voting conditions determine whether a Two-Phase Commit coordinator decides to commit or abort?",
+        "answer": "In Two-Phase Commit, participants write uncommitted modifications to a write-ahead log. If any participant votes VOTE_ABORT, the coordinator overrides the abort and broadcasts GLOBAL_COMMIT.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 2,
+        "supported_items": 1,
+        "faithfulness": 0.5,
+        "details": [
+          {
+            "sentence": "In Two-Phase Commit, participants write uncommitted modifications to a write-ahead log.",
+            "supported": true,
+            "best_window_index": 12,
+            "best_window": "Each participant checks local constraints, writes uncommitted changes to a write-ahead log (WAL), and votes either VOTE_COMMIT or VOTE_ABORT. In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT.",
+            "entailment_prob": 0.9797,
+            "contradiction_prob": 0.002,
+            "reason": "Win 12: entail=0.980, contra=0.002"
+          },
+          {
+            "sentence": "If any participant votes VOTE_ABORT, the coordinator overrides the abort and broadcasts GLOBAL_COMMIT.",
+            "supported": false,
+            "best_window_index": 17,
+            "best_window": "In Phase 1 (Prepare phase), the coordinator sends a PREPARE message to all participants, asking whether they can commit the transaction. Each participant checks local constraints, writes uncommitted changes to a write-ahead log (WAL), and votes either VOTE_COMMIT or VOTE_ABORT. In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT.",
+            "entailment_prob": 0.023,
+            "contradiction_prob": 0.7098,
+            "reason": "Win 17: entail=0.023, contra=0.710"
+          }
+        ]
+      },
+      {
+        "id": "heldout_neg_08",
+        "question": "What are the two distinct categories into which Conflict-free Replicated Data Types are divided?",
+        "answer": "CRDTs come in two varieties: State-based (CvRDTs) and Operation-based (CmRDTs). State-based CRDTs resolve conflicts by locking distributed transactions with two-phase commit.",
+        "is_negative_control": true,
+        "unscorable": false,
+        "total_items": 2,
+        "supported_items": 1,
+        "faithfulness": 0.5,
+        "details": [
+          {
+            "sentence": "CRDTs come in two varieties: State-based (CvRDTs) and Operation-based (CmRDTs).",
+            "supported": true,
+            "best_window_index": 19,
+            "best_window": "To resolve conflicting concurrent updates without coordination or consensus locks, Conflict-free Replicated Data Types (CRDTs) were introduced. CRDTs come in two varieties: State-based (CvRDTs) and Operation-based (CmRDTs). State-based CRDTs propagate full state and merge replicas using a mathematically proven join-semilattice with a least upper bound operator.",
+            "entailment_prob": 0.9963,
+            "contradiction_prob": 0.0004,
+            "reason": "Win 19: entail=0.996, contra=0.000"
+          },
+          {
+            "sentence": "State-based CRDTs resolve conflicts by locking distributed transactions with two-phase commit.",
+            "supported": false,
+            "best_window_index": 2,
+            "best_window": "A major limitation of 2PC is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+            "entailment_prob": 0.0179,
+            "contradiction_prob": 0.2288,
+            "reason": "Win 2: entail=0.018, contra=0.229"
+          }
+        ]
+      }
+    ]
+  },
+  "calibration_sweep": [
+    {
+      "threshold": 0.3,
+      "mean_reference": 0.75,
+      "max_negative_control": 0.333,
+      "margin": -0.05,
+      "passed": false
+    },
+    {
+      "threshold": 0.35,
+      "mean_reference": 0.75,
+      "max_negative_control": 0.333,
+      "margin": -0.05,
+      "passed": false
+    },
+    {
+      "threshold": 0.4,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.45,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.5,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.55,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.6,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.65,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.7,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.75,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.8,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.85,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    },
+    {
+      "threshold": 0.9,
+      "mean_reference": 0.667,
+      "max_negative_control": 0.333,
+      "margin": -0.133,
+      "passed": false
+    }
+  ],
+  "mean_reference_faithfulness": 0.75,
+  "mean_negative_control_faithfulness": 0.111,
+  "max_negative_control_faithfulness": 0.333,
+  "reference_accept_rate": 0.75,
+  "negative_control_false_accept_rate": 0.0,
+  "negative_control_fully_accepted_rate": 0.0,
+  "unscorable_references_count": 0,
+  "unscorable_negative_controls_count": 0,
+  "reference_scores": [
+    1.0,
+    1.0,
+    1.0,
+    0.0,
+    1.0,
+    0.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    0.0
+  ],
+  "negative_control_scores": [
+    0.0,
+    0.0,
+    0.0,
+    0.333,
+    0.333,
+    0.0
+  ],
+  "reference_results": [
+    {
+      "id": "ci_01",
+      "question": "What is the primary technique used for high availability in distributed systems?",
+      "answer": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+          "supported": true,
+          "best_window_index": 11,
+          "best_window": "Fault tolerance requires distinguishing between crash-stop failures, crash-recovery failures, and arbitrary Byzantine failures. Replication is the primary technique for high availability, allowing a service to remain operational even when individual nodes crash.",
+          "entailment_prob": 0.9948,
+          "contradiction_prob": 0.0003,
+          "reason": "Win 11: entail=0.995, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_02",
+      "question": "What does the PACELC theorem state regarding latency and consistency?",
+      "answer": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "The PACELC theorem states that if there is a partition, the system trades off availability and consistency; else, when running normally without partitions, the system trades off latency and consistency.",
+          "supported": true,
+          "best_window_index": 3,
+          "best_window": "Daniel Abadi extended this trade-off with the PACELC theorem: If there is a Partition (P), how does the system trade off Availability (A) and Consistency (C); Else (E), when the system is running normally without partitions, how does the system trade off Latency (L) and Consistency (C)?",
+          "entailment_prob": 0.9978,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 3: entail=0.998, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_03",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "answer": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted).",
+          "supported": true,
+          "best_window_index": 19,
+          "best_window": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted). A proposer node sends a Prepare request with a unique ballot number to a majority quorum of acceptors. If a majority responds with a Promise not to accept proposals with lower ballot numbers, the proposer issues an Accept request.",
+          "entailment_prob": 0.9976,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 19: entail=0.998, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_04",
+      "question": "How does Multi-Paxos optimize basic Paxos for recurring log entries?",
+      "answer": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Multi-Paxos optimizes basic Paxos by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+          "supported": false,
+          "best_window_index": 14,
+          "best_window": "If a majority responds with a Promise not to accept proposals with lower ballot numbers, the proposer issues an Accept request. Multi-Paxos optimizes this protocol by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+          "entailment_prob": 0.0251,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 14: entail=0.025, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_05",
+      "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+      "answer": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "In the Raft consensus algorithm, a node is in one of three states: Leader, Follower, or Candidate.",
+          "supported": true,
+          "best_window_index": 19,
+          "best_window": "Chapter 4: The Raft Consensus Algorithm Designed by Diego Ongaro and John Ousterhout, Raft was created as an understandable alternative to Multi-Paxos. Raft decomposes consensus into three independent subproblems: Leader Election, Log Replication, and Safety. At any time, a node is in one of three states: Leader, Follower, or Candidate.",
+          "entailment_prob": 0.998,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 19: entail=0.998, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_06",
+      "question": "What RPCs are used by the Raft leader to replicate log entries across followers?",
+      "answer": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "The Raft leader accepts client commands, appends them to its log, and sends AppendEntries RPCs to replicate entries across a quorum.",
+          "supported": false,
+          "best_window_index": 28,
+          "best_window": "However, Lamport clocks cannot distinguish between causally related events and concurrent events.",
+          "entailment_prob": 0.0129,
+          "contradiction_prob": 0.4397,
+          "reason": "Win 28: entail=0.013, contra=0.440"
+        }
+      ]
+    },
+    {
+      "id": "ci_07",
+      "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+      "answer": "Lamport clocks cannot distinguish between causally related events and concurrent events. Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 2,
+      "supported_items": 2,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "Lamport clocks cannot distinguish between causally related events and concurrent events.",
+          "supported": true,
+          "best_window_index": 12,
+          "best_window": "Lamport timestamps increment on local events and update to max(local, received) + 1 upon receiving messages. However, Lamport clocks cannot distinguish between causally related events and concurrent events.",
+          "entailment_prob": 0.9977,
+          "contradiction_prob": 0.0001,
+          "reason": "Win 12: entail=0.998, contra=0.000"
+        },
+        {
+          "sentence": "Vector clocks maintain a vector of integers where each entry represents the local clock of a specific node, and two events are concurrent if neither vector dominates the other.",
+          "supported": true,
+          "best_window_index": 14,
+          "best_window": "Vector clocks solve this limitation by maintaining a vector of integers, where each entry represents the local clock of a specific node. Two events are concurrent if neither vector dominates the other, enabling systems like Riak to detect conflicting updates.",
+          "entailment_prob": 0.9954,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 14: entail=0.995, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_08",
+      "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+      "answer": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+          "supported": true,
+          "best_window_index": 4,
+          "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+          "entailment_prob": 0.9948,
+          "contradiction_prob": 0.0005,
+          "reason": "Win 4: entail=0.995, contra=0.001"
+        }
+      ]
+    },
+    {
+      "id": "ci_09",
+      "question": "What are the three operational phases of Practical Byzantine Fault Tolerance (PBFT)?",
+      "answer": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "Practical Byzantine Fault Tolerance (PBFT) uses three phases: Pre-Prepare, Prepare, and Commit, relying on cryptographic signatures or message authentication codes.",
+          "supported": true,
+          "best_window_index": 19,
+          "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1. Miguel Castro and Barbara Liskov introduced Practical Byzantine Fault Tolerance (PBFT), which operates in an asynchronous network. PBFT uses three phases: Pre-Prepare, Prepare, and Commit, and relies on cryptographic signatures or message authentication codes (MACs).",
+          "entailment_prob": 0.9967,
+          "contradiction_prob": 0.0002,
+          "reason": "Win 19: entail=0.997, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_10",
+      "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+      "answer": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "A major limitation of Two-Phase Commit (2PC) is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+          "supported": true,
+          "best_window_index": 26,
+          "best_window": "In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT. A major limitation of 2PC is that it is a blocking protocol: if the coordinator crashes during Phase 2, participants remain blocked.",
+          "entailment_prob": 0.3772,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 26: entail=0.377, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_11",
+      "question": "What mathematical properties of the merge operator guarantee convergence in state-based CRDTs?",
+      "answer": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 1,
+      "faithfulness": 1.0,
+      "details": [
+        {
+          "sentence": "State-based CRDTs merge replicas using a join-semilattice where merge operations are associative, commutative, and idempotent, which mathematically guarantees convergence.",
+          "supported": true,
+          "best_window_index": 3,
+          "best_window": "State-based CRDTs propagate full state and merge replicas using a mathematically proven join-semilattice with a least upper bound operator. Because merge operations are associative, commutative, and idempotent, convergence is mathematically guaranteed regardless of message reordering.",
+          "entailment_prob": 0.9956,
+          "contradiction_prob": 0.0,
+          "reason": "Win 3: entail=0.996, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "ci_12",
+      "question": "What are common examples of conflict-free replicated data types such as PN-Counters and OR-Sets?",
+      "answer": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+      "is_negative_control": false,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Common examples of conflict-free replicated data types include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+          "supported": false,
+          "best_window_index": 24,
+          "best_window": "Because merge operations are associative, commutative, and idempotent, convergence is mathematically guaranteed regardless of message reordering. Examples include G-Counters (grow-only counters), PN-Counters (positive-negative counters), and Observed-Removed Sets (OR-Sets).",
+          "entailment_prob": 0.0103,
+          "contradiction_prob": 0.0014,
+          "reason": "Win 24: entail=0.010, contra=0.001"
+        }
+      ]
+    }
+  ],
+  "negative_control_results": [
+    {
+      "id": "neg_01",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "answer": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Paxos operates by deploying quantum entanglement teleportation relays across galactic networks, ensuring that relativistic wormholes synchronize subspace clocks.",
+          "supported": false,
+          "best_window_index": 0,
+          "best_window": "does the system trade off Latency (L) and Consistency (C)?",
+          "entailment_prob": 0.0045,
+          "contradiction_prob": 0.024,
+          "reason": "Win 0: entail=0.005, contra=0.024"
+        }
+      ]
+    },
+    {
+      "id": "neg_02",
+      "question": "What are the three states a node can occupy in the Raft consensus algorithm?",
+      "answer": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Raft consensus relies strictly on cellular mitochondria and ribosomal peptide synthesis where chloroplasts hydrolyze adenosine triphosphate to vote on amino acid sequencing.",
+          "supported": false,
+          "best_window_index": 41,
+          "best_window": "In Phase 1 (Prepare phase), the coordinator sends a PREPARE message to all participants, asking whether they can commit the transaction. Each participant checks local constraints, writes uncommitted changes to a write-ahead log (WAL), and votes either VOTE_COMMIT or VOTE_ABORT. In Phase 2 (Commit phase), if all participants vote VOTE_COMMIT, the coordinator broadcasts a GLOBAL_COMMIT; otherwise, it sends GLOBAL_ABORT.",
+          "entailment_prob": 0.0007,
+          "contradiction_prob": 0.6079,
+          "reason": "Win 41: entail=0.001, contra=0.608"
+        }
+      ]
+    },
+    {
+      "id": "neg_03",
+      "question": "Why can vector clocks detect concurrent events whereas Lamport timestamps cannot?",
+      "answer": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 1,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Vector clocks utilize pressurized pneumatic disc calipers with asbestos lining to compress train wheels under hydraulic steam leverage.",
+          "supported": false,
+          "best_window_index": 39,
+          "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1. Miguel Castro and Barbara Liskov introduced Practical Byzantine Fault Tolerance (PBFT), which operates in an asynchronous network. PBFT uses three phases: Pre-Prepare, Prepare, and Commit, and relies on cryptographic signatures or message authentication codes (MACs).",
+          "entailment_prob": 0.1387,
+          "contradiction_prob": 0.6667,
+          "reason": "Win 39: entail=0.139, contra=0.667"
+        }
+      ]
+    },
+    {
+      "id": "neg_04",
+      "question": "What is the primary operational weakness or limitation of the Two-Phase Commit (2PC) protocol?",
+      "answer": "Two-Phase Commit coordinates transactions across distributed nodes. The coordinator never blocks participants during crashes. Recovery is achieved through instantaneous autonomous rollback without waiting.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 3,
+      "supported_items": 1,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "Two-Phase Commit coordinates transactions across distributed nodes.",
+          "supported": true,
+          "best_window_index": 14,
+          "best_window": "Modern blockchain consensus mechanisms, such as Tendermint and PBFT-based state machine replication, build directly upon these foundations. Chapter 7: Distributed Transactions and Two-Phase Commit When an atomic transaction spans multiple autonomous storage nodes, distributed commit protocols ensure atomicity across all participants. The Two-Phase Commit (2PC) protocol coordinates transactions using a designated coordinator and participating resource managers.",
+          "entailment_prob": 0.994,
+          "contradiction_prob": 0.0006,
+          "reason": "Win 14: entail=0.994, contra=0.001"
+        },
+        {
+          "sentence": "The coordinator never blocks participants during crashes.",
+          "supported": false,
+          "best_window_index": 20,
+          "best_window": "Chapter 8: Eventual Consistency and CRDTs Eventual consistency is a weak consistency model where, in the absence of new updates, all replicas eventually converge to the same value.",
+          "entailment_prob": 0.0002,
+          "contradiction_prob": 0.0131,
+          "reason": "Win 20: entail=0.000, contra=0.013"
+        },
+        {
+          "sentence": "Recovery is achieved through instantaneous autonomous rollback without waiting.",
+          "supported": false,
+          "best_window_index": 21,
+          "best_window": "To resolve conflicting concurrent updates without coordination or consensus locks, Conflict-free Replicated Data Types (CRDTs) were introduced.",
+          "entailment_prob": 0.0003,
+          "contradiction_prob": 0.7867,
+          "reason": "Win 21: entail=0.000, contra=0.787"
+        }
+      ]
+    },
+    {
+      "id": "neg_05",
+      "question": "What are the two distinct phases of the basic Paxos consensus protocol?",
+      "answer": "Basic Paxos requires two consecutive rounds of message exchanges. Proposers broadcast promises directly to all replicas. Acceptors subsequently finalize decisions without counting majorities.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 3,
+      "supported_items": 1,
+      "faithfulness": 0.333,
+      "details": [
+        {
+          "sentence": "Basic Paxos requires two consecutive rounds of message exchanges.",
+          "supported": true,
+          "best_window_index": 12,
+          "best_window": "Basic Paxos operates in two distinct phases: Phase 1 (Prepare and Promise) and Phase 2 (Accept and Accepted). A proposer node sends a Prepare request with a unique ballot number to a majority quorum of acceptors.",
+          "entailment_prob": 0.988,
+          "contradiction_prob": 0.0006,
+          "reason": "Win 12: entail=0.988, contra=0.001"
+        },
+        {
+          "sentence": "Proposers broadcast promises directly to all replicas.",
+          "supported": false,
+          "best_window_index": 27,
+          "best_window": "The candidate increments its current term, votes for itself, and broadcasts RequestVote RPCs to all peers.",
+          "entailment_prob": 0.1352,
+          "contradiction_prob": 0.1015,
+          "reason": "Win 27: entail=0.135, contra=0.102"
+        },
+        {
+          "sentence": "Acceptors subsequently finalize decisions without counting majorities.",
+          "supported": false,
+          "best_window_index": 29,
+          "best_window": "roposals with lower ballot numbers, the proposer issues an Accept request. Multi-Paxos optimizes this protocol by electing a stable leader, amortizing the cost of Phase 1 across multiple log entries.",
+          "entailment_prob": 0.0006,
+          "contradiction_prob": 0.0004,
+          "reason": "Win 29: entail=0.001, contra=0.000"
+        }
+      ]
+    },
+    {
+      "id": "neg_06",
+      "question": "How many total nodes n are required in a Byzantine fault tolerant system to tolerate f faulty nodes?",
+      "answer": "Byzantine fault tolerance establishes consensus in adversarial environments. A total count of 2f + 1 nodes is sufficient to guarantee agreement. Traitors are isolated by simply halving the required quorum.",
+      "is_negative_control": true,
+      "unscorable": false,
+      "total_items": 3,
+      "supported_items": 0,
+      "faithfulness": 0.0,
+      "details": [
+        {
+          "sentence": "Byzantine fault tolerance establishes consensus in adversarial environments.",
+          "supported": false,
+          "best_window_index": 16,
+          "best_window": "Two events are concurrent if neither vector dominates the other, enabling systems like Riak to detect conflicting updates. Chapter 6: Byzantine Fault Tolerance Byzantine fault tolerance (BFT) addresses systems where faulty nodes may exhibit arbitrary behavior, including malicious attacks and lying. The Byzantine Generals Problem illustrates the challenge of reaching agreement among commanders who may be traitors.",
+          "entailment_prob": 0.0379,
+          "contradiction_prob": 0.0009,
+          "reason": "Win 16: entail=0.038, contra=0.001"
+        },
+        {
+          "sentence": "A total count of 2f + 1 nodes is sufficient to guarantee agreement.",
+          "supported": false,
+          "best_window_index": 4,
+          "best_window": "In a system with f Byzantine nodes, consensus is impossible unless the total number of nodes n satisfies n >= 3f + 1.",
+          "entailment_prob": 0.0025,
+          "contradiction_prob": 0.9926,
+          "reason": "Win 4: entail=0.002, contra=0.993"
+        },
+        {
+          "sentence": "Traitors are isolated by simply halving the required quorum.",
+          "supported": false,
+          "best_window_index": 35,
+          "best_window": "Unlike centralized systems, distributed systems face independent node failures, network partitions, and lack of a global clock. The fundamental model assumes message passing with arbitrary network delays and potential packet loss. System models can be synchronous, where bounds on processing and network delays are known, or asynchronous, where no timing assumptions hold.",
+          "entailment_prob": 0.0029,
+          "contradiction_prob": 0.0488,
+          "reason": "Win 35: entail=0.003, contra=0.049"
+        }
+      ]
+    }
+  ]
+}

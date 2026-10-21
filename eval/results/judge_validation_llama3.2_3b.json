@@ -1,0 +1,25 @@
+{
+  "judge_type": "llm",
+  "judge_model": "llama3.2:3b",
+  "passed": false,
+  "status": "JUDGE NOT TRUSTWORTHY",
+  "mean_reference_faithfulness": 0.917,
+  "mean_negative_control_faithfulness": 0.222,
+  "max_negative_control_faithfulness": 1.0,
+  "unscorable_references_count": 4,
+  "unscorable_references": [
+    "ci_03",
+    "ci_04",
+    "ci_06",
+    "ci_08"
+  ],
+  "failed_negative_controls": [
+    {
+      "id": "neg_06",
+      "faithfulness": 1.0,
+      "claims": "2/2 entailed",
+      "note": "subtly wrong answer scored 2/2 entailed"
+    }
+  ],
+  "note": "Recorded from a manual run on 2026-10-19. 4 of 12 reference answers (ci_03, ci_04, ci_06, ci_08) had zero extracted claims and were scored 1.00 by mistake due to the zero-claim bug. neg_06 was scored 2/2 entailed (1.000). Verdict: JUDGE NOT TRUSTWORTHY."
+}

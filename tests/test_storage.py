@@ -99,7 +99,7 @@ class TestDocumentStore(unittest.TestCase):
         self.assertIsNotNone(doc_id)
 
         # Check embedding file exists
-        embedding_file = os.path.join(self.embeddings_path, f"doc_{doc_id}_chunk_0.json")
+        embedding_file = os.path.join(self.embeddings_path, f"{doc_id}.npy")
         self.assertTrue(os.path.exists(embedding_file))
 
     def test_store_and_retrieve_with_page_bounds(self):
@@ -188,6 +188,113 @@ class TestDocumentStore(unittest.TestCase):
         self.assertIn("page", cols)
         self.assertIn("page_start", cols)
         self.assertIn("page_end", cols)
+
+
+class TestNumPyVectorStoreAndMigration(unittest.TestCase):
+    """Test NumPyVectorStore npy format, migration script, and caching."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.temp_dir, "test.db")
+        self.embeddings_path = os.path.join(self.temp_dir, "embeddings")
+        os.makedirs(self.embeddings_path, exist_ok=True)
+        from src.storage.database import Database
+        from src.storage.vector_store import NumPyVectorStore
+
+        self.db = Database(self.db_path)
+        self.vs = NumPyVectorStore(self.db_path, self.embeddings_path, db=self.db)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_numpy_vector_store_npy_format_and_load_once(self):
+        """Test that NumPyVectorStore stores float32 .npy files and loads embeddings correctly."""
+        import numpy as np
+
+        chunks = [
+            {"chunk_index": 0, "content": "Chunk 0", "char_count": 7, "filename": "test.pdf"},
+            {"chunk_index": 1, "content": "Chunk 1", "char_count": 7, "filename": "test.pdf"},
+        ]
+        embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
+        self.vs.add(chunks, embeddings, user_id=1)
+
+        doc_id = chunks[0]["document_id"]
+        npy_path = os.path.join(self.embeddings_path, f"{doc_id}.npy")
+        self.assertTrue(os.path.exists(npy_path))
+
+        arr = np.load(npy_path)
+        self.assertEqual(arr.dtype, np.float32)
+        self.assertEqual(arr.shape, (2, 3))
+
+        loaded = self.vs.get_user_chunks_with_embeddings(user_id=1)
+        self.assertEqual(len(loaded), 2)
+        self.assertAlmostEqual(loaded[0]["embedding"][0], 0.1, places=5)
+        self.assertAlmostEqual(loaded[1]["embedding"][0], 0.4, places=5)
+
+    def test_migrate_embeddings_script_idempotent(self):
+        """Test scripts/migrate_embeddings.py idempotently converts JSON to .npy."""
+        import json
+
+        import numpy as np
+
+        from scripts.migrate_embeddings import migrate_embeddings
+
+        # Create mock legacy JSON files for doc 42
+        for i, emb in enumerate([[1.0, 2.0], [3.0, 4.0]]):
+            fn = os.path.join(self.embeddings_path, f"doc_42_chunk_{i}.json")
+            with open(fn, "w") as f:
+                json.dump({"embedding": emb}, f)
+
+        migrated = migrate_embeddings(self.embeddings_path)
+        self.assertEqual(migrated, 1)
+
+        npy_path = os.path.join(self.embeddings_path, "42.npy")
+        self.assertTrue(os.path.exists(npy_path))
+        arr = np.load(npy_path)
+        self.assertEqual(arr.shape, (2, 2))
+
+        # Second run should skip (idempotent)
+        second_run = migrate_embeddings(self.embeddings_path)
+        self.assertEqual(second_run, 0)
+
+    def test_bm25_cache_and_invalidation(self):
+        """Test HybridRetriever BM25 caching per (user_id, corpus fingerprint) and invalidation."""
+        from src.rag.hybrid import HybridRetriever
+
+        retriever = HybridRetriever()
+
+        chunks = [
+            {"document_id": 1, "chunk_index": 0, "content": "alpha beta gamma", "user_id": 99},
+            {"document_id": 1, "chunk_index": 1, "content": "delta epsilon zeta", "user_id": 99},
+        ]
+        retriever.index_corpus(chunks, user_id=99)
+        self.assertIsNotNone(retriever.bm25)
+        first_bm25 = retriever.bm25
+
+        # Re-index same corpus -> cache hit, same instance
+        retriever.index_corpus(chunks, user_id=99)
+        self.assertIs(retriever.bm25, first_bm25)
+
+        # Invalidate cache for user
+        retriever.invalidate_cache(user_id=99)
+        self.assertEqual(len(retriever._bm25_cache), 0)
+
+    def test_cross_encoder_models_cached_by_name(self):
+        """Test CrossEncoderReranker caches models keyed by model_name."""
+        from unittest.mock import Mock, patch
+
+        from src.rag.reranker import CrossEncoderReranker
+
+        with patch("sentence_transformers.CrossEncoder") as mock_ce:
+            mock_ce.side_effect = lambda name, device: Mock(name=name)
+            m1 = CrossEncoderReranker._get_model("test-model-1")
+            m2 = CrossEncoderReranker._get_model("test-model-2")
+            m1_again = CrossEncoderReranker._get_model("test-model-1")
+
+            self.assertIn("test-model-1", CrossEncoderReranker._models)
+            self.assertIn("test-model-2", CrossEncoderReranker._models)
+            self.assertIs(m1, m1_again)
+            self.assertIsNot(m1, m2)
 
 
 if __name__ == "__main__":

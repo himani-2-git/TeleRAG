@@ -26,6 +26,11 @@ class DocumentRetriever:
         self.retrieval_mode = retrieval_mode
         self._hybrid_retriever = None
 
+    def invalidate_cache(self, user_id: int | None = None) -> None:
+        """Invalidate cached retrieval structures."""
+        if self._hybrid_retriever is not None:
+            self._hybrid_retriever.invalidate_cache(user_id)
+
     def retrieve(
         self, query: str, query_embedding: list[float], chunks: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:

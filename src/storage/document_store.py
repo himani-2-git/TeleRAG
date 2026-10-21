@@ -6,6 +6,8 @@ import logging
 import os
 from typing import Any
 
+import numpy as np
+
 from .database import Database
 from .vector_store import ChromaVectorStore, NumPyVectorStore, VectorStore, get_vector_store
 
@@ -136,11 +138,10 @@ class DocumentStore:
             user_id, filename, file_hash, file_size, chunks_data, source_type=source_type
         )
 
-        # Store embeddings in files
-        for i, embedding in enumerate(embeddings):
-            embedding_path = self._get_embedding_path(document_id, i)
-            with open(embedding_path, "w") as f:
-                json.dump({"embedding": embedding}, f)
+        # Store embeddings in single .npy file per document (float32)
+        if embeddings:
+            npy_path = os.path.join(self.embeddings_path, f"{document_id}.npy")
+            np.save(npy_path, np.array(embeddings, dtype=np.float32))
 
         # Also sync to vector store
         for c in chunks_data:
@@ -192,13 +193,23 @@ class DocumentStore:
         document_id = doc_to_delete["id"]
         chunk_count = doc_to_delete["chunk_count"]
 
+        for p in (
+            os.path.join(self.embeddings_path, f"{document_id}.npy"),
+            os.path.join(self.embeddings_path, f"doc_{document_id}.npy"),
+        ):
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception as e:
+                    logger.warning(f"Failed to delete embedding file: {e}")
+
         for i in range(chunk_count):
             embedding_path = self._get_embedding_path(document_id, i)
             if os.path.exists(embedding_path):
                 try:
                     os.remove(embedding_path)
                 except Exception as e:
-                    logger.warning(f"Failed to delete embedding file: {e}")
+                    logger.warning(f"Failed to delete legacy embedding file: {e}")
 
         # Delete from vector store
         try:
@@ -226,13 +237,23 @@ class DocumentStore:
             document_id = doc["id"]
             chunk_count = doc["chunk_count"]
 
+            for p in (
+                os.path.join(self.embeddings_path, f"{document_id}.npy"),
+                os.path.join(self.embeddings_path, f"doc_{document_id}.npy"),
+            ):
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except Exception as e:
+                        logger.warning(f"Failed to delete embedding file: {e}")
+
             for i in range(chunk_count):
                 embedding_path = self._get_embedding_path(document_id, i)
                 if os.path.exists(embedding_path):
                     try:
                         os.remove(embedding_path)
                     except Exception as e:
-                        logger.warning(f"Failed to delete embedding file: {e}")
+                        logger.warning(f"Failed to delete legacy embedding file: {e}")
 
             try:
                 self.vector_store.delete(document_id, user_id)
@@ -261,19 +282,43 @@ class DocumentStore:
 
         chunks = self.db.get_all_user_chunks(user_id)
 
-        # Load embeddings
+        # Load embeddings per document once
+        doc_embeddings: dict[int, np.ndarray | None] = {}
         for chunk in chunks:
-            embedding_path = self._get_embedding_path(chunk["document_id"], chunk["chunk_index"])
+            doc_id = chunk["document_id"]
+            if doc_id not in doc_embeddings:
+                npy_path = os.path.join(self.embeddings_path, f"{doc_id}.npy")
+                alt_path = os.path.join(self.embeddings_path, f"doc_{doc_id}.npy")
+                if os.path.exists(npy_path):
+                    try:
+                        doc_embeddings[doc_id] = np.load(npy_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to load embeddings from {npy_path}: {e}")
+                        doc_embeddings[doc_id] = None
+                elif os.path.exists(alt_path):
+                    try:
+                        doc_embeddings[doc_id] = np.load(alt_path)
+                    except Exception as e:
+                        logger.warning(f"Failed to load embeddings from {alt_path}: {e}")
+                        doc_embeddings[doc_id] = None
+                else:
+                    doc_embeddings[doc_id] = None
 
-            if os.path.exists(embedding_path):
-                try:
-                    with open(embedding_path) as f:
-                        data = json.load(f)
-                        chunk["embedding"] = data["embedding"]
-                except Exception as e:
-                    logger.warning(f"Failed to load embedding: {e}")
-                    chunk["embedding"] = None
+            emb_arr = doc_embeddings[doc_id]
+            idx = chunk["chunk_index"]
+            if emb_arr is not None and idx < len(emb_arr):
+                chunk["embedding"] = emb_arr[idx].tolist()
             else:
-                chunk["embedding"] = None
+                embedding_path = self._get_embedding_path(doc_id, idx)
+                if os.path.exists(embedding_path):
+                    try:
+                        with open(embedding_path) as f:
+                            data = json.load(f)
+                            chunk["embedding"] = data["embedding"]
+                    except Exception as e:
+                        logger.warning(f"Failed to load legacy embedding: {e}")
+                        chunk["embedding"] = None
+                else:
+                    chunk["embedding"] = None
 
         return chunks

@@ -9,47 +9,26 @@ logger = logging.getLogger(__name__)
 class CrossEncoderReranker:
     """Reranks candidate chunks using a pretrained cross-encoder model."""
 
-    _model = None
+    _models: dict[str, Any] = {}
 
     def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
-        """Initialize reranker.
-
-        Args:
-            model_name: HuggingFace model identifier for cross-encoder.
-        """
+        """Initialize reranker with model identifier."""
         self.model_name = model_name
 
     @classmethod
     def _get_model(cls, model_name: str):
-        """Lazy load and cache cross-encoder model on CPU.
-
-        Args:
-            model_name: Model identifier.
-
-        Returns:
-            CrossEncoder instance.
-        """
-        if cls._model is None:
+        """Lazy load and cache cross-encoder model keyed by model_name."""
+        if model_name not in cls._models:
             logger.info("Loading CrossEncoder model '%s' on CPU", model_name)
             from sentence_transformers import CrossEncoder
 
-            cls._model = CrossEncoder(model_name, device="cpu")
-        return cls._model
+            cls._models[model_name] = CrossEncoder(model_name, device="cpu")
+        return cls._models[model_name]
 
     def rerank(
         self, query: str, candidates: list[dict[str, Any]], top_k: int = 5
     ) -> list[dict[str, Any]]:
-        """Rerank candidate chunks against the query using cross-encoder scoring.
-
-        Args:
-            query: Query string.
-            candidates: List of candidate chunk dictionaries containing 'content'.
-            top_k: Number of top reranked chunks to return.
-
-        Returns:
-            List of reranked chunk dictionaries with 'rerank_score' added,
-            sorted by score descending.
-        """
+        """Rerank candidate chunks against the query using cross-encoder scoring."""
         if not candidates:
             return []
 

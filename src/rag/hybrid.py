@@ -1,5 +1,6 @@
 """Hybrid retrieval module combining dense semantic search and BM25 via Reciprocal Rank Fusion."""
 
+import hashlib
 import logging
 import re
 from collections import defaultdict
@@ -12,14 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def tokenize_text(text: str) -> list[str]:
-    """Tokenize text into lowercase alphanumeric words.
-
-    Args:
-        text: Input string.
-
-    Returns:
-        List of lowercase tokens.
-    """
+    """Tokenize text into lowercase alphanumeric words."""
     return re.findall(r"\w+", text.lower())
 
 
@@ -27,55 +21,82 @@ class HybridRetriever:
     """Combines dense semantic retrieval and sparse BM25 via Reciprocal Rank Fusion (RRF)."""
 
     def __init__(self, top_k: int = 5, similarity_threshold: float = 0.3, rrf_k: int = 60):
-        """Initialize hybrid retriever.
-
-        Args:
-            top_k: Number of final fused candidates to return.
-            similarity_threshold: Strict dense cosine threshold gatekeeper.
-            rrf_k: Constant denominator offset for RRF (default 60).
-        """
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.rrf_k = rrf_k
         self.bm25: BM25Okapi | None = None
         self.chunks: list[dict[str, Any]] = []
         self._corpus_tokenized: list[list[str]] = []
+        self._bm25_cache: dict[
+            tuple[Any, str], tuple[BM25Okapi, list[dict[str, Any]], list[list[str]]]
+        ] = {}
 
-    def index_corpus(self, chunks: list[dict[str, Any]]) -> None:
-        """Build BM25 index over the chunk collection.
+    def _compute_corpus_fingerprint(self, chunks: list[dict[str, Any]]) -> str:
+        """Compute deterministic hash of chunks corpus."""
+        parts = [
+            f"{c.get('document_id', c.get('doc_id', ''))}:{c.get('chunk_index', '')}:{len(c.get('content', ''))}"
+            for c in chunks
+        ]
+        return hashlib.sha256("|".join(parts).encode()).hexdigest()
 
-        Args:
-            chunks: List of chunk dictionaries containing 'content'.
-        """
+    def invalidate_cache(self, user_id: int | None = None) -> None:
+        """Invalidate cached BM25 index for a specific user or globally."""
+        if user_id is None:
+            self._bm25_cache.clear()
+            self.bm25 = None
+            self.chunks = []
+            self._corpus_tokenized = []
+        else:
+            to_del = [k for k in self._bm25_cache if k[0] == user_id]
+            for k in to_del:
+                del self._bm25_cache[k]
+            if self.chunks and self.chunks[0].get("user_id") == user_id:
+                self.bm25 = None
+                self.chunks = []
+                self._corpus_tokenized = []
+
+    def index_corpus(self, chunks: list[dict[str, Any]], user_id: int | None = None) -> None:
+        """Build BM25 index over the chunk collection, using cache when available."""
         self.chunks = list(chunks)
+        if not self.chunks:
+            self.bm25 = None
+            self._corpus_tokenized = []
+            return
+
+        uid = user_id if user_id is not None else self.chunks[0].get("user_id")
+        fingerprint = self._compute_corpus_fingerprint(self.chunks)
+        cache_key = (uid, fingerprint)
+
+        if cache_key in self._bm25_cache:
+            cached_bm25, cached_chunks, cached_tokenized = self._bm25_cache[cache_key]
+            self.bm25 = cached_bm25
+            self.chunks = cached_chunks
+            self._corpus_tokenized = cached_tokenized
+            logger.debug("Reused cached BM25 index for user %s", uid)
+            return
+
         self._corpus_tokenized = [tokenize_text(c.get("content", "")) for c in self.chunks]
         if self._corpus_tokenized:
             self.bm25 = BM25Okapi(self._corpus_tokenized)
+            self._bm25_cache[cache_key] = (self.bm25, self.chunks, self._corpus_tokenized)
             logger.info("Indexed %d chunks into BM25 corpus", len(self.chunks))
         else:
             self.bm25 = None
 
     def search(
-        self, query: str, query_embedding: list[float], chunks: list[dict[str, Any]] | None = None
+        self,
+        query: str,
+        query_embedding: list[float],
+        chunks: list[dict[str, Any]] | None = None,
+        user_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform hybrid retrieval using dense similarity and BM25 fused via RRF.
-
-        STRICT ABSTENTION INVARIANT:
-        If the maximum dense cosine similarity across all valid chunks is below
-        `similarity_threshold`, this method immediately returns an empty list `[]`
-        and performs no BM25 fusion or candidate promotion.
-
-        Args:
-            query: Natural language query string for lexical BM25 search.
-            query_embedding: Dense embedding vector for semantic search.
-            chunks: Optional collection of chunks. If provided and different from indexed corpus,
-                   the corpus will be re-indexed.
-
-        Returns:
-            Ranked list of top-k fused chunk dictionaries with RRF scores.
-        """
-        if chunks is not None and (self.bm25 is None or len(chunks) != len(self.chunks)):
-            self.index_corpus(chunks)
+        """Perform hybrid retrieval using dense similarity and BM25 fused via RRF."""
+        if chunks is not None:
+            uid = user_id if user_id is not None else (chunks[0].get("user_id") if chunks else None)
+            fp = self._compute_corpus_fingerprint(chunks)
+            cache_key = (uid, fp)
+            if self.bm25 is None or cache_key not in self._bm25_cache:
+                self.index_corpus(chunks, user_id=uid)
 
         target_chunks = self.chunks
         if not target_chunks:
@@ -131,7 +152,6 @@ class HybridRetriever:
             bm25_candidates.sort(key=lambda x: x[1], reverse=True)
 
         # 3. Reciprocal Rank Fusion (RRF)
-        # RRF score = sum(1 / (k + rank))
         rrf_scores: dict[int, float] = defaultdict(float)
         dense_ranks: dict[int, int] = {}
         bm25_ranks: dict[int, int] = {}
@@ -148,7 +168,6 @@ class HybridRetriever:
             bm25_ranks[idx] = rank
             bm25_scores_map[idx] = score
 
-        # Sort fused candidates by RRF score descending
         fused_indices = sorted(rrf_scores.keys(), key=lambda idx: rrf_scores[idx], reverse=True)
 
         results: list[dict[str, Any]] = []
@@ -159,7 +178,6 @@ class HybridRetriever:
             chunk_copy["bm25_score"] = round(bm25_scores_map.get(idx, 0.0), 4)
             chunk_copy["dense_rank"] = dense_ranks.get(idx)
             chunk_copy["bm25_rank"] = bm25_ranks.get(idx)
-            # Ensure similarity_score is preserved for downstream components
             chunk_copy["similarity_score"] = chunk_copy["dense_score"]
             results.append(chunk_copy)
 

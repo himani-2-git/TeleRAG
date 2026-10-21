@@ -1,6 +1,6 @@
 # TeleRAG
 
-A lightweight Telegram bot for grounded question answering over PDF documents, running on local embeddings without external vector databases.
+A lightweight Telegram bot for grounded question answering over PDFs, markdown, text files and static web pages, running on local embeddings with no external vector database required by default (Chroma is optional).
 
 **Project status**: v1.1.0: versioned prompts, grounding gate, faithfulness evaluation (experimental, unvalidated judge), markdown/text/web ingestion, optional Chroma and LangGraph
 
@@ -437,7 +437,7 @@ To evaluate passage granularity, a chunk-size ablation study was run using `eval
 | **1000 (Default)** | 200 | 10 | 824.4 | 173.1 | 0.0% | 1.0000 | 1.0000 | 0.7500 | 0.4861 |
 | **1500** | 300 | 7 | 1178.3 | 243.7 | 71.43% | 1.0000 | 1.0000 | 0.6667 | 0.6042 |
 
-The test fixture is small (8 pages, 12 test questions) and both 500 and 1000 characters scored the same on span Hit@2 (1.0000) and span MRR (1.0000), so the ablation does not show that 1000 "wins". The only clear finding is that 1500 characters exceeds the embedder's 256-token window and is partly truncated (71.43% of chunks exceed 256 tokens). Chunk size 1000 is kept as the default because it fits within the embedding model's context window (0.0% exceeding 256 tokens) and produces fewer chunks than 500 (10 chunks vs. 19 chunks), not because it scored better on retrieval metrics.
+The test fixture is small (8 pages, 12 answerable test questions) and both 500 and 1000 characters scored the same on span Hit@2 (1.0000) and span MRR (1.0000), so the ablation does not show that 1000 "wins". On the strict start-page metrics (single-page containment, relevant to page-level citations), 500 characters scored higher than 1000 (Hit@2 1.0000 vs 0.7500, MRR 0.9583 vs 0.4861), but 1000 was kept as the default because the fixture is small, the span metrics tie, and 500 doubles the chunk count (19 chunks vs 10 chunks); the strict result should be re-checked on a larger set before changing the default. The only clear finding is that 1500 characters exceeds the embedder's 256-token window and is partly truncated (71.43% of chunks exceed 256 tokens). Chunk size 1000 is kept as the default because it fits within the embedding model's context window (0.0% exceeding 256 tokens) and produces fewer chunks than 500 (10 chunks vs. 19 chunks), not because it scored better on retrieval metrics.
 
 ---
 

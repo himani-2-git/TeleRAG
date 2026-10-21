@@ -27,6 +27,7 @@ class Config:
     top_k_results: int = 2
     similarity_threshold: float = 0.3
     retrieval_mode: str = "hybrid"
+    orchestrator: str = "plain"
     
     # LLM Settings (Ollama default, configurable to hosted providers)
     llm_model: str = "qwen2.5:3b"
@@ -77,6 +78,7 @@ def get_config(require_telegram: bool = True) -> Config:
         top_k_results=int(os.getenv("TOP_K_RESULTS", "2")),
         similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
         retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
+        orchestrator=os.getenv("ORCHESTRATOR", "plain").lower(),
         llm_model=llm_model,
         llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),

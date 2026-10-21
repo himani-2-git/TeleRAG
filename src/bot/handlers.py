@@ -622,44 +622,8 @@ class BotHandlers:
 
     def _format_source_footer(self, chunks: List[Dict[str, Any]]) -> str:
         """Format verified sources footer from retrieved chunks."""
-        if not chunks:
-            return ""
-        
-        sources = []
-        seen = set()
-        for chunk in chunks:
-            filename = chunk.get("filename", "document.pdf")
-            source_type = chunk.get("source_type", "pdf")
-            section_label = chunk.get("section_label")
-            p_start = chunk.get("page_start")
-            p_end = chunk.get("page_end")
-            page = chunk.get("page")
-            
-            if source_type == "web":
-                entry = section_label if section_label else filename
-            elif source_type == "markdown" and section_label:
-                entry = f"{filename} ({section_label})"
-            elif p_start is not None and p_end is not None:
-                page_str = f"p. {p_start}" if p_start == p_end else f"p. {p_start}-{p_end}"
-                entry = f"{filename} ({page_str})"
-            elif page is not None:
-                entry = f"{filename} (p. {page})"
-            elif section_label:
-                entry = f"{filename} ({section_label})"
-            elif source_type == "text":
-                entry = f"{filename}"
-            else:
-                entry = f"{filename} (p. 1)"
-                
-            if entry not in seen:
-                seen.add(entry)
-                sources.append(entry)
-                
-        if not sources:
-            return ""
-            
-        footer_lines = ["\n\nSources:"] + [f"• {s}" for s in sources]
-        return "\n".join(footer_lines)
+        from ..rag.pipeline import format_source_footer
+        return format_source_footer(chunks)
 
     def _is_url(self, text: str) -> bool:
         """Check if text contains a URL.

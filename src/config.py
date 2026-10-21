@@ -40,9 +40,11 @@ class Config:
     grounding_enforce: bool = False
     grounding_min_coverage: float = 0.5
     
-    # Database
+    # Database & Vector Store
     database_path: str = "data/documents.db"
     embeddings_path: str = "data/embeddings"
+    vector_backend: str = "numpy"
+    chroma_path: str = "data/chroma"
     
     # Logging
     log_level: str = "INFO"
@@ -85,6 +87,8 @@ def get_config(require_telegram: bool = True) -> Config:
         grounding_min_coverage=float(os.getenv("GROUNDING_MIN_COVERAGE", "0.5")),
         database_path=os.getenv("DATABASE_PATH", "data/documents.db"),
         embeddings_path=os.getenv("EMBEDDINGS_PATH", "data/embeddings"),
+        vector_backend=os.getenv("VECTOR_BACKEND", "numpy").lower(),
+        chroma_path=os.getenv("CHROMA_PATH", "data/chroma"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         log_file=os.getenv("LOG_FILE", "logs/bot.log")
     )

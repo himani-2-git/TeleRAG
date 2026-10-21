@@ -58,8 +58,12 @@ def main():
         pdf_processor = PDFProcessor(max_file_size_mb=config.max_file_size_mb)
         text_chunker = TextChunker(chunk_size=config.chunk_size, 
                                    overlap=config.chunk_overlap)
-        document_store = DocumentStore(db_path=config.database_path,
-                                      embeddings_path=config.embeddings_path)
+        document_store = DocumentStore(
+            db_path=config.database_path,
+            embeddings_path=config.embeddings_path,
+            vector_backend=config.vector_backend,
+            chroma_path=config.chroma_path
+        )
         embedding_generator = EmbeddingGenerator(model_name=config.embedding_model)
         retriever = DocumentRetriever(top_k=config.top_k_results,
                                      similarity_threshold=config.similarity_threshold,

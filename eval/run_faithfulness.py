@@ -30,6 +30,7 @@ from eval.report import (
     print_faithfulness_summary_table,
     print_threshold_calibration_table,
     print_validation_set_summary,
+    rate,
 )
 from eval.run_eval import extract_chunks_with_pages
 from src.config import get_config
@@ -665,7 +666,8 @@ def validate_judge(
                 else:
                     t_ref_scores.append(score)
 
-            m_ref = sum(t_ref_scores) / len(t_ref_scores) if t_ref_scores else 0.0
+            m_ref_val = rate(sum(t_ref_scores), len(t_ref_scores))
+            m_ref = m_ref_val if m_ref_val is not None else 0.0
             m_neg = max(t_neg_scores) if t_neg_scores else 0.0
             p_ok = (m_ref >= 0.80) and (m_neg <= 0.50) and (t_unscorable_ref == 0)
             margin = min(m_ref - 0.80, 0.50 - m_neg)
@@ -726,23 +728,28 @@ def validate_judge(
         unscorable_neg_cnt = sum(1 for r in negs if r.get("unscorable"))
         ref_sc = [r["faithfulness"] for r in scorable_ref]
         neg_sc = [r["faithfulness"] for r in scorable_neg]
-        m_ref = sum(ref_sc) / len(ref_sc) if ref_sc else 0.0
-        m_neg = sum(neg_sc) / len(neg_sc) if neg_sc else 0.0
-        max_neg = max(neg_sc) if neg_sc else 0.0
-        p_ok = (m_ref >= 0.80) and all(s <= 0.50 for s in neg_sc) and (unscorable_ref_cnt == 0)
+        m_ref = rate(sum(ref_sc), len(ref_sc))
+        m_neg = rate(sum(neg_sc), len(neg_sc))
+        max_neg = max(neg_sc) if neg_sc else None
+        p_ok = (
+            (m_ref is not None and m_ref >= 0.80)
+            and (all(s <= 0.50 for s in neg_sc) if neg_sc else True)
+            and (unscorable_ref_cnt == 0)
+        )
 
         # Explicit judge error rates
         ref_accept_cnt = sum(1 for r in scorable_ref if r["faithfulness"] >= 0.80)
-        ref_accept_rate = round(ref_accept_cnt / len(scorable_ref), 3) if scorable_ref else 0.0
+        raw_ref_rate = rate(ref_accept_cnt, len(scorable_ref))
+        ref_accept_rate = round(raw_ref_rate, 3) if raw_ref_rate is not None else None
 
         neg_false_accept_cnt = sum(1 for r in scorable_neg if r["faithfulness"] > 0.50)
-        neg_false_accept_rate = (
-            round(neg_false_accept_cnt / len(scorable_neg), 3) if scorable_neg else 0.0
-        )
+        raw_neg_fa_rate = rate(neg_false_accept_cnt, len(scorable_neg))
+        neg_false_accept_rate = round(raw_neg_fa_rate, 3) if raw_neg_fa_rate is not None else None
 
         neg_fully_accepted_cnt = sum(1 for r in scorable_neg if r["faithfulness"] >= 1.0 - 1e-6)
+        raw_neg_full_rate = rate(neg_fully_accepted_cnt, len(scorable_neg))
         neg_fully_accepted_rate = (
-            round(neg_fully_accepted_cnt / len(scorable_neg), 3) if scorable_neg else 0.0
+            round(raw_neg_full_rate, 3) if raw_neg_full_rate is not None else None
         )
 
         print_validation_set_summary(
@@ -768,12 +775,18 @@ def validate_judge(
 
         return {
             "passed": p_ok,
-            "mean_reference_faithfulness": round(m_ref, 3),
-            "mean_negative_control_faithfulness": round(m_neg, 3),
-            "max_negative_control_faithfulness": round(max_neg, 3),
-            "reference_accept_rate": ref_accept_rate,
-            "negative_control_false_accept_rate": neg_false_accept_rate,
-            "negative_control_fully_accepted_rate": neg_fully_accepted_rate,
+            "mean_reference_faithfulness": round(m_ref, 3) if m_ref is not None else "n/a",
+            "mean_negative_control_faithfulness": (round(m_neg, 3) if m_neg is not None else "n/a"),
+            "max_negative_control_faithfulness": (
+                round(max_neg, 3) if max_neg is not None else "n/a"
+            ),
+            "reference_accept_rate": ref_accept_rate if ref_accept_rate is not None else "n/a",
+            "negative_control_false_accept_rate": (
+                neg_false_accept_rate if neg_false_accept_rate is not None else "n/a"
+            ),
+            "negative_control_fully_accepted_rate": (
+                neg_fully_accepted_rate if neg_fully_accepted_rate is not None else "n/a"
+            ),
             "unscorable_references_count": unscorable_ref_cnt,
             "unscorable_negative_controls_count": unscorable_neg_cnt,
             "reference_scores": ref_sc,
@@ -1033,7 +1046,7 @@ def run_faithfulness_evaluation(
         f"PDF: {pdf_base} | Questions: {len(selected)} (sampled from {len(answerable)} answerable, seed={seed})"
     )
 
-    def _save_current_progress(mean_score: float | None = None):
+    def _save_current_progress(mean_score: float | str | None = None):
         existing_data = {}
         if os.path.exists(output_path):
             try:
@@ -1062,7 +1075,9 @@ def run_faithfulness_evaluation(
             "questions": results,
         }
         if mean_score is not None:
-            summary_payload["mean_faithfulness"] = round(mean_score, 3)
+            summary_payload["mean_faithfulness"] = (
+                round(mean_score, 3) if isinstance(mean_score, (int, float)) else str(mean_score)
+            )
 
         existing_data.update(summary_payload)
         with open(output_path, "w", encoding="utf-8") as f:
@@ -1200,7 +1215,7 @@ def run_faithfulness_evaluation(
         heldout_false_accept_rate=heldout_false_accept_rate,
     )
 
-    _save_current_progress(mean_score=mean_f)
+    _save_current_progress(mean_score=mean_f if mean_f is not None else "n/a")
 
     return {
         "cache_key": current_cache_key,
@@ -1217,7 +1232,7 @@ def run_faithfulness_evaluation(
         "n": n,
         "seed": seed,
         "sample_size": len(results),
-        "mean_faithfulness": round(mean_f, 3),
+        "mean_faithfulness": round(mean_f, 3) if mean_f is not None else "n/a",
         "unscorable_count": unscorable_count,
         "questions": results,
     }

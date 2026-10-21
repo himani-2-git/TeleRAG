@@ -548,7 +548,7 @@ class TestFaithfulness(unittest.TestCase):
                 gen_client=mock_gen,
             )
 
-            self.assertEqual(summary["mean_faithfulness"], 1.0)
+            self.assertEqual(summary["mean_faithfulness"], "n/a")
             q_id = list(summary["questions"].keys())[0]
             rec = summary["questions"][q_id]
             self.assertFalse(rec["applicable"])

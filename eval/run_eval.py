@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from pypdf import PdfReader
 
+from eval.report import rate
 from src.processors.pdf_processor import PDFProcessor
 from src.processors.text_chunker import TextChunker
 from src.rag.embeddings import EmbeddingGenerator
@@ -309,22 +310,21 @@ def run_evaluation(
                 }
             )
 
-    strict_h1 = (strict_hit1_count / answerable_count) if answerable_count > 0 else 0.0
-    strict_h5 = (strict_hit5_count / answerable_count) if answerable_count > 0 else 0.0
-    strict_mrr = (sum(strict_reciprocal_ranks) / answerable_count) if answerable_count > 0 else 0.0
+    def _format_rate(val: float | None, fmt: str = "%.4f") -> str:
+        return fmt % val if val is not None else "n/a"
 
-    span_h1 = (span_hit1_count / answerable_count) if answerable_count > 0 else 0.0
-    span_h5 = (span_hit5_count / answerable_count) if answerable_count > 0 else 0.0
-    span_mrr = (sum(span_reciprocal_ranks) / answerable_count) if answerable_count > 0 else 0.0
+    strict_h1 = rate(strict_hit1_count, answerable_count)
+    strict_h5 = rate(strict_hit5_count, answerable_count)
+    strict_mrr = rate(sum(strict_reciprocal_ranks), answerable_count)
 
-    abstention_acc = (abstention_correct / unanswerable_count) if unanswerable_count > 0 else 1.0
-    abstention_acc_easy = (
-        (abstention_easy_correct / unanswerable_easy_count) if unanswerable_easy_count > 0 else 1.0
-    )
-    abstention_acc_hard = (
-        (abstention_hard_correct / unanswerable_hard_count) if unanswerable_hard_count > 0 else 1.0
-    )
-    mean_latency_ms = (sum(latencies_ms) / len(latencies_ms)) if latencies_ms else 0.0
+    span_h1 = rate(span_hit1_count, answerable_count)
+    span_h5 = rate(span_hit5_count, answerable_count)
+    span_mrr = rate(sum(span_reciprocal_ranks), answerable_count)
+
+    abstention_acc = rate(abstention_correct, unanswerable_count)
+    abstention_acc_easy = rate(abstention_easy_correct, unanswerable_easy_count)
+    abstention_acc_hard = rate(abstention_hard_correct, unanswerable_hard_count)
+    mean_latency_ms = rate(sum(latencies_ms), len(latencies_ms))
 
     summary = {
         "mode": mode,
@@ -336,65 +336,72 @@ def run_evaluation(
         "unanswerable_easy_questions": unanswerable_easy_count,
         "unanswerable_hard_questions": unanswerable_hard_count,
         "strict": {
-            "hit_at_1": round(strict_h1, 4),
-            "hit_at_5": round(strict_h5, 4),
-            "mrr": round(strict_mrr, 4),
+            "hit_at_1": round(strict_h1, 4) if strict_h1 is not None else "n/a",
+            "hit_at_5": round(strict_h5, 4) if strict_h5 is not None else "n/a",
+            "mrr": round(strict_mrr, 4) if strict_mrr is not None else "n/a",
         },
         "span": {
-            "hit_at_1": round(span_h1, 4),
-            "hit_at_5": round(span_h5, 4),
-            "mrr": round(span_mrr, 4),
+            "hit_at_1": round(span_h1, 4) if span_h1 is not None else "n/a",
+            "hit_at_5": round(span_h5, 4) if span_h5 is not None else "n/a",
+            "mrr": round(span_mrr, 4) if span_mrr is not None else "n/a",
         },
-        "hit_at_1": round(span_h1, 4),
-        "hit_at_5": round(span_h5, 4),
-        "mrr": round(span_mrr, 4),
-        "abstention_accuracy": round(abstention_acc, 4),
-        "abstention_accuracy_easy": round(abstention_acc_easy, 4),
-        "abstention_accuracy_hard": round(abstention_acc_hard, 4),
-        "mean_retrieval_ms": round(mean_latency_ms, 2),
+        "hit_at_1": round(span_h1, 4) if span_h1 is not None else "n/a",
+        "hit_at_5": round(span_h5, 4) if span_h5 is not None else "n/a",
+        "mrr": round(span_mrr, 4) if span_mrr is not None else "n/a",
+        "abstention_accuracy": round(abstention_acc, 4) if abstention_acc is not None else "n/a",
+        "abstention_accuracy_easy": (
+            round(abstention_acc_easy, 4) if abstention_acc_easy is not None else "n/a"
+        ),
+        "abstention_accuracy_hard": (
+            round(abstention_acc_hard, 4) if abstention_acc_hard is not None else "n/a"
+        ),
+        "mean_retrieval_ms": (round(mean_latency_ms, 2) if mean_latency_ms is not None else "n/a"),
         "query_results": query_results,
     }
 
     logger.info("Evaluation Summary [%s]:", mode)
     logger.info(
-        "  [Span Metric]   hit@1: %.4f (%d/%d), hit@5: %.4f (%d/%d), MRR: %.4f",
-        summary["span"]["hit_at_1"],
+        "  [Span Metric]   hit@1: %s (%d/%d), hit@5: %s (%d/%d), MRR: %s",
+        _format_rate(span_h1),
         span_hit1_count,
         answerable_count,
-        summary["span"]["hit_at_5"],
+        _format_rate(span_h5),
         span_hit5_count,
         answerable_count,
-        summary["span"]["mrr"],
+        _format_rate(span_mrr),
     )
     logger.info(
-        "  [Strict Metric] hit@1: %.4f (%d/%d), hit@5: %.4f (%d/%d), MRR: %.4f",
-        summary["strict"]["hit_at_1"],
+        "  [Strict Metric] hit@1: %s (%d/%d), hit@5: %s (%d/%d), MRR: %s",
+        _format_rate(strict_h1),
         strict_hit1_count,
         answerable_count,
-        summary["strict"]["hit_at_5"],
+        _format_rate(strict_h5),
         strict_hit5_count,
         answerable_count,
-        summary["strict"]["mrr"],
+        _format_rate(strict_mrr),
     )
     logger.info(
-        "  Abstention Accuracy (all):  %.4f (%d/%d)",
-        summary["abstention_accuracy"],
+        "  Abstention Accuracy (all):  %s (%d/%d)",
+        _format_rate(abstention_acc),
         abstention_correct,
         unanswerable_count,
     )
     logger.info(
-        "  Abstention Accuracy (easy): %.4f (%d/%d)",
-        summary["abstention_accuracy_easy"],
+        "  Abstention Accuracy (easy): %s (%d/%d)",
+        _format_rate(abstention_acc_easy),
         abstention_easy_correct,
         unanswerable_easy_count,
     )
     logger.info(
-        "  Abstention Accuracy (hard): %.4f (%d/%d)",
-        summary["abstention_accuracy_hard"],
+        "  Abstention Accuracy (hard): %s (%d/%d)",
+        _format_rate(abstention_acc_hard),
         abstention_hard_correct,
         unanswerable_hard_count,
     )
-    logger.info("  Mean Latency:               %.2f ms/query", summary["mean_retrieval_ms"])
+    logger.info(
+        "  Mean Latency:               %s ms/query",
+        _format_rate(mean_latency_ms, fmt="%.2f"),
+    )
 
     if out_path:
         out_dir = os.path.dirname(out_path)
@@ -461,26 +468,29 @@ def main():
             th = json.load(f)
 
         failed = False
-        if "min_hit_at_5" in th and summary["hit_at_5"] < th["min_hit_at_5"]:
-            logger.error(
-                "Gate FAILED: hit@5 (%.4f) < min_hit_at_5 (%.4f)",
-                summary["hit_at_5"],
-                th["min_hit_at_5"],
-            )
-            failed = True
-        if "min_mrr" in th and summary["mrr"] < th["min_mrr"]:
-            logger.error("Gate FAILED: mrr (%.4f) < min_mrr (%.4f)", summary["mrr"], th["min_mrr"])
-            failed = True
-        if (
-            "min_abstention_easy" in th
-            and summary["abstention_accuracy_easy"] < th["min_abstention_easy"]
-        ):
-            logger.error(
-                "Gate FAILED: easy abstention (%.4f) < min_abstention_easy (%.4f)",
-                summary["abstention_accuracy_easy"],
-                th["min_abstention_easy"],
-            )
-            failed = True
+        if "min_hit_at_5" in th:
+            val = summary["hit_at_5"]
+            if val == "n/a" or (isinstance(val, (int, float)) and val < th["min_hit_at_5"]):
+                logger.error(
+                    "Gate FAILED: hit@5 (%s) < min_hit_at_5 (%.4f)",
+                    val,
+                    th["min_hit_at_5"],
+                )
+                failed = True
+        if "min_mrr" in th:
+            val = summary["mrr"]
+            if val == "n/a" or (isinstance(val, (int, float)) and val < th["min_mrr"]):
+                logger.error("Gate FAILED: mrr (%s) < min_mrr (%.4f)", val, th["min_mrr"])
+                failed = True
+        if "min_abstention_easy" in th:
+            val = summary["abstention_accuracy_easy"]
+            if val == "n/a" or (isinstance(val, (int, float)) and val < th["min_abstention_easy"]):
+                logger.error(
+                    "Gate FAILED: easy abstention (%s) < min_abstention_easy (%.4f)",
+                    val,
+                    th["min_abstention_easy"],
+                )
+                failed = True
 
         if failed:
             logger.error("Retrieval quality gate FAILED.")

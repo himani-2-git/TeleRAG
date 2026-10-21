@@ -3,6 +3,13 @@
 from typing import Any
 
 
+def rate(num: int | float, den: int | float) -> float | None:
+    """Calculate ratio num / den, returning None when den == 0."""
+    if den == 0:
+        return None
+    return num / den
+
+
 def print_threshold_calibration_table(calibration_sweep: list[dict[str, Any]]) -> float:
     """Print the calibration sweep table and determine the best threshold."""
     print("\n### Threshold Calibration Sweep (DEV Only)\n")
@@ -75,18 +82,27 @@ def print_validation_set_summary(
             f"| {r['id']} | NEG_CTRL | {r.get('supported_items', 0)} | {r.get('total_items', 0)} | {f_str} | {st} |"
         )
 
+    m_ref_str = f"{m_ref:.3f}" if m_ref is not None else "n/a"
+    m_neg_str = f"{m_neg:.3f}" if m_neg is not None else "n/a"
+    max_neg_str = f"{max_neg:.3f}" if max_neg is not None else "n/a"
+    ref_acc_str = f"{ref_accept_rate:.3f}" if ref_accept_rate is not None else "n/a"
+    neg_fa_str = f"{neg_false_accept_rate:.3f}" if neg_false_accept_rate is not None else "n/a"
+    neg_full_str = (
+        f"{neg_fully_accepted_rate:.3f}" if neg_fully_accepted_rate is not None else "n/a"
+    )
+
     print(f"\n{name} Metrics:")
-    print(f"  Mean Reference Faithfulness:         {m_ref:.3f} (Required >= 0.800)")
-    print(f"  Mean Negative Control Faithfulness:  {m_neg:.3f}")
-    print(f"  Max Negative Control Faithfulness:   {max_neg:.3f} (Required <= 0.500)")
+    print(f"  Mean Reference Faithfulness:         {m_ref_str} (Required >= 0.800)")
+    print(f"  Mean Negative Control Faithfulness:  {m_neg_str}")
+    print(f"  Max Negative Control Faithfulness:   {max_neg_str} (Required <= 0.500)")
     print(
-        f"  Reference Accept Rate:               {ref_accept_rate:.3f} ({ref_accept_cnt}/{scorable_ref_count})"
+        f"  Reference Accept Rate:               {ref_acc_str} ({ref_accept_cnt}/{scorable_ref_count})"
     )
     print(
-        f"  Negative Control False-Accept Rate:  {neg_false_accept_rate:.3f} ({neg_false_accept_cnt}/{scorable_neg_count})"
+        f"  Negative Control False-Accept Rate:  {neg_fa_str} ({neg_false_accept_cnt}/{scorable_neg_count})"
     )
     print(
-        f"  Negative Control Fully-Accepted Rate:{neg_fully_accepted_rate:.3f} ({neg_fully_accepted_cnt}/{scorable_neg_count})"
+        f"  Negative Control Fully-Accepted Rate:{neg_full_str} ({neg_fully_accepted_cnt}/{scorable_neg_count})"
     )
     print(f"  Unscorable References:               {unscorable_ref_cnt} (Required == 0)")
     print(f"  Unscorable Negative Controls:        {unscorable_neg_cnt}")
@@ -133,7 +149,7 @@ def print_faithfulness_summary_table(
     judge_val_verdict: str,
     heldout_accept_rate: float | None,
     heldout_false_accept_rate: float | None,
-) -> tuple[float, int]:
+) -> tuple[float | None, int]:
     """Print the final evaluation summary table and calculate mean faithfulness."""
     print("\n### Faithfulness Evaluation Summary Table\n")
     print(f"**Judge Model**: `{active_judge_name}`")
@@ -179,9 +195,10 @@ def print_faithfulness_summary_table(
             f"| {r['id']} | {q_excerpt} | {r.get('supported_items', 0)} | {r.get('total_items', 0)} | {f_str} | {status_str} |"
         )
 
-    mean_f = sum(applicable_scores) / len(applicable_scores) if applicable_scores else 1.0
+    mean_f = rate(sum(applicable_scores), len(applicable_scores))
+    mean_f_str = f"`{mean_f:.3f}`" if mean_f is not None else "`n/a`"
     print(
-        f"\n**Mean Answer Faithfulness**: `{mean_f:.3f}` across {len(applicable_scores)} applicable answers."
+        f"\n**Mean Answer Faithfulness**: {mean_f_str} across {len(applicable_scores)} applicable answers."
     )
     if unscorable_count > 0:
         print(f"**Unscorable Answers Excluded from Mean**: {unscorable_count}")

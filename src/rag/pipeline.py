@@ -5,7 +5,7 @@ import logging
 from typing import Any, TypedDict
 
 from .grounding import grounding_report
-from .llm_client import LLMClient
+from .llm_client import LLMClient, LLMUnavailableError
 from .prompts import PromptConfig, load_prompt_config
 from .retriever import DocumentRetriever
 
@@ -182,25 +182,22 @@ class RAGPipeline:
 
         try:
             raw_ans = self.llm_client.generate_answer(question, context_text)
-        except Exception as e:
-            # Handle unavailable LLM gracefully (Phase 3 adds specific LLMUnavailableError)
-            if type(e).__name__ == "LLMUnavailableError":
-                return {
-                    **state,
-                    "raw_answer": None,
-                    "answer": "❌ The model is currently unavailable. Please try again shortly.",
-                    "refused": True,
-                    "refusal_reason": "LLM_UNAVAILABLE",
-                }
-            raise
-
-        if raw_ans is None:
+        except LLMUnavailableError:
             return {
                 **state,
                 "raw_answer": None,
-                "answer": "I'm sorry, I couldn't generate a response at this time. Please try again.",
+                "answer": "❌ The model is currently unavailable. Please try again shortly.",
                 "refused": True,
-                "refusal_reason": "LLM_FAILURE",
+                "refusal_reason": "LLM_UNAVAILABLE",
+            }
+
+        if not raw_ans:
+            return {
+                **state,
+                "raw_answer": None,
+                "answer": "❌ The model is currently unavailable. Please try again shortly.",
+                "refused": True,
+                "refusal_reason": "LLM_UNAVAILABLE",
             }
 
         answer = self.llm_client.validate_response(raw_ans)

@@ -197,11 +197,10 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.mock_retriever.retrieve.return_value = chunks
         self.mock_retriever.format_context.return_value = "Formatted context"
 
-        # LLM generation fails (returns None)
-        self.mock_llm.generate_answer.return_value = None
-        self.mock_llm.validate_response.return_value = (
-            "I'm sorry, I couldn't generate a response at this time. Please try again."
-        )
+        # LLM generation fails (raises LLMUnavailableError)
+        from src.rag.llm_client import LLMUnavailableError
+
+        self.mock_llm.generate_answer.side_effect = LLMUnavailableError("Service down")
 
         mock_thinking_msg = Mock()
         mock_thinking_msg.delete = AsyncMock()
@@ -218,7 +217,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(update.message.reply_text.call_count, 2)
         self.assertEqual("Thinking...", update.message.reply_text.call_args_list[0][0][0])
         reply = update.message.reply_text.call_args_list[1][0][0]
-        self.assertIn("couldn't generate a response", reply)
+        self.assertIn("model is currently unavailable", reply)
         self.assertNotIn("Sources:", reply)
         self.assertNotIn("Answered in", reply)
         mock_thinking_msg.delete.assert_called_once()

@@ -71,11 +71,12 @@ def main():
             retrieval_mode=config.retrieval_mode,
         )
         llm_client = LLMClient(
-            api_key=config.llm_api_key,
+            api_key=config.llm_api_key or "",
             model=config.llm_model,
             max_retries=config.max_retries,
             retry_delay=config.retry_delay,
             base_url=config.llm_base_url,
+            timeout=(5.0, float(config.llm_timeout_seconds)),
             max_tokens=config.llm_max_tokens,
             prompt_config=prompt_config,
         )

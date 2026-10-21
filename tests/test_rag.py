@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from src.rag.embeddings import EmbeddingGenerator
-from src.rag.llm_client import LLMClient
+from src.rag.llm_client import LLMClient, LLMUnavailableError
 from src.rag.retriever import DocumentRetriever
 
 
@@ -141,10 +141,9 @@ class TestLLMClient(unittest.TestCase):
         self.assertEqual(validated, "Test response")
 
     def test_validate_none_response(self):
-        """Test validation of None response."""
+        """Test validation of None response returns empty string."""
         validated = self.client.validate_response(None)
-
-        self.assertIn("couldn't generate", validated)
+        self.assertEqual(validated, "")
 
     @patch("requests.post")
     def test_send_request_success(self, mock_post):
@@ -229,7 +228,7 @@ class TestLLMClient(unittest.TestCase):
         mock_post.assert_called_once()
         headers = mock_post.call_args[1]["headers"]
         self.assertNotIn("Authorization", headers)
-        self.assertEqual(mock_post.call_args[1]["timeout"], 300.0)
+        self.assertEqual(mock_post.call_args[1]["timeout"], (5.0, 120.0))
 
     @patch("requests.post")
     def test_rate_limit_429_retries_at_most_once(self, mock_post):
@@ -269,6 +268,58 @@ class TestLLMClient(unittest.TestCase):
         mock_post.assert_called_once()
         sent_payload = mock_post.call_args[1]["json"]
         self.assertEqual(sent_payload["max_tokens"], 250)
+
+    @patch("requests.post")
+    def test_generate_answer_failure_raises_llm_unavailable_error(self, mock_post):
+        """Test that failure across all retries raises LLMUnavailableError."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+
+        client = LLMClient(api_key="key", model="qwen", max_retries=3, retry_delay=0.01)
+        with patch("time.sleep"):
+            with self.assertRaises(LLMUnavailableError):
+                client.generate_answer("What is this?", "Some context")
+        self.assertEqual(mock_post.call_count, 3)
+
+    @patch("requests.post")
+    def test_exponential_backoff_delays(self, mock_post):
+        """Test that retries use exponential backoff delay * 2 ** attempt."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+
+        client = LLMClient(api_key="key", model="qwen", max_retries=3, retry_delay=1.5)
+        with patch("time.sleep") as mock_sleep:
+            client.send_request([{"role": "user", "content": "hi"}])
+        self.assertEqual(mock_sleep.call_count, 2)
+        mock_sleep.assert_has_calls([unittest.mock.call(1.5), unittest.mock.call(3.0)])
+
+    def test_refusal_path_produces_no_footer(self):
+        """Test that LLMUnavailableError handled by pipeline produces no Sources footer."""
+        from src.rag.pipeline import PlainOrchestrator, RAGPipeline
+        from src.rag.prompts import load_prompt_config
+
+        mock_retriever = Mock()
+        mock_retriever.retrieve.return_value = [{"content": "c", "filename": "doc.pdf", "page": 1}]
+        mock_retriever.format_context.return_value = "c"
+        mock_llm = Mock()
+        mock_llm.generate_answer.side_effect = LLMUnavailableError("Service down")
+
+        pipeline = RAGPipeline(
+            retriever=mock_retriever,
+            llm_client=mock_llm,
+            embedding_generator=Mock(),
+            prompt_config=load_prompt_config("v1"),
+        )
+        orch = PlainOrchestrator(pipeline)
+        result = orch.run("test question", 1, [{"content": "c", "filename": "doc.pdf", "page": 1}])
+        self.assertTrue(result["refused"])
+        self.assertEqual(result["refusal_reason"], "LLM_UNAVAILABLE")
+        self.assertNotIn("Sources:", result["final_response"])
+        self.assertIn("unavailable", result["final_response"].lower())
 
     def test_config_reads_llm_env_vars(self):
         """Test that get_config reads LLM_BASE_URL, LLM_MODEL, and LLM_API_KEY from environment."""

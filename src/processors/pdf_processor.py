@@ -4,6 +4,7 @@ import logging
 import re
 
 from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class PDFProcessor:
             with open(file_path, "rb") as f:
                 PdfReader(f)
             return True, None
-        except Exception as e:
+        except (OSError, PyPdfError, ValueError) as e:
             logger.error(f"PDF validation failed: {e}")
             return False, "Invalid PDF format or corrupted file"
 
@@ -68,18 +69,18 @@ class PDFProcessor:
                             cleaned_page_text = self.clean_text(raw_page_text)
                             if cleaned_page_text.strip():
                                 pages_data.append((page_num, cleaned_page_text))
-                    except Exception as e:
+                    except (PyPdfError, ValueError, TypeError, KeyError) as e:
                         logger.warning(f"Failed to extract text from page {page_num}: {e}")
                         continue
 
             if not pages_data:
-                raise Exception("No text content could be extracted from PDF")
+                raise ValueError("No text content could be extracted from PDF")
 
             return pages_data
 
-        except Exception as e:
+        except (OSError, PyPdfError, ValueError) as e:
             logger.error(f"Text extraction failed: {e}")
-            raise Exception(f"Failed to extract text from PDF: {str(e)}") from e
+            raise ValueError(f"Failed to extract text from PDF: {e}") from e
 
     def extract_text(self, file_path: str) -> str:
         """Extract text content from all PDF pages.

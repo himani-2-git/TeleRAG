@@ -7,7 +7,7 @@ from typing import Any
 
 from telegram import Update
 from telegram.constants import ChatAction
-from telegram.error import NetworkError, TimedOut
+from telegram.error import NetworkError, TelegramError, TimedOut
 from telegram.ext import ContextTypes
 
 from ...rag.pipeline import format_source_footer
@@ -76,9 +76,9 @@ class QuestionHandlersMixin:
             stop_typing.set()
             try:
                 await typing_task
-            except Exception:
-                pass
-            logger.error("Failed to answer question [%s]: %s", type(e).__name__, e)
+            except (asyncio.CancelledError, TelegramError) as typing_err:
+                logger.debug("Typing task cancellation error: %s", typing_err)
+            logger.exception("Failed to answer question: %s", e)
             await self._deliver_answer(
                 update,
                 thinking_msg,
@@ -102,7 +102,7 @@ class QuestionHandlersMixin:
         if thinking_msg:
             try:
                 await thinking_msg.delete()
-            except Exception as e:
+            except TelegramError as e:
                 logger.warning(f"Could not delete thinking message [{type(e).__name__}]: {e}")
 
     async def _send_typing_action(self, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
@@ -115,11 +115,11 @@ class QuestionHandlersMixin:
             )
             try:
                 await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-            except Exception as retry_err:
+            except TelegramError as retry_err:
                 logger.warning(
                     f"Typing action retry failed [{type(retry_err).__name__}]: {retry_err}"
                 )
-        except Exception as e:
+        except TelegramError as e:
             logger.warning(f"Typing action failed [{type(e).__name__}]: {e}")
 
     async def _keep_typing(
@@ -140,6 +140,6 @@ class QuestionHandlersMixin:
         except (TimedOut, NetworkError) as e:
             logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}. Retrying once...")
             return await update.message.reply_text(text)
-        except Exception as e:
+        except TelegramError as e:
             logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}")
             return None

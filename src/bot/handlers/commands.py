@@ -52,7 +52,7 @@ class CommandHandlersMixin:
 
             await update.message.reply_text(message)
         except Exception as e:
-            logger.error(f"Failed to list documents [{type(e).__name__}]: {e}")
+            logger.exception("Failed to list documents: %s", e)
             await update.message.reply_text("❌ Failed to retrieve document list.")
 
     async def delete_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,7 +70,7 @@ class CommandHandlersMixin:
             else:
                 await update.message.reply_text(f"❌ Document not found: {filename}")
         except Exception as e:
-            logger.error(f"Failed to delete document [{type(e).__name__}]: {e}")
+            logger.exception("Failed to delete document: %s", e)
             await update.message.reply_text("❌ Failed to delete document.")
 
     async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -83,7 +83,7 @@ class CommandHandlersMixin:
             else:
                 await update.message.reply_text("📭 You don't have any documents to delete.")
         except Exception as e:
-            logger.error(f"Failed to clear documents [{type(e).__name__}]: {e}")
+            logger.exception("Failed to clear documents: %s", e)
             await update.message.reply_text("❌ Failed to clear documents.")
 
     async def addurl_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

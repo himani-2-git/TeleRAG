@@ -1,5 +1,6 @@
 """LLM client for chat completion interactions."""
 
+import json
 import logging
 import time
 from typing import Any
@@ -68,7 +69,7 @@ class LLMClient:
                 return True, 200, "OK"
             short_msg = response.text[:200].strip()
             return False, response.status_code, short_msg
-        except Exception as e:
+        except requests.RequestException as e:
             return False, None, str(e)
 
     def send_request(
@@ -145,7 +146,7 @@ class LLMClient:
                     continue
                 return None
 
-            except Exception as e:
+            except (requests.RequestException, json.JSONDecodeError) as e:
                 logger.error("Request failed: %s", e)
                 if attempt < self.max_retries - 1:
                     time.sleep(delay)

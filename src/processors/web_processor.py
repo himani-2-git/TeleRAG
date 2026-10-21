@@ -60,8 +60,9 @@ def validate_url_ssrf(url: str) -> tuple[bool, str]:
         # Resolve DNS
         try:
             addr_info = socket.getaddrinfo(hostname, None)
-        except Exception as e:
-            return False, f"Could not resolve hostname '{hostname}': {e}"
+        except (socket.gaierror, socket.herror, OSError) as e:
+            logger.debug("DNS resolution failed for %s: %s", hostname, e)
+            return False, f"Could not resolve hostname '{hostname}'."
 
         if not addr_info:
             return False, f"Could not resolve hostname '{hostname}'."
@@ -90,8 +91,9 @@ def validate_url_ssrf(url: str) -> tuple[bool, str]:
                 )
 
         return True, ""
-    except Exception as e:
-        return False, f"URL validation failed: {e}"
+    except (ValueError, TypeError) as e:
+        logger.debug("URL validation error: %s", e)
+        return False, "URL validation failed."
 
 
 def extract_html_content(html: str, url: str) -> tuple[str, str, str]:

@@ -150,7 +150,7 @@ class DocumentStore:
         if not isinstance(self.vector_store, NumPyVectorStore):
             try:
                 self.vector_store.add(chunks_data, embeddings, user_id)
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError) as e:
                 logger.warning(f"Failed to sync to vector_store: {e}")
 
         logger.info(f"Stored document {document_id} with {len(embeddings)} embeddings")
@@ -200,7 +200,7 @@ class DocumentStore:
             if os.path.exists(p):
                 try:
                     os.remove(p)
-                except Exception as e:
+                except OSError as e:
                     logger.warning(f"Failed to delete embedding file: {e}")
 
         for i in range(chunk_count):
@@ -208,13 +208,13 @@ class DocumentStore:
             if os.path.exists(embedding_path):
                 try:
                     os.remove(embedding_path)
-                except Exception as e:
+                except OSError as e:
                     logger.warning(f"Failed to delete legacy embedding file: {e}")
 
         # Delete from vector store
         try:
             self.vector_store.delete(document_id, user_id)
-        except Exception as e:
+        except (OSError, ValueError, RuntimeError, KeyError) as e:
             logger.warning(f"Failed to delete from vector_store: {e}")
 
         # Delete from database
@@ -244,7 +244,7 @@ class DocumentStore:
                 if os.path.exists(p):
                     try:
                         os.remove(p)
-                    except Exception as e:
+                    except OSError as e:
                         logger.warning(f"Failed to delete embedding file: {e}")
 
             for i in range(chunk_count):
@@ -252,12 +252,12 @@ class DocumentStore:
                 if os.path.exists(embedding_path):
                     try:
                         os.remove(embedding_path)
-                    except Exception as e:
+                    except OSError as e:
                         logger.warning(f"Failed to delete legacy embedding file: {e}")
 
             try:
                 self.vector_store.delete(document_id, user_id)
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError, KeyError) as e:
                 logger.warning(f"Failed to delete doc {document_id} from vector_store: {e}")
 
         # Delete from database
@@ -277,7 +277,7 @@ class DocumentStore:
                 chroma_chunks = self.vector_store.get_user_chunks_with_embeddings(user_id)
                 if chroma_chunks:
                     return chroma_chunks
-            except Exception as e:
+            except (OSError, ValueError, RuntimeError, KeyError) as e:
                 logger.warning(f"Failed to fetch chunks from Chroma, falling back to SQLite: {e}")
 
         chunks = self.db.get_all_user_chunks(user_id)
@@ -292,13 +292,13 @@ class DocumentStore:
                 if os.path.exists(npy_path):
                     try:
                         doc_embeddings[doc_id] = np.load(npy_path)
-                    except Exception as e:
+                    except (OSError, ValueError) as e:
                         logger.warning(f"Failed to load embeddings from {npy_path}: {e}")
                         doc_embeddings[doc_id] = None
                 elif os.path.exists(alt_path):
                     try:
                         doc_embeddings[doc_id] = np.load(alt_path)
-                    except Exception as e:
+                    except (OSError, ValueError) as e:
                         logger.warning(f"Failed to load embeddings from {alt_path}: {e}")
                         doc_embeddings[doc_id] = None
                 else:
@@ -315,7 +315,7 @@ class DocumentStore:
                         with open(embedding_path) as f:
                             data = json.load(f)
                             chunk["embedding"] = data["embedding"]
-                    except Exception as e:
+                    except (OSError, json.JSONDecodeError, KeyError) as e:
                         logger.warning(f"Failed to load legacy embedding: {e}")
                         chunk["embedding"] = None
                 else:

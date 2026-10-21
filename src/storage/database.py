@@ -114,7 +114,7 @@ class Database:
             conn.commit()
             logger.info("Database schema initialized successfully")
 
-        except Exception as e:
+        except sqlite3.Error as e:
             logger.error(f"Failed to initialize database schema: {e}")
             raise
         finally:
@@ -198,7 +198,7 @@ class Database:
         except sqlite3.IntegrityError as e:
             logger.error(f"Document {filename} already exists for user {user_id}")
             raise Exception(f"Document '{filename}' already exists") from e
-        except Exception as e:
+        except sqlite3.Error as e:
             conn.rollback()
             logger.error(f"Failed to store document: {e}")
             raise

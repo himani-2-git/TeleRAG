@@ -69,7 +69,7 @@ def load_prompt_config(
     try:
         with open(prompt_file, encoding="utf-8") as f:
             data = yaml.safe_load(f)
-    except Exception as e:
+    except (OSError, yaml.YAMLError) as e:
         raise ValueError(f"Failed to parse YAML file {prompt_file}: {e}") from e
 
     if not isinstance(data, dict):

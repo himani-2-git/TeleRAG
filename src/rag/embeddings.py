@@ -42,7 +42,7 @@ class EmbeddingGenerator:
             )
             return [emb.tolist() for emb in embeddings]
 
-        except Exception as e:
+        except (ValueError, TypeError, RuntimeError) as e:
             logger.error(f"Failed to generate embeddings: {e}")
             raise
 

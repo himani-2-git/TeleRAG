@@ -184,7 +184,7 @@ class NumPyVectorStore(VectorStore):
             if os.path.exists(p):
                 try:
                     os.remove(p)
-                except Exception as e:
+                except OSError as e:
                     logger.warning("Failed to delete embedding file %s: %s", p, e)
 
         for i in range(matched.get("chunk_count", 0)):
@@ -192,7 +192,7 @@ class NumPyVectorStore(VectorStore):
             if os.path.exists(emb_path):
                 try:
                     os.remove(emb_path)
-                except Exception as e:
+                except OSError as e:
                     logger.warning("Failed to delete legacy embedding file %s: %s", emb_path, e)
 
         return self.db.delete_document(user_id, matched["filename"])
@@ -211,13 +211,13 @@ class NumPyVectorStore(VectorStore):
                 if os.path.exists(npy_path):
                     try:
                         doc_embeddings[doc_id] = np.load(npy_path)
-                    except Exception as e:
+                    except (OSError, ValueError) as e:
                         logger.warning("Failed to load embeddings from %s: %s", npy_path, e)
                         doc_embeddings[doc_id] = None
                 elif os.path.exists(alt_path):
                     try:
                         doc_embeddings[doc_id] = np.load(alt_path)
-                    except Exception as e:
+                    except (OSError, ValueError) as e:
                         logger.warning("Failed to load embeddings from %s: %s", alt_path, e)
                         doc_embeddings[doc_id] = None
                 else:
@@ -234,7 +234,7 @@ class NumPyVectorStore(VectorStore):
                         with open(emb_path) as f:
                             data = json.load(f)
                             chunk["embedding"] = data["embedding"]
-                    except Exception as e:
+                    except (OSError, json.JSONDecodeError, KeyError) as e:
                         logger.warning("Failed to load legacy embedding: %s", e)
                         chunk["embedding"] = None
                 else:

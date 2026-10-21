@@ -1,6 +1,7 @@
 """Telegram bot handlers for PDF RAG chatbot."""
 
 import asyncio
+import hashlib
 import logging
 import os
 import re
@@ -8,14 +9,14 @@ import socket  # noqa: F401
 import tempfile
 import time
 from typing import Any
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
-import requests
 from telegram import Update
 from telegram.constants import ChatAction
 from telegram.error import NetworkError, TimedOut
 from telegram.ext import ContextTypes
 
+from ..processors.pdf_fetcher import fetch_pdf_bytes
 from ..rag.pipeline import RAGPipeline, format_source_footer, get_orchestrator
 from ..rag.prompts import load_prompt_config
 
@@ -222,9 +223,13 @@ class BotHandlers:
                 f"📊 Created {len(chunks)} chunks\n\n"
                 f"You can now ask questions about this page!"
             )
-        except Exception as e:
-            logger.error(f"Failed to ingest web page [{type(e).__name__}]: {e}")
-            await update.message.reply_text(f"❌ Failed to ingest web page: {str(e)}")
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception:
+            logger.exception("Failed to ingest web page: %s", url)
+            await update.message.reply_text(
+                "❌ An unexpected error occurred while processing the web page. Please try again."
+            )
 
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle document uploads (PDF, Markdown, Text)."""
@@ -350,9 +355,13 @@ class BotHandlers:
                 f"You can now ask questions about this document!"
             )
 
-        except Exception as e:
-            logger.error(f"Failed to process document [{type(e).__name__}]: {e}")
-            await update.message.reply_text(f"❌ Failed to process document: {str(e)}")
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception:
+            logger.exception("Failed to process document: %s", fn)
+            await update.message.reply_text(
+                "❌ An unexpected error occurred while processing your document. Please try again."
+            )
 
         finally:
             if temp_file and os.path.exists(temp_file.name):
@@ -385,15 +394,15 @@ class BotHandlers:
 
         start_time = time.time()
 
+        self.active_requests += 1
         # Check if another LLM request is currently active/busy
-        if self.llm_semaphore.locked() or self.active_requests > 0:
-            k = self.active_requests
+        if self.llm_semaphore.locked() or self.active_requests > 1:
+            k = self.active_requests - 1
             init_text = f"Queued: {k} question(s) ahead of you. I'll reply when it's your turn."
         else:
             init_text = "Thinking..."
 
         thinking_msg = await self._reply_with_retry(update, init_text)
-        self.active_requests += 1
 
         await self._send_typing_action(context, update.effective_chat.id)
 
@@ -523,7 +532,8 @@ class BotHandlers:
         filename = os.path.basename(parsed.path)
 
         if not filename or not filename.endswith(".pdf"):
-            filename = f"document_{hash(url) % 10000}.pdf"
+            suffix = hashlib.sha256(url.encode()).hexdigest()[:8]
+            filename = f"document_{suffix}.pdf"
 
         return filename
 
@@ -536,21 +546,13 @@ class BotHandlers:
     async def _handle_url_upload(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
     ):
-        """Handle PDF upload from URL.
-
-        Args:
-            update: Telegram update
-            context: Bot context
-            url: URL to PDF file
-        """
+        """Handle PDF upload from URL safely with async thread download."""
         user_id = update.effective_user.id
 
-        # Extract URL if there's extra text
         url_match = re.search(r"https?://[^\s]+", url)
         if url_match:
             url = url_match.group(0)
 
-        # Check if URL ends with .pdf
         if not url.lower().endswith(".pdf") and ".pdf" not in url.lower():
             await update.message.reply_text(
                 "❌ The URL doesn't appear to be a PDF file.\n"
@@ -558,7 +560,6 @@ class BotHandlers:
             )
             return
 
-        # Validate URL for SSRF protection
         is_safe, error_msg = self._is_safe_url(url)
         if not is_safe:
             await update.message.reply_text(f"❌ {error_msg}")
@@ -569,135 +570,42 @@ class BotHandlers:
             chat_id=update.effective_chat.id, action=ChatAction.TYPING
         )
 
+        max_bytes = self.config.max_file_size_mb * 1024 * 1024
+        try:
+            pdf_bytes = await asyncio.to_thread(fetch_pdf_bytes, url, max_bytes, 30)
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+            return
+        except Exception:
+            logger.exception("Failed to download PDF from URL: %s", url)
+            await update.message.reply_text(
+                "❌ An unexpected error occurred while downloading the PDF. Please try again."
+            )
+            return
+
         temp_file = None
         try:
-            # Download file from URL with manual redirect following to prevent SSRF via redirects
-            download_headers = {
-                "User-Agent": "TeleRAG/1.0 (PDF Document Assistant)",
-                "Accept": "application/pdf, application/octet-stream;q=0.9, */*;q=0.8",
-            }
-
-            current_url = url
-            max_redirects = 3
-            redirect_count = 0
-            response = None
-
-            while True:
-                response = requests.get(
-                    current_url,
-                    headers=download_headers,
-                    timeout=30,
-                    stream=True,
-                    allow_redirects=False,
-                )
-
-                # Check for redirects (301, 302, 303, 307, 308)
-                if response.is_redirect or response.status_code in (301, 302, 303, 307, 308):
-                    redirect_count += 1
-                    if redirect_count > max_redirects:
-                        response.close()
-                        await update.message.reply_text(
-                            "❌ Too many redirects (maximum 3 allowed)."
-                        )
-                        return
-
-                    location = response.headers.get("Location")
-                    if not location:
-                        response.close()
-                        await update.message.reply_text("❌ Redirect without location header.")
-                        return
-
-                    # Resolve relative redirect URLs against current URL
-                    next_url = urljoin(current_url, location)
-
-                    # Validate next hop URL for SSRF protection
-                    is_safe, error_msg = self._is_safe_url(next_url)
-                    if not is_safe:
-                        response.close()
-                        await update.message.reply_text(f"❌ Redirect blocked: {error_msg}")
-                        return
-
-                    response.close()
-                    current_url = next_url
-                    continue
-
-                # If not a redirect, proceed to process the response
-                response.raise_for_status()
-                break
-
-            # Check content type
-            content_type = response.headers.get("content-type", "")
-            if "pdf" not in content_type.lower() and not current_url.lower().endswith(".pdf"):
-                response.close()
-                await update.message.reply_text(
-                    f"❌ The URL doesn't point to a PDF file.\nContent type: {content_type}"
-                )
-                return
-
-            # Check declared file size
-            max_bytes = self.config.max_file_size_mb * 1024 * 1024
-            content_length = response.headers.get("content-length")
-            if content_length:
-                try:
-                    file_size = int(content_length)
-                    if file_size > max_bytes:
-                        response.close()
-                        await update.message.reply_text(
-                            f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
-                        )
-                        return
-                except ValueError:
-                    pass
-
-            # Save to temp file with streaming cap to enforce MAX_FILE_SIZE_MB during streaming
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            downloaded_bytes = 0
-            try:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        downloaded_bytes += len(chunk)
-                        if downloaded_bytes > max_bytes:
-                            temp_file.close()
-                            response.close()
-                            await update.message.reply_text(
-                                f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
-                            )
-                            return
-                        temp_file.write(chunk)
-            finally:
-                response.close()
+            temp_file.write(pdf_bytes)
             temp_file.close()
 
-            # Get actual downloaded file size
-            file_size = os.path.getsize(temp_file.name)
-
+            file_size = len(pdf_bytes)
             await update.message.reply_text("📥 Processing PDF...")
 
-            # Read file content
-            with open(temp_file.name, "rb") as f:
-                file_content = f.read()
-
-            # Validate PDF
             is_valid, error_msg = self.pdf_processor.validate_pdf(temp_file.name, file_size)
             if not is_valid:
                 await update.message.reply_text(f"❌ {error_msg}")
                 return
 
-            # Extract text with pages
             pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
-
-            # Create chunks with page bounds
             chunks = self.text_chunker.create_chunks_with_pages(pages_data)
-
             if not chunks:
                 await update.message.reply_text("❌ No text content found in PDF.")
                 return
 
-            # Generate embeddings
             chunk_texts = [chunk.content for chunk in chunks]
             embeddings = self.embedding_generator.generate_embeddings(chunk_texts)
 
-            # Prepare chunks for storage
             chunks_data = [
                 {
                     "chunk_index": chunk.chunk_index,
@@ -710,14 +618,11 @@ class BotHandlers:
                 for chunk in chunks
             ]
 
-            # Get filename
-            filename = self._extract_filename_from_url(current_url)
-
-            # Store document
+            filename = self._extract_filename_from_url(url)
             self.document_store.store_document(
                 user_id=user_id,
                 filename=filename,
-                file_content=file_content,
+                file_content=pdf_bytes,
                 chunks=chunks_data,
                 embeddings=embeddings,
             )
@@ -728,25 +633,14 @@ class BotHandlers:
                 f"🔗 Source: {url[:50]}...\n\n"
                 f"You can now ask questions about this document!"
             )
-
-        except requests.exceptions.Timeout as e:
-            logger.error(f"Timeout downloading from URL [{type(e).__name__}]: {e}")
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception:
+            logger.exception("Failed to process downloaded PDF from URL: %s", url)
             await update.message.reply_text(
-                "❌ Download timeout. The file took too long to download.\n"
-                "Please try again or use a different link."
+                "❌ An unexpected error occurred while processing the PDF. Please try again."
             )
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to download from URL [{type(e).__name__}]: {e}")
-            await update.message.reply_text(
-                f"❌ Failed to download PDF from URL.\n"
-                f"Error: {str(e)}\n\n"
-                f"Please check the URL and try again."
-            )
-        except Exception as e:
-            logger.error(f"Failed to process URL upload [{type(e).__name__}]: {e}")
-            await update.message.reply_text(f"❌ Failed to process PDF: {str(e)}")
         finally:
-            # Clean up temp file
             if temp_file and os.path.exists(temp_file.name):
                 try:
                     os.unlink(temp_file.name)

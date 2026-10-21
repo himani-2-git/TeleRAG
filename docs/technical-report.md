@@ -187,6 +187,8 @@ To explore gating without data leakage:
 | **Cross-Tenant Data Leakage** | Database User Scoping | Every database query filters by `WHERE documents.user_id = ?`. Users have zero access to or visibility of other users' documents. |
 | **Orphaned Vector Records** | Relational Foreign Key Cascades | Database enforces `PRAGMA foreign_keys = ON` with `ON DELETE CASCADE`. Removing a document cleanly removes all associated chunk metadata and vectors. |
 
+> **Note on direct-IP connection vs. hostname requests:** Direct-IP connection with `Host` headers breaks TLS Server Name Indication (SNI) and certificate validation on modern HTTPS endpoints, causing severe connection failures with CDNs and reverse proxies. TeleRAG instead validates all resolved IP addresses across the complete DNS response (rejecting any response containing private, loopback, or link-local IPs) and re-verifies on every redirect hop.
+
 ---
 
 ## 7. Verification Matrix & CI Quality Gates

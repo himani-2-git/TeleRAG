@@ -60,10 +60,9 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(is_safe)
         self.assertIn("forbidden", error.lower())
 
-    @patch("src.bot.handlers.requests.get")
+    @patch("src.processors.pdf_fetcher.requests.get")
     async def test_redirect_to_loopback_rejected(self, mock_requests_get):
         """Test that redirects to 127.0.0.1 are detected and blocked."""
-        # Initial request returns a 302 redirect to 127.0.0.1
         mock_redirect = Mock()
         mock_redirect.status_code = 302
         mock_redirect.is_redirect = True
@@ -79,8 +78,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        with patch.object(self.handlers, "_is_safe_url") as mock_safe:
-            # First hop is safe, second hop (127.0.0.1) is unsafe
+        with patch("src.processors.pdf_fetcher.validate_url_ssrf") as mock_safe:
             mock_safe.side_effect = [
                 (True, ""),
                 (False, "Access to private or local network resources is forbidden."),
@@ -95,7 +93,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_requests_get.call_count, 1)
         mock_redirect.close.assert_called()
 
-    @patch("src.bot.handlers.requests.get")
+    @patch("src.processors.pdf_fetcher.requests.get")
     async def test_redirect_to_cloud_metadata_rejected(self, mock_requests_get):
         """Test that redirects to 169.254.169.254 are detected and blocked."""
         mock_redirect = Mock()
@@ -115,7 +113,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        with patch.object(self.handlers, "_is_safe_url") as mock_safe:
+        with patch("src.processors.pdf_fetcher.validate_url_ssrf") as mock_safe:
             mock_safe.side_effect = [
                 (True, ""),
                 (False, "Access to private or local network resources is forbidden."),
@@ -127,18 +125,16 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("Redirect blocked" in r and "forbidden" in r for r in replies))
         mock_redirect.close.assert_called()
 
-    @patch("src.bot.handlers.requests.get")
+    @patch("src.processors.pdf_fetcher.requests.get")
     async def test_streaming_max_file_size_enforced(self, mock_requests_get):
         """Test that MAX_FILE_SIZE_MB is strictly enforced while streaming even without Content-Length."""
-        self.config.max_file_size_mb = 1  # 1 MB limit
-        1 * 1024 * 1024
+        self.config.max_file_size_mb = 1
 
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.is_redirect = False
-        mock_response.headers = {"content-type": "application/pdf"}  # No content-length header
+        mock_response.headers = {"content-type": "application/pdf"}
         mock_response.close = Mock()
-        # Stream chunks totaling over 1 MB (e.g., 3 chunks of 500KB)
         chunk = b"A" * (500 * 1024)
         mock_response.iter_content.return_value = [chunk, chunk, chunk]
         mock_requests_get.return_value = mock_response
@@ -150,13 +146,24 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
         context = Mock()
         context.bot.send_chat_action = AsyncMock()
 
-        with patch.object(self.handlers, "_is_safe_url", return_value=(True, "")):
+        with patch("src.processors.pdf_fetcher.validate_url_ssrf", return_value=(True, "")):
             await self.handlers._handle_url_upload(update, context, "https://example.com/large.pdf")
 
         update.message.reply_text.assert_called()
         replies = [call.args[0] for call in update.message.reply_text.call_args_list]
         self.assertTrue(any("File too large" in r for r in replies))
         mock_response.close.assert_called()
+
+    @patch("src.processors.web_processor.socket.getaddrinfo")
+    def test_dns_rebinding_style_resolution_rejected(self, mock_getaddrinfo):
+        """Test that hostname resolving to a mix of public and private IPs is rejected."""
+        mock_getaddrinfo.return_value = [
+            (2, 1, 0, "", ("93.184.216.34", 80)),
+            (2, 1, 0, "", ("127.0.0.1", 80)),
+        ]
+        is_safe, error = self.handlers._is_safe_url("http://rebinding.attack.com/doc.pdf")
+        self.assertFalse(is_safe)
+        self.assertIn("forbidden", error.lower())
 
 
 class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
@@ -569,6 +576,37 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(is_insufficient_context("I don't have enough information."))
         self.assertFalse(is_insufficient_context("The context does not mention this."))
         self.assertFalse(is_insufficient_context(""))
+
+    async def test_queue_accounting_increments_before_notice_and_decrements_in_finally(self):
+        """Verify active_requests increments before queue notice and decrements in finally."""
+        user_id = 999
+        self.mock_doc_store.list_documents.return_value = [{"id": 1, "filename": "doc.pdf"}]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = [
+            {"content": "content", "filename": "doc.pdf", "page": 1, "chunk_index": 0}
+        ]
+
+        await self.handlers.llm_semaphore.acquire()
+        self.handlers.active_requests = 1
+
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 888
+        update.message.text = "Question?"
+        mock_queued_msg = Mock()
+        mock_queued_msg.delete = AsyncMock()
+        update.message.reply_text = AsyncMock(return_value=mock_queued_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        async def release_later():
+            await asyncio.sleep(0.01)
+            self.handlers.llm_semaphore.release()
+
+        asyncio.create_task(release_later())
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(self.handlers.active_requests, 1)
 
 
 if __name__ == "__main__":

@@ -1,16 +1,26 @@
 """Tests for the LLM benchmark harness (eval/bench_llm.py)."""
 
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import Mock, patch
 
-from eval.bench_llm import run_llm_benchmark, is_refusal_response
+from eval.bench_llm import is_refusal_response, run_llm_benchmark
 
 
 class TestBenchLLM(unittest.TestCase):
     """Test LLM benchmarking loop, abstention handling, and metric aggregation."""
+
+    def setUp(self):
+        self._stdout_trap = io.StringIO()
+        self._stdout_redirector = redirect_stdout(self._stdout_trap)
+        self._stdout_redirector.__enter__()
+
+    def tearDown(self):
+        self._stdout_redirector.__exit__(None, None, None)
 
     def test_is_refusal_response_detection(self):
         """Verify is_refusal_response recognizes refusal strings and INSUFFICIENT_CONTEXT."""
@@ -34,12 +44,12 @@ class TestBenchLLM(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_json = os.path.join(tmp_dir, "llm_bench.json")
-            
+
             results = run_llm_benchmark(
                 models=["test-mock-3b"],
                 pdf_path="eval/fixtures/ci_fixture.pdf",
                 golden_path="eval/golden_ci.json",
-                output_path=out_json
+                output_path=out_json,
             )
 
             # 1. Assert model key present
@@ -52,7 +62,7 @@ class TestBenchLLM(unittest.TestCase):
                 "p95_latency_s",
                 "answerable_answered_pct",
                 "unanswerable_refused_pct",
-                "sample_size"
+                "sample_size",
             ]
             for f in required_fields:
                 self.assertIn(f, m, f"Missing required table field: {f}")
@@ -72,14 +82,14 @@ class TestBenchLLM(unittest.TestCase):
             # so they must abstain and NEVER call client.generate_answer.
             # Thus generate_answer should only be called 9 times (for answerable questions).
             self.assertEqual(mock_client.generate_answer.call_count, 9)
-            
+
             # Unanswerable questions were counted as refused without LLM calls
             self.assertEqual(m["unanswerable_refused_pct"], 100.0)
             self.assertEqual(m["answerable_answered_pct"], 100.0)
 
             # 5. Assert output file was written to disk
             self.assertTrue(os.path.exists(out_json))
-            with open(out_json, "r", encoding="utf-8") as f:
+            with open(out_json, encoding="utf-8") as f:
                 saved_data = json.load(f)
             self.assertIn("test-mock-3b", saved_data)
             self.assertEqual(saved_data["test-mock-3b"]["sample_size"], 12)
@@ -90,14 +100,16 @@ class TestBenchLLM(unittest.TestCase):
         """Loop catches per-question exceptions, logs them, increments failure count, and continues."""
         mock_client = Mock()
         mock_client.send_request.return_value = {"choices": [{"message": {"content": "ok"}}]}
-        
+
         # Raise an exception on the 1st answerable question, succeed on the rest
         call_counter = {"count": 0}
+
         def generate_with_one_error(q, ctx):
             call_counter["count"] += 1
             if call_counter["count"] == 1:
                 raise RuntimeError("Simulated transient socket error")
             return "Valid answer."
+
         mock_client.generate_answer.side_effect = generate_with_one_error
         mock_client_cls.return_value = mock_client
 
@@ -107,7 +119,7 @@ class TestBenchLLM(unittest.TestCase):
                 models=["robust-test-model"],
                 pdf_path="eval/fixtures/ci_fixture.pdf",
                 golden_path="eval/golden_ci.json",
-                output_path=out_json
+                output_path=out_json,
             )
 
             m = results["robust-test-model"]

@@ -1,25 +1,51 @@
 """RAG execution pipeline with Plain and LangGraph orchestrators."""
 
+import importlib.util
 import logging
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, TypedDict
 
-from .retriever import DocumentRetriever
-from .llm_client import LLMClient
-from .prompts import PromptConfig, load_prompt_config
 from .grounding import grounding_report
+from .llm_client import LLMClient, LLMUnavailableError
+from .prompts import PromptConfig, load_prompt_config
+from .retriever import DocumentRetriever
 
 logger = logging.getLogger(__name__)
 
+SUMMARY_CUES = (
+    "summarize",
+    "summary",
+    "overview",
+    "main points",
+    "key takeaways",
+    "what is this document about",
+    "what is this book about",
+    "what is the document about",
+    "what is the book about",
+    "what is this pdf about",
+    "what is the pdf about",
+    "tell me about this document",
+    "tell me about this pdf",
+    "explain this document",
+    "brief overview",
+)
 
-def format_source_footer(chunks: List[Dict[str, Any]]) -> str:
-    """Format the sources / citation footer block for retrieved chunks.
 
-    Args:
-        chunks: List of chunk metadata dictionaries.
+def is_summary_query(query: str) -> bool:
+    """Return True if query is asking for a document summary or overview."""
+    q = query.lower().strip()
+    return any(cue in q for cue in SUMMARY_CUES)
 
-    Returns:
-        Formatted Sources string or empty string if no citations.
-    """
+
+def is_insufficient_context(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
+    """Check if the answer begins with the insufficient context marker."""
+    if not answer:
+        return False
+    stripped = answer.strip("`'\" \t\r\n")
+    return stripped.upper().startswith(marker.upper())
+
+
+def format_source_footer(chunks: list[dict[str, Any]]) -> str:
+    """Format the citation footer block for retrieved chunks."""
     if not chunks:
         return ""
 
@@ -62,15 +88,16 @@ def format_source_footer(chunks: List[Dict[str, Any]]) -> str:
 
 class RAGState(TypedDict, total=False):
     """Pipeline state passed across graph nodes."""
+
     question: str
     user_id: int
-    user_chunks: List[Dict[str, Any]]
-    query_embedding: Optional[List[float]]
-    retrieved_chunks: List[Dict[str, Any]]
-    raw_answer: Optional[str]
+    user_chunks: list[dict[str, Any]]
+    query_embedding: list[float] | None
+    retrieved_chunks: list[dict[str, Any]]
+    raw_answer: str | None
     answer: str
     refused: bool
-    refusal_reason: Optional[str]
+    refusal_reason: str | None
     grounding_report: Any
     final_response: str
 
@@ -83,10 +110,10 @@ class RAGPipeline:
         retriever: DocumentRetriever,
         llm_client: LLMClient,
         embedding_generator: Any,
-        prompt_config: Optional[PromptConfig] = None,
+        prompt_config: PromptConfig | None = None,
         grounding_threshold: float = 0.45,
         grounding_enforce: bool = False,
-        grounding_min_coverage: float = 0.5
+        grounding_min_coverage: float = 0.5,
     ):
         self.retriever = retriever
         self.llm_client = llm_client
@@ -97,15 +124,11 @@ class RAGPipeline:
         self.grounding_min_coverage = grounding_min_coverage
 
     def _is_insufficient_context(self, answer: str) -> bool:
-        if not answer:
-            return False
-        clean = answer.strip().upper()
-        marker = getattr(self.prompt_config, "insufficient_context_marker", "INSUFFICIENT_CONTEXT").upper()
-        return clean.startswith(marker) or marker in clean
+        marker = getattr(self.prompt_config, "insufficient_context_marker", "INSUFFICIENT_CONTEXT")
+        return is_insufficient_context(answer, marker)
 
-    # --- Node 1: retrieve ---
     def node_retrieve(self, state: RAGState) -> RAGState:
-        """Node 1: Retrieve relevant chunks using configured retriever."""
+        """Retrieve relevant chunks or first chunks for summary queries."""
         question = state["question"]
         user_chunks = state.get("user_chunks", [])
 
@@ -114,27 +137,33 @@ class RAGPipeline:
                 **state,
                 "retrieved_chunks": [],
                 "refused": True,
-                "refusal_reason": "NO_CHUNKS"
+                "refusal_reason": "NO_CHUNKS",
+                "answer": "❌ No document content available.",
             }
+
+        if is_summary_query(question):
+            sorted_chunks = sorted(
+                user_chunks,
+                key=lambda c: (
+                    c.get("page_start")
+                    if c.get("page_start") is not None
+                    else (c.get("page") or 0),
+                    c.get("chunk_index", 0),
+                ),
+            )
+            return {**state, "retrieved_chunks": sorted_chunks[:8]}
 
         query_embedding = state.get("query_embedding")
         if query_embedding is None and self.embedding_generator is not None:
             query_embedding = self.embedding_generator.generate_query_embedding(question)
 
         retrieved = self.retriever.retrieve(
-            query=question,
-            query_embedding=query_embedding or [],
-            chunks=user_chunks
+            query=question, query_embedding=query_embedding or [], chunks=user_chunks
         )
-        return {
-            **state,
-            "query_embedding": query_embedding,
-            "retrieved_chunks": retrieved
-        }
+        return {**state, "query_embedding": query_embedding, "retrieved_chunks": retrieved}
 
-    # --- Node 2: abstain_or_generate ---
     def node_abstain_or_generate(self, state: RAGState) -> RAGState:
-        """Node 2: Checks threshold, either abstains with refusal or calls LLM."""
+        """Check threshold; either abstain with refusal or invoke LLM."""
         if state.get("refused"):
             return state
 
@@ -145,12 +174,32 @@ class RAGPipeline:
                 **state,
                 "answer": refusal_msg,
                 "refused": True,
-                "refusal_reason": "NO_RELEVANT"
+                "refusal_reason": "NO_RELEVANT",
             }
 
         question = state["question"]
         context_text = self.retriever.format_context(retrieved)
-        raw_ans = self.llm_client.generate_answer(question, context_text)
+
+        try:
+            raw_ans = self.llm_client.generate_answer(question, context_text)
+        except LLMUnavailableError:
+            return {
+                **state,
+                "raw_answer": None,
+                "answer": "❌ The model is currently unavailable. Please try again shortly.",
+                "refused": True,
+                "refusal_reason": "LLM_UNAVAILABLE",
+            }
+
+        if not raw_ans:
+            return {
+                **state,
+                "raw_answer": None,
+                "answer": "❌ The model is currently unavailable. Please try again shortly.",
+                "refused": True,
+                "refusal_reason": "LLM_UNAVAILABLE",
+            }
+
         answer = self.llm_client.validate_response(raw_ans)
 
         if self._is_insufficient_context(answer):
@@ -160,19 +209,13 @@ class RAGPipeline:
                 "raw_answer": raw_ans,
                 "answer": refusal_msg,
                 "refused": True,
-                "refusal_reason": "INSUFFICIENT_CONTEXT"
+                "refusal_reason": "INSUFFICIENT_CONTEXT",
             }
 
-        return {
-            **state,
-            "raw_answer": raw_ans,
-            "answer": answer,
-            "refused": False
-        }
+        return {**state, "raw_answer": raw_ans, "answer": answer, "refused": False}
 
-    # --- Node 3: grounding ---
     def node_grounding(self, state: RAGState) -> RAGState:
-        """Node 3: Evaluates semantic grounding against retrieved chunks."""
+        """Evaluate semantic grounding against retrieved passages."""
         if state.get("refused"):
             return state
 
@@ -184,13 +227,15 @@ class RAGPipeline:
                 answer=answer,
                 chunks=retrieved,
                 embedder=self.embedding_generator,
-                threshold=self.grounding_threshold
+                threshold=self.grounding_threshold,
             )
             state_update: RAGState = {**state, "grounding_report": report}
 
-            if (self.grounding_enforce and 
-                report.applicable and 
-                report.citation_coverage < self.grounding_min_coverage):
+            if (
+                self.grounding_enforce
+                and report.applicable
+                and report.citation_coverage < self.grounding_min_coverage
+            ):
                 refusal_msg = self.prompt_config.refusal_message
                 state_update["answer"] = refusal_msg
                 state_update["refused"] = True
@@ -198,16 +243,23 @@ class RAGPipeline:
 
             return state_update
         except Exception as e:
-            logger.warning("Grounding check failed: %s", e)
+            if self.grounding_enforce:
+                refusal_msg = self.prompt_config.refusal_message
+                return {
+                    **state,
+                    "answer": refusal_msg,
+                    "refused": True,
+                    "refusal_reason": "GROUNDING_ERROR",
+                }
+            logger.exception("Grounding check failed: %s", e)
             return state
 
-    # --- Node 4: format_reply ---
     def node_format_reply(self, state: RAGState) -> RAGState:
-        """Node 4: Formats final reply, appending Sources footer if applicable."""
+        """Format final reply, appending Sources footer if applicable."""
         if state.get("refused"):
             return {
                 **state,
-                "final_response": state.get("answer", self.prompt_config.refusal_message)
+                "final_response": state.get("answer", self.prompt_config.refusal_message),
             }
 
         answer = state.get("answer", "")
@@ -215,10 +267,7 @@ class RAGPipeline:
         footer = format_source_footer(retrieved)
         final_text = f"{answer}{footer}" if footer else answer
 
-        return {
-            **state,
-            "final_response": final_text
-        }
+        return {**state, "final_response": final_text}
 
 
 class PlainOrchestrator:
@@ -231,15 +280,15 @@ class PlainOrchestrator:
         self,
         question: str,
         user_id: int,
-        user_chunks: List[Dict[str, Any]],
-        query_embedding: Optional[List[float]] = None
+        user_chunks: list[dict[str, Any]],
+        query_embedding: list[float] | None = None,
     ) -> RAGState:
         state: RAGState = {
             "question": question,
             "user_id": user_id,
             "user_chunks": user_chunks,
             "query_embedding": query_embedding,
-            "refused": False
+            "refused": False,
         }
         state = self.pipeline.node_retrieve(state)
         state = self.pipeline.node_abstain_or_generate(state)
@@ -253,11 +302,11 @@ class LangGraphOrchestrator:
 
     def __init__(self, pipeline: RAGPipeline):
         try:
-            from langgraph.graph import StateGraph, END
+            from langgraph.graph import END, StateGraph
         except ImportError as e:
             raise ImportError(
                 "langgraph is required for LangGraphOrchestrator. "
-                "Install it using: pip install -r requirements-graph.txt"
+                "Install it using: pip install -r requirements/graph.txt"
             ) from e
 
         self.pipeline = pipeline
@@ -280,41 +329,28 @@ class LangGraphOrchestrator:
         self,
         question: str,
         user_id: int,
-        user_chunks: List[Dict[str, Any]],
-        query_embedding: Optional[List[float]] = None
+        user_chunks: list[dict[str, Any]],
+        query_embedding: list[float] | None = None,
     ) -> RAGState:
         initial_state: RAGState = {
             "question": question,
             "user_id": user_id,
             "user_chunks": user_chunks,
             "query_embedding": query_embedding,
-            "refused": False
+            "refused": False,
         }
         return self.graph.invoke(initial_state)
 
 
-def get_orchestrator(
-    pipeline: RAGPipeline,
-    orchestrator: str = "plain"
-) -> Any:
-    """Factory to get the appropriate pipeline orchestrator.
-
-    Args:
-        pipeline: RAGPipeline component instance.
-        orchestrator: 'plain' or 'langgraph'.
-
-    Returns:
-        PlainOrchestrator or LangGraphOrchestrator instance.
-    """
+def get_orchestrator(pipeline: RAGPipeline, orchestrator: str = "plain") -> Any:
+    """Factory to get the appropriate pipeline orchestrator."""
     mode = (orchestrator or "plain").strip().lower()
     if mode == "langgraph":
-        try:
-            import langgraph
+        if importlib.util.find_spec("langgraph") is not None:
             return LangGraphOrchestrator(pipeline)
-        except ImportError:
-            logger.warning(
-                "langgraph is requested (ORCHESTRATOR=langgraph) but not installed. "
-                "Falling back to plain orchestrator."
-            )
-            return PlainOrchestrator(pipeline)
+        logger.warning(
+            "langgraph is requested (ORCHESTRATOR=langgraph) but not installed. "
+            "Falling back to plain orchestrator."
+        )
+        return PlainOrchestrator(pipeline)
     return PlainOrchestrator(pipeline)

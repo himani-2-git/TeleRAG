@@ -12,20 +12,26 @@ NOTE:
 """
 
 import argparse
-from dataclasses import dataclass, field
 import json
 import logging
 import os
 import random
 import re
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import numpy as np
 
 # Ensure project root is in sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from eval.report import (
+    print_failure_diagnostics,
+    print_faithfulness_summary_table,
+    print_threshold_calibration_table,
+    print_validation_set_summary,
+    rate,
+)
 from eval.run_eval import extract_chunks_with_pages
 from src.config import get_config
 from src.rag.embeddings import EmbeddingGenerator
@@ -48,10 +54,11 @@ try:
         reason: str = ""
 
     class FaithfulnessReport(BaseModel):
-        claims: List[ClaimAssessment] = Field(default_factory=list)
+        claims: list[ClaimAssessment] = Field(default_factory=list)
         unscorable: bool = False
 
 except ImportError:
+
     class ClaimAssessment:  # type: ignore
         def __init__(self, claim: str, entailed: bool, reason: str = ""):
             self.claim = claim
@@ -62,7 +69,7 @@ except ImportError:
             return {"claim": self.claim, "entailed": self.entailed, "reason": self.reason}
 
     class FaithfulnessReport:  # type: ignore
-        def __init__(self, claims: Optional[List[Any]] = None, unscorable: bool = False):
+        def __init__(self, claims: list[Any] | None = None, unscorable: bool = False):
             self.claims = claims or []
             self.unscorable = unscorable
 
@@ -133,12 +140,12 @@ def make_cache_key(
     return f"{judge_type}:{judge_model}:{gen_model}:{prompt_version}:{pdf_name}:{n}:{seed}"
 
 
-def get_nli_label_indices(config: Any) -> Dict[str, int]:
+def get_nli_label_indices(config: Any) -> dict[str, int]:
     """Extract mapping from standard label names ('entailment', 'contradiction', 'neutral') to model output indices.
 
     Reads label order dynamically from model config (never hard-coded).
     """
-    label_map: Dict[str, int] = {}
+    label_map: dict[str, int] = {}
     id2label = getattr(config, "id2label", None) or {}
     for idx, lbl in id2label.items():
         lbl_lower = str(lbl).lower()
@@ -175,13 +182,15 @@ def truncate_premise(tokenizer: Any, text: str, max_tokens: int = 400) -> str:
     if not text or not tokenizer:
         return text or ""
     try:
-        tokens = tokenizer.encode(text, truncation=True, max_length=max_tokens, add_special_tokens=False)
+        tokens = tokenizer.encode(
+            text, truncation=True, max_length=max_tokens, add_special_tokens=False
+        )
         return tokenizer.decode(tokens, skip_special_tokens=True)
     except Exception:
         return text[: max_tokens * 4]
 
 
-def parse_premise_windows(window_str: str) -> List[int]:
+def parse_premise_windows(window_str: str) -> list[int]:
     """Parse comma-separated window sizes (e.g. '1,2,3') into a sorted list of positive ints."""
     sizes = []
     for part in str(window_str).split(","):
@@ -194,17 +203,17 @@ def parse_premise_windows(window_str: str) -> List[int]:
 
 
 def build_premise_windows(
-    chunks: List[Any],
-    window_sizes: Union[List[int], Tuple[int, ...]] = (1, 2, 3),
+    chunks: list[Any],
+    window_sizes: list[int] | tuple[int, ...] = (1, 2, 3),
     tokenizer: Any = None,
     max_tokens: int = 400,
-) -> List[str]:
+) -> list[str]:
     """Build sliding sentence windows within each chunk (never crossing chunk boundaries).
 
     For each chunk, sentences are split and sliding windows of length w in window_sizes
     are generated. Windows from different chunks are never combined.
     """
-    windows: List[str] = []
+    windows: list[str] = []
     seen = set()
     for c in chunks:
         raw_text = c.get("content", "") if isinstance(c, dict) else str(c)
@@ -240,7 +249,7 @@ def build_premise_windows(
     return windows
 
 
-def extract_json_block(text: str) -> Optional[Dict[str, Any]]:
+def extract_json_block(text: str) -> dict[str, Any] | None:
     """Extract and parse first valid JSON object from LLM response."""
     if not text:
         return None
@@ -301,7 +310,9 @@ Evaluate the claims in the Answer above:"""
                 return FaithfulnessReport(claims=[], unscorable=True)
             return FaithfulnessReport(claims=validated_claims, unscorable=False)
     except Exception as e:
-        logger.warning("Judge LLM call failed or produced invalid format [%s]: %s", type(e).__name__, e)
+        logger.warning(
+            "Judge LLM call failed or produced invalid format [%s]: %s", type(e).__name__, e
+        )
 
     return FaithfulnessReport(claims=[], unscorable=True)
 
@@ -313,11 +324,11 @@ judge_answer_faithfulness = judge_answer_faithfulness_llm
 def judge_answer_faithfulness_nli(
     cross_encoder: Any,
     question: str,
-    chunks: List[Any],
+    chunks: list[Any],
     answer: str,
     entail_threshold: float = 0.5,
-    premise_window_sizes: Union[List[int], Tuple[int, ...]] = (1, 2, 3),
-) -> Dict[str, Any]:
+    premise_window_sizes: list[int] | tuple[int, ...] = (1, 2, 3),
+) -> dict[str, Any]:
     """Evaluate answer faithfulness using CrossEncoder NLI across sentence-level sliding premise windows."""
     clean_ans = strip_footers(answer)
     sentences = split_sentences(clean_ans)
@@ -382,7 +393,9 @@ def judge_answer_faithfulness_nli(
             "status": "EVALUATED",
         }
 
-    model_config = getattr(cross_encoder, "config", None) or getattr(getattr(cross_encoder, "model", None), "config", None)
+    model_config = getattr(cross_encoder, "config", None) or getattr(
+        getattr(cross_encoder, "model", None), "config", None
+    )
     label_map = get_nli_label_indices(model_config)
     entail_idx = label_map["entailment"]
     contra_idx = label_map["contradiction"]
@@ -398,7 +411,7 @@ def judge_answer_faithfulness_nli(
     exp_p = np.exp(preds - np.max(preds, axis=-1, keepdims=True))
     probs = exp_p / np.sum(exp_p, axis=-1, keepdims=True)
 
-    assessments: List[Dict[str, Any]] = []
+    assessments: list[dict[str, Any]] = []
     supported_count = 0
     num_windows = len(windows)
 
@@ -439,15 +452,15 @@ def validate_judge(
     answers_path: str = DEFAULT_CI_ANSWERS,
     heldout_answers_path: str = DEFAULT_HELDOUT_ANSWERS,
     pdf_path: str = DEFAULT_CI_PDF,
-    output_path: Optional[str] = None,
+    output_path: str | None = None,
     judge_type: str = "nli",
     judge_model: str = "llama3.2:3b",
     nli_model: str = DEFAULT_NLI_MODEL,
-    entail_threshold: Optional[float] = None,
+    entail_threshold: float | None = None,
     premise_window: str = DEFAULT_PREMISE_WINDOWS,
-    judge_client: Optional[LLMClient] = None,
-    cross_encoder: Optional[Any] = None,
-) -> Dict[str, Any]:
+    judge_client: LLMClient | None = None,
+    cross_encoder: Any | None = None,
+) -> dict[str, Any]:
     """Validate faithfulness judge using supported references and negative controls.
 
     Pass Rule:
@@ -470,6 +483,7 @@ def validate_judge(
         config = get_config(require_telegram=False)
     except Exception:
         from src.config import Config
+
         config = Config(telegram_bot_token="", llm_base_url="http://localhost:11434/v1")
 
     logger.info("Extracting fixture for judge validation: %s", pdf_path)
@@ -478,7 +492,7 @@ def validate_judge(
     embedder = EmbeddingGenerator(model_name=config.embedding_model)
     contents = [c.get("content", "") for c in chunks]
     embeddings = embedder.generate_embeddings(contents)
-    for chunk, emb in zip(chunks, embeddings):
+    for chunk, emb in zip(chunks, embeddings, strict=False):
         chunk["embedding"] = emb
 
     retriever = DocumentRetriever(
@@ -501,7 +515,9 @@ def validate_judge(
     if judge_type == "nli":
         if cross_encoder is None:
             if CrossEncoder is None:
-                raise ImportError("sentence-transformers is required for NLI judge. Install sentence-transformers.")
+                raise ImportError(
+                    "sentence-transformers is required for NLI judge. Install sentence-transformers."
+                )
             logger.info("Loading NLI CrossEncoder: %s", nli_model)
             cross_encoder = CrossEncoder(nli_model)
     else:
@@ -514,7 +530,9 @@ def validate_judge(
                 max_tokens=600,
             )
 
-    def _eval_items(items: List[Dict[str, Any]], current_threshold: float) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def _eval_items(
+        items: list[dict[str, Any]], current_threshold: float
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         refs_eval = []
         negs_eval = []
         for item in items:
@@ -574,8 +592,13 @@ def validate_judge(
                 else:
                     score = entailed_c / total_c
                     claims_data = [
-                        c.model_dump() if hasattr(c, "model_dump")
-                        else (c.dict() if hasattr(c, "dict") else {"claim": c.claim, "entailed": c.entailed, "reason": c.reason})
+                        c.model_dump()
+                        if hasattr(c, "model_dump")
+                        else (
+                            c.dict()
+                            if hasattr(c, "dict")
+                            else {"claim": c.claim, "entailed": c.entailed, "reason": c.reason}
+                        )
                         for c in report_llm.claims
                     ]
                     rec = {
@@ -597,19 +620,23 @@ def validate_judge(
         return refs_eval, negs_eval
 
     # Load DEV items
-    with open(answers_path, "r", encoding="utf-8") as f:
+    with open(answers_path, encoding="utf-8") as f:
         dev_items = json.load(f)
 
     # Initial threshold to evaluate DEV raw stats
-    initial_threshold = entail_threshold if entail_threshold is not None else DEFAULT_ENTAIL_THRESHOLD
-    print(f"\n--- Running Judge Validation Mode ---")
-    print(f"Judge Type: {judge_type.upper()} | Model: {active_model_name} | Premise Windows: {premise_window}")
+    initial_threshold = (
+        entail_threshold if entail_threshold is not None else DEFAULT_ENTAIL_THRESHOLD
+    )
+    print("\n--- Running Judge Validation Mode ---")
+    print(
+        f"Judge Type: {judge_type.upper()} | Model: {active_model_name} | Premise Windows: {premise_window}"
+    )
     print(f"DEV Set ({answers_path}): {len(dev_items)} items")
 
     dev_refs, dev_negs = _eval_items(dev_items, initial_threshold)
 
     # Threshold calibration on DEV items only (if NLI)
-    calibration_sweep: List[Dict[str, Any]] = []
+    calibration_sweep: list[dict[str, Any]] = []
     chosen_threshold = initial_threshold
 
     if judge_type == "nli":
@@ -628,8 +655,10 @@ def validate_judge(
                 if not sentences:
                     continue
                 sup_cnt = sum(
-                    1 for s in sentences
-                    if s.get("entailment_prob", 0.0) >= t_cand and s.get("entailment_prob", 0.0) > s.get("contradiction_prob", 0.0)
+                    1
+                    for s in sentences
+                    if s.get("entailment_prob", 0.0) >= t_cand
+                    and s.get("entailment_prob", 0.0) > s.get("contradiction_prob", 0.0)
                 )
                 score = sup_cnt / len(sentences)
                 if r.get("is_negative_control"):
@@ -637,34 +666,22 @@ def validate_judge(
                 else:
                     t_ref_scores.append(score)
 
-            m_ref = sum(t_ref_scores) / len(t_ref_scores) if t_ref_scores else 0.0
+            m_ref_val = rate(sum(t_ref_scores), len(t_ref_scores))
+            m_ref = m_ref_val if m_ref_val is not None else 0.0
             m_neg = max(t_neg_scores) if t_neg_scores else 0.0
             p_ok = (m_ref >= 0.80) and (m_neg <= 0.50) and (t_unscorable_ref == 0)
             margin = min(m_ref - 0.80, 0.50 - m_neg)
-            calibration_sweep.append({
-                "threshold": t_cand,
-                "mean_reference": round(m_ref, 3),
-                "max_negative_control": round(m_neg, 3),
-                "margin": round(margin, 3),
-                "passed": p_ok,
-            })
+            calibration_sweep.append(
+                {
+                    "threshold": t_cand,
+                    "mean_reference": round(m_ref, 3),
+                    "max_negative_control": round(m_neg, 3),
+                    "margin": round(margin, 3),
+                    "passed": p_ok,
+                }
+            )
 
-        print("\n### Threshold Calibration Sweep (DEV Only)\n")
-        print("| Threshold | Reference Mean | Max Neg Ctrl | Margin | Status |")
-        print("| :--- | :--- | :--- | :--- | :--- |")
-        for sw in calibration_sweep:
-            st = "PASS" if sw["passed"] else "FAIL"
-            print(f"| {sw['threshold']:.2f} | {sw['mean_reference']:.3f} | {sw['max_negative_control']:.3f} | {sw['margin']:+.3f} | {st} |")
-
-        valid_sweeps = [sw for sw in calibration_sweep if sw["passed"]]
-        if valid_sweeps:
-            best_sweep = max(valid_sweeps, key=lambda sw: (sw["margin"], sw["threshold"]))
-            best_calibrated = best_sweep["threshold"]
-            print(f"\nOptimal Calibrated Threshold on DEV: {best_calibrated:.2f} (margin: {best_sweep['margin']:+.3f})")
-        else:
-            best_sweep = max(calibration_sweep, key=lambda sw: sw["margin"])
-            best_calibrated = best_sweep["threshold"]
-            print(f"\nNo threshold met pass rule on DEV. Best candidate threshold: {best_calibrated:.2f} (margin: {best_sweep['margin']:+.3f})")
+        best_calibrated = print_threshold_calibration_table(calibration_sweep)
 
         chosen_threshold = entail_threshold if entail_threshold is not None else best_calibrated
 
@@ -684,78 +701,92 @@ def validate_judge(
                     r["faithfulness"] = round(sup_cnt / len(r["details"]), 3)
 
     # Evaluate HELD-OUT set ONCE with fixed chosen_threshold
-    heldout_refs: List[Dict[str, Any]] = []
-    heldout_negs: List[Dict[str, Any]] = []
+    heldout_refs: list[dict[str, Any]] = []
+    heldout_negs: list[dict[str, Any]] = []
     has_heldout = os.path.exists(heldout_answers_path)
     if has_heldout:
-        with open(heldout_answers_path, "r", encoding="utf-8") as f:
+        with open(heldout_answers_path, encoding="utf-8") as f:
             heldout_items = json.load(f)
-        print(f"\nEvaluating HELD-OUT Set ({heldout_answers_path}): {len(heldout_items)} items with fixed threshold {chosen_threshold:.2f}...")
+        print(
+            f"\nEvaluating HELD-OUT Set ({heldout_answers_path}): {len(heldout_items)} items with fixed threshold {chosen_threshold:.2f}..."
+        )
         heldout_refs, heldout_negs = _eval_items(heldout_items, chosen_threshold)
     else:
         logger.warning("Held-out answers file not found at %s", heldout_answers_path)
 
     # Helper to summarize a set
-    def _summarize_set(name: str, refs: List[Dict[str, Any]], negs: List[Dict[str, Any]]) -> Dict[str, Any]:
-        scorable_ref = [r for r in refs if not r.get("unscorable") and r.get("faithfulness") is not None]
-        scorable_neg = [r for r in negs if not r.get("unscorable") and r.get("faithfulness") is not None]
+    def _summarize_set(
+        name: str, refs: list[dict[str, Any]], negs: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        scorable_ref = [
+            r for r in refs if not r.get("unscorable") and r.get("faithfulness") is not None
+        ]
+        scorable_neg = [
+            r for r in negs if not r.get("unscorable") and r.get("faithfulness") is not None
+        ]
         unscorable_ref_cnt = sum(1 for r in refs if r.get("unscorable"))
         unscorable_neg_cnt = sum(1 for r in negs if r.get("unscorable"))
         ref_sc = [r["faithfulness"] for r in scorable_ref]
         neg_sc = [r["faithfulness"] for r in scorable_neg]
-        m_ref = sum(ref_sc) / len(ref_sc) if ref_sc else 0.0
-        m_neg = sum(neg_sc) / len(neg_sc) if neg_sc else 0.0
-        max_neg = max(neg_sc) if neg_sc else 0.0
-        p_ok = (m_ref >= 0.80) and all(s <= 0.50 for s in neg_sc) and (unscorable_ref_cnt == 0)
+        m_ref = rate(sum(ref_sc), len(ref_sc))
+        m_neg = rate(sum(neg_sc), len(neg_sc))
+        max_neg = max(neg_sc) if neg_sc else None
+        p_ok = (
+            (m_ref is not None and m_ref >= 0.80)
+            and (all(s <= 0.50 for s in neg_sc) if neg_sc else True)
+            and (unscorable_ref_cnt == 0)
+        )
 
         # Explicit judge error rates
         ref_accept_cnt = sum(1 for r in scorable_ref if r["faithfulness"] >= 0.80)
-        ref_accept_rate = round(ref_accept_cnt / len(scorable_ref), 3) if scorable_ref else 0.0
+        raw_ref_rate = rate(ref_accept_cnt, len(scorable_ref))
+        ref_accept_rate = round(raw_ref_rate, 3) if raw_ref_rate is not None else None
 
         neg_false_accept_cnt = sum(1 for r in scorable_neg if r["faithfulness"] > 0.50)
-        neg_false_accept_rate = round(neg_false_accept_cnt / len(scorable_neg), 3) if scorable_neg else 0.0
+        raw_neg_fa_rate = rate(neg_false_accept_cnt, len(scorable_neg))
+        neg_false_accept_rate = round(raw_neg_fa_rate, 3) if raw_neg_fa_rate is not None else None
 
         neg_fully_accepted_cnt = sum(1 for r in scorable_neg if r["faithfulness"] >= 1.0 - 1e-6)
-        neg_fully_accepted_rate = round(neg_fully_accepted_cnt / len(scorable_neg), 3) if scorable_neg else 0.0
+        raw_neg_full_rate = rate(neg_fully_accepted_cnt, len(scorable_neg))
+        neg_fully_accepted_rate = (
+            round(raw_neg_full_rate, 3) if raw_neg_full_rate is not None else None
+        )
 
-        print(f"\n### {name} Summary Table (Threshold: {chosen_threshold:.2f})\n")
-        print("| Item ID | Type | Supported | Total | Faithfulness | Status |")
-        print("| :--- | :--- | :--- | :--- | :--- | :--- |")
-        for r in refs:
-            if r.get("unscorable"):
-                f_str, st = "n/a", "UNSCORABLE (COVERAGE FAIL)"
-            else:
-                f_str = f"{r['faithfulness']:.2f}"
-                st = "PASS" if r["faithfulness"] >= 0.80 else "FAIL"
-            print(f"| {r['id']} | REFERENCE | {r.get('supported_items', 0)} | {r.get('total_items', 0)} | {f_str} | {st} |")
-
-        for r in negs:
-            if r.get("unscorable"):
-                f_str, st = "n/a", "UNSCORABLE"
-            else:
-                f_str = f"{r['faithfulness']:.2f}"
-                st = "PASS" if r["faithfulness"] <= 0.50 else "FAIL"
-            print(f"| {r['id']} | NEG_CTRL | {r.get('supported_items', 0)} | {r.get('total_items', 0)} | {f_str} | {st} |")
-
-        print(f"\n{name} Metrics:")
-        print(f"  Mean Reference Faithfulness:         {m_ref:.3f} (Required >= 0.800)")
-        print(f"  Mean Negative Control Faithfulness:  {m_neg:.3f}")
-        print(f"  Max Negative Control Faithfulness:   {max_neg:.3f} (Required <= 0.500)")
-        print(f"  Reference Accept Rate:               {ref_accept_rate:.3f} ({ref_accept_cnt}/{len(scorable_ref)})")
-        print(f"  Negative Control False-Accept Rate:  {neg_false_accept_rate:.3f} ({neg_false_accept_cnt}/{len(scorable_neg)})")
-        print(f"  Negative Control Fully-Accepted Rate:{neg_fully_accepted_rate:.3f} ({neg_fully_accepted_count}/{len(scorable_neg)})" if 'neg_fully_accepted_count' in dir() else f"  Negative Control Fully-Accepted Rate:{neg_fully_accepted_rate:.3f} ({neg_fully_accepted_cnt}/{len(scorable_neg)})")
-        print(f"  Unscorable References:               {unscorable_ref_cnt} (Required == 0)")
-        print(f"  Unscorable Negative Controls:        {unscorable_neg_cnt}")
-        print(f"  Set Status:                          {'PASS' if p_ok else 'FAIL'}")
+        print_validation_set_summary(
+            name=name,
+            chosen_threshold=chosen_threshold,
+            refs=refs,
+            negs=negs,
+            m_ref=m_ref,
+            m_neg=m_neg,
+            max_neg=max_neg,
+            ref_accept_rate=ref_accept_rate,
+            ref_accept_cnt=ref_accept_cnt,
+            scorable_ref_count=len(scorable_ref),
+            neg_false_accept_rate=neg_false_accept_rate,
+            neg_false_accept_cnt=neg_false_accept_cnt,
+            scorable_neg_count=len(scorable_neg),
+            neg_fully_accepted_rate=neg_fully_accepted_rate,
+            neg_fully_accepted_cnt=neg_fully_accepted_cnt,
+            unscorable_ref_cnt=unscorable_ref_cnt,
+            unscorable_neg_cnt=unscorable_neg_cnt,
+            passed=p_ok,
+        )
 
         return {
             "passed": p_ok,
-            "mean_reference_faithfulness": round(m_ref, 3),
-            "mean_negative_control_faithfulness": round(m_neg, 3),
-            "max_negative_control_faithfulness": round(max_neg, 3),
-            "reference_accept_rate": ref_accept_rate,
-            "negative_control_false_accept_rate": neg_false_accept_rate,
-            "negative_control_fully_accepted_rate": neg_fully_accepted_rate,
+            "mean_reference_faithfulness": round(m_ref, 3) if m_ref is not None else "n/a",
+            "mean_negative_control_faithfulness": (round(m_neg, 3) if m_neg is not None else "n/a"),
+            "max_negative_control_faithfulness": (
+                round(max_neg, 3) if max_neg is not None else "n/a"
+            ),
+            "reference_accept_rate": ref_accept_rate if ref_accept_rate is not None else "n/a",
+            "negative_control_false_accept_rate": (
+                neg_false_accept_rate if neg_false_accept_rate is not None else "n/a"
+            ),
+            "negative_control_fully_accepted_rate": (
+                neg_fully_accepted_rate if neg_fully_accepted_rate is not None else "n/a"
+            ),
             "unscorable_references_count": unscorable_ref_cnt,
             "unscorable_negative_controls_count": unscorable_neg_cnt,
             "reference_scores": ref_sc,
@@ -765,34 +796,22 @@ def validate_judge(
         }
 
     dev_summary = _summarize_set("DEV SET", dev_refs, dev_negs)
-    heldout_summary = _summarize_set("HELD-OUT SET", heldout_refs, heldout_negs) if has_heldout else {"passed": True}
+    heldout_summary = (
+        _summarize_set("HELD-OUT SET", heldout_refs, heldout_negs)
+        if has_heldout
+        else {"passed": True}
+    )
 
     is_overall_valid = bool(dev_summary["passed"] and heldout_summary["passed"])
     overall_status = "VALID" if is_overall_valid else "JUDGE NOT TRUSTWORTHY"
 
     # Requirement 5: If it fails, print which items fail on which windows and stop
     if not is_overall_valid:
-        print("\n================================================================================")
-        print("[FAIL] JUDGE NOT TRUSTWORTHY: Detailed Failure Diagnostic")
-        print("================================================================================")
-        for set_label, s_data in [("DEV", dev_summary), ("HELD-OUT", heldout_summary)]:
-            all_set_items = s_data.get("reference_results", []) + s_data.get("negative_control_results", [])
-            for itm in all_set_items:
-                is_nc = bool(itm.get("is_negative_control", False))
-                f_val = itm.get("faithfulness")
-                unsc = bool(itm.get("unscorable", False))
-                item_failed = unsc or (not is_nc and (f_val is None or f_val < 0.80)) or (is_nc and f_val is not None and f_val > 0.50)
-                if item_failed:
-                    print(f"\nItem [{itm['id']}] ({set_label} | {'NEG_CTRL' if is_nc else 'REFERENCE'}): faithfulness={f_val} unscorable={unsc}")
-                    print(f"  Question: {itm.get('question')}")
-                    print(f"  Answer:   {itm.get('answer')}")
-                    for s_i, s_entry in enumerate(itm.get("details", [])):
-                        print(f"    Sentence {s_i+1}: \"{s_entry.get('sentence')}\"")
-                        print(f"      Supported: {s_entry.get('supported')} (entail={s_entry.get('entailment_prob')}, contra={s_entry.get('contradiction_prob')})")
-                        print(f"      Best Window [{s_entry.get('best_window_index')}]: \"{s_entry.get('best_window')}\"")
-        print("================================================================================\n")
+        print_failure_diagnostics(dev_summary, heldout_summary)
     else:
-        print(f"\n[PASS] VALID: Judge distinguishes supported answers from unsupported negative controls across both DEV and HELD-OUT sets.\n")
+        print(
+            "\n[PASS] VALID: Judge distinguishes supported answers from unsupported negative controls across both DEV and HELD-OUT sets.\n"
+        )
 
     val_payload = {
         "status": overall_status,
@@ -843,10 +862,10 @@ def run_faithfulness_evaluation(
     premise_window: str = DEFAULT_PREMISE_WINDOWS,
     gen_model: str = "qwen2.5:3b",
     resume: bool = True,
-    judge_client: Optional[LLMClient] = None,
-    cross_encoder: Optional[Any] = None,
-    gen_client: Optional[LLMClient] = None,
-) -> Dict[str, Any]:
+    judge_client: LLMClient | None = None,
+    cross_encoder: Any | None = None,
+    gen_client: LLMClient | None = None,
+) -> dict[str, Any]:
     """Execute faithfulness evaluation pipeline across golden questions."""
     premise_window_sizes = parse_premise_windows(premise_window)
     active_judge_name = nli_model if judge_type == "nli" else judge_model
@@ -860,7 +879,9 @@ def run_faithfulness_evaluation(
     if not os.path.exists(pdf_path):
         abs_path = os.path.abspath(pdf_path)
         print(f"Error: Evaluation document not found at: {abs_path}")
-        print(f"Please place 'Think Python 2e' PDF at '{abs_path}' or specify --pdf and --golden explicitly (e.g. --pdf eval/fixtures/ci_fixture.pdf --golden eval/golden_ci.json).")
+        print(
+            f"Please place 'Think Python 2e' PDF at '{abs_path}' or specify --pdf and --golden explicitly (e.g. --pdf eval/fixtures/ci_fixture.pdf --golden eval/golden_ci.json)."
+        )
         sys.exit(0)
 
     if not os.path.exists(golden_path):
@@ -873,6 +894,7 @@ def run_faithfulness_evaluation(
         config = get_config(require_telegram=False)
     except Exception:
         from src.config import Config
+
         config = Config(telegram_bot_token="", llm_base_url="http://localhost:11434/v1")
 
     try:
@@ -889,7 +911,7 @@ def run_faithfulness_evaluation(
     embedder = EmbeddingGenerator(model_name=config.embedding_model)
     contents = [c.get("content", "") for c in chunks]
     embeddings = embedder.generate_embeddings(contents)
-    for chunk, emb in zip(chunks, embeddings):
+    for chunk, emb in zip(chunks, embeddings, strict=False):
         chunk["embedding"] = emb
 
     retriever = DocumentRetriever(
@@ -898,7 +920,7 @@ def run_faithfulness_evaluation(
         retrieval_mode=getattr(config, "retrieval_mode", "hybrid"),
     )
 
-    with open(golden_path, "r", encoding="utf-8") as f:
+    with open(golden_path, encoding="utf-8") as f:
         all_questions = json.load(f)
 
     # Evaluate answerable questions only
@@ -925,7 +947,9 @@ def run_faithfulness_evaluation(
     if judge_type == "nli":
         if cross_encoder is None:
             if CrossEncoder is None:
-                raise ImportError("sentence-transformers is required for NLI judge. Install sentence-transformers.")
+                raise ImportError(
+                    "sentence-transformers is required for NLI judge. Install sentence-transformers."
+                )
             logger.info("Loading NLI CrossEncoder: %s", nli_model)
             cross_encoder = CrossEncoder(nli_model)
     else:
@@ -949,18 +973,24 @@ def run_faithfulness_evaluation(
         seed=seed,
     )
 
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
     if resume and os.path.exists(output_path):
         try:
-            with open(output_path, "r", encoding="utf-8") as f:
+            with open(output_path, encoding="utf-8") as f:
                 saved = json.load(f)
                 if isinstance(saved, dict) and "questions" in saved:
                     saved_key = saved.get("cache_key")
                     # Check cache key components to ensure results from different judges are never mixed
                     key_matches = (saved_key == current_cache_key) or (
                         saved.get("judge_type") == judge_type
-                        and (saved.get("judge") == active_judge_name or saved.get("judge_model") == active_judge_name)
-                        and (saved.get("generator") == gen_model or saved.get("gen_model") == gen_model)
+                        and (
+                            saved.get("judge") == active_judge_name
+                            or saved.get("judge_model") == active_judge_name
+                        )
+                        and (
+                            saved.get("generator") == gen_model
+                            or saved.get("gen_model") == gen_model
+                        )
                         and saved.get("prompt_version") == prompt_version
                         and saved.get("pdf_name") == pdf_base
                         and saved.get("n") == n
@@ -968,7 +998,11 @@ def run_faithfulness_evaluation(
                     )
                     if key_matches:
                         results = saved["questions"]
-                        logger.info("Resuming from %s with %d matching cached evaluations", output_path, len(results))
+                        logger.info(
+                            "Resuming from %s with %d matching cached evaluations",
+                            output_path,
+                            len(results),
+                        )
                     else:
                         logger.info(
                             "Cache mismatch in %s (cached key: '%s', current key: '%s'). Starting fresh.",
@@ -991,7 +1025,7 @@ def run_faithfulness_evaluation(
 
     if os.path.exists(val_file_path):
         try:
-            with open(val_file_path, "r", encoding="utf-8") as f:
+            with open(val_file_path, encoding="utf-8") as f:
                 val_data = json.load(f)
                 judge_val_verdict = val_data.get("status", "UNVALIDATED")
                 heldout_sec = val_data.get("heldout", {})
@@ -1004,15 +1038,19 @@ def run_faithfulness_evaluation(
     print(f"Judge Type: {judge_type.upper()} | Judge Model: {active_judge_name}")
     print(f"Validation Verdict: {judge_val_verdict}")
     if heldout_accept_rate is not None:
-        print(f"HELD-OUT Accept Rate: {heldout_accept_rate:.3f} | HELD-OUT False-Accept Rate: {heldout_false_accept_rate:.3f}")
+        print(
+            f"HELD-OUT Accept Rate: {heldout_accept_rate:.3f} | HELD-OUT False-Accept Rate: {heldout_false_accept_rate:.3f}"
+        )
     print(f"Generator Model: {gen_model} | Prompt Version: {prompt_version}")
-    print(f"PDF: {pdf_base} | Questions: {len(selected)} (sampled from {len(answerable)} answerable, seed={seed})")
+    print(
+        f"PDF: {pdf_base} | Questions: {len(selected)} (sampled from {len(answerable)} answerable, seed={seed})"
+    )
 
-    def _save_current_progress(mean_score: Optional[float] = None):
+    def _save_current_progress(mean_score: float | str | None = None):
         existing_data = {}
         if os.path.exists(output_path):
             try:
-                with open(output_path, "r", encoding="utf-8") as f:
+                with open(output_path, encoding="utf-8") as f:
                     existing_data = json.load(f)
                     if not isinstance(existing_data, dict):
                         existing_data = {}
@@ -1037,7 +1075,9 @@ def run_faithfulness_evaluation(
             "questions": results,
         }
         if mean_score is not None:
-            summary_payload["mean_faithfulness"] = round(mean_score, 3)
+            summary_payload["mean_faithfulness"] = (
+                round(mean_score, 3) if isinstance(mean_score, (int, float)) else str(mean_score)
+            )
 
         existing_data.update(summary_payload)
         with open(output_path, "w", encoding="utf-8") as f:
@@ -1120,7 +1160,9 @@ def run_faithfulness_evaluation(
                         total_c = len(rep_llm.claims)
                         entailed_c = sum(1 for c in rep_llm.claims if c.entailed)
                         is_unscorable = rep_llm.unscorable or total_c == 0
-                        score = (entailed_c / total_c) if (total_c > 0 and not is_unscorable) else None
+                        score = (
+                            (entailed_c / total_c) if (total_c > 0 and not is_unscorable) else None
+                        )
 
                         record = {
                             "id": q_id,
@@ -1136,7 +1178,15 @@ def run_faithfulness_evaluation(
                                 (
                                     c.model_dump()
                                     if hasattr(c, "model_dump")
-                                    else (c.dict() if hasattr(c, "dict") else {"claim": c.claim, "entailed": c.entailed, "reason": c.reason})
+                                    else (
+                                        c.dict()
+                                        if hasattr(c, "dict")
+                                        else {
+                                            "claim": c.claim,
+                                            "entailed": c.entailed,
+                                            "reason": c.reason,
+                                        }
+                                    )
                                 )
                                 for c in rep_llm.claims
                             ],
@@ -1157,53 +1207,15 @@ def run_faithfulness_evaluation(
             }
             _save_current_progress()
 
-    # Summary table
-    print("\n### Faithfulness Evaluation Summary Table\n")
-    print(f"**Judge Model**: `{active_judge_name}`")
-    print(f"**Judge Validation Verdict**: `{judge_val_verdict}`")
-    h_acc_str = f"{heldout_accept_rate:.3f}" if heldout_accept_rate is not None else "n/a"
-    h_fa_str = f"{heldout_false_accept_rate:.3f}" if heldout_false_accept_rate is not None else "n/a"
-    print(f"**HELD-OUT Accept Rate**: `{h_acc_str}`")
-    print(f"**HELD-OUT False-Accept Rate**: `{h_fa_str}`\n")
-    if judge_val_verdict != "VALID":
-        print("UNVALIDATED JUDGE: treat scores as directional\n")
+    mean_f, unscorable_count = print_faithfulness_summary_table(
+        results=results,
+        active_judge_name=active_judge_name,
+        judge_val_verdict=judge_val_verdict,
+        heldout_accept_rate=heldout_accept_rate,
+        heldout_false_accept_rate=heldout_false_accept_rate,
+    )
 
-    print("| Question ID | Question Excerpt | Supported | Total | Faithfulness | Status |")
-    print("| :--- | :--- | :--- | :--- | :--- | :--- |")
-    applicable_scores: List[float] = []
-    unscorable_count = 0
-
-    for r in results.values():
-        if "error" in r:
-            status_str = "ERROR"
-            f_str = "n/a"
-        elif not r.get("applicable", True):
-            status_str = "REFUSAL / ABSTAINED"
-            f_str = "n/a"
-        elif r.get("unscorable", False):
-            status_str = "UNSCORABLE"
-            f_str = "n/a"
-            unscorable_count += 1
-        else:
-            score_val = r.get("faithfulness")
-            if score_val is not None:
-                applicable_scores.append(score_val)
-                f_str = f"{score_val:.2f}"
-                status_str = "PASS" if score_val >= 0.7 else "WARN"
-            else:
-                f_str = "n/a"
-                status_str = "UNSCORABLE"
-                unscorable_count += 1
-
-        q_excerpt = (r["question"][:40] + "...") if len(r["question"]) > 40 else r["question"]
-        print(f"| {r['id']} | {q_excerpt} | {r.get('supported_items', 0)} | {r.get('total_items', 0)} | {f_str} | {status_str} |")
-
-    mean_f = sum(applicable_scores) / len(applicable_scores) if applicable_scores else 1.0
-    print(f"\n**Mean Answer Faithfulness**: `{mean_f:.3f}` across {len(applicable_scores)} applicable answers.")
-    if unscorable_count > 0:
-        print(f"**Unscorable Answers Excluded from Mean**: {unscorable_count}")
-
-    _save_current_progress(mean_score=mean_f)
+    _save_current_progress(mean_score=mean_f if mean_f is not None else "n/a")
 
     return {
         "cache_key": current_cache_key,
@@ -1220,7 +1232,7 @@ def run_faithfulness_evaluation(
         "n": n,
         "seed": seed,
         "sample_size": len(results),
-        "mean_faithfulness": round(mean_f, 3),
+        "mean_faithfulness": round(mean_f, 3) if mean_f is not None else "n/a",
         "unscorable_count": unscorable_count,
         "questions": results,
     }
@@ -1228,24 +1240,73 @@ def run_faithfulness_evaluation(
 
 def main():
     default_pdf = DEFAULT_BOOK_PDF if os.path.exists(DEFAULT_BOOK_PDF) else DEFAULT_BOOK_PDF
-    default_golden = DEFAULT_BOOK_GOLDEN if os.path.exists(DEFAULT_BOOK_PDF) else DEFAULT_BOOK_GOLDEN
+    default_golden = (
+        DEFAULT_BOOK_GOLDEN if os.path.exists(DEFAULT_BOOK_PDF) else DEFAULT_BOOK_GOLDEN
+    )
 
-    parser = argparse.ArgumentParser(description="Evaluate answer faithfulness with NLI or LLM judge.")
-    parser.add_argument("--judge-type", type=str, choices=["nli", "llm"], default="nli", help="Judge architecture (nli or llm)")
-    parser.add_argument("--nli-model", type=str, default=DEFAULT_NLI_MODEL, help="NLI model name (e.g. cross-encoder/nli-deberta-v3-small, cross-encoder/nli-MiniLM2-L6-H768)")
-    parser.add_argument("--entail-threshold", type=float, default=None, help="Entailment probability threshold for sentence support (default calibrated on dev: 0.30)")
-    parser.add_argument("--premise-window", type=str, default=DEFAULT_PREMISE_WINDOWS, help="Sliding window sizes of consecutive sentences within chunks (default '1,2,3')")
-    parser.add_argument("--judge-model", type=str, default="llama3.2:3b", help="Model identifier for LLM judge")
-    parser.add_argument("--gen-model", type=str, default="qwen2.5:3b", help="Model identifier for answer generation")
-    parser.add_argument("--golden", type=str, default=default_golden, help="Path to golden questions JSON")
+    parser = argparse.ArgumentParser(
+        description="Evaluate answer faithfulness with NLI or LLM judge."
+    )
+    parser.add_argument(
+        "--judge-type",
+        type=str,
+        choices=["nli", "llm"],
+        default="nli",
+        help="Judge architecture (nli or llm)",
+    )
+    parser.add_argument(
+        "--nli-model",
+        type=str,
+        default=DEFAULT_NLI_MODEL,
+        help="NLI model name (e.g. cross-encoder/nli-deberta-v3-small, cross-encoder/nli-MiniLM2-L6-H768)",
+    )
+    parser.add_argument(
+        "--entail-threshold",
+        type=float,
+        default=None,
+        help="Entailment probability threshold for sentence support (default calibrated on dev: 0.30)",
+    )
+    parser.add_argument(
+        "--premise-window",
+        type=str,
+        default=DEFAULT_PREMISE_WINDOWS,
+        help="Sliding window sizes of consecutive sentences within chunks (default '1,2,3')",
+    )
+    parser.add_argument(
+        "--judge-model", type=str, default="llama3.2:3b", help="Model identifier for LLM judge"
+    )
+    parser.add_argument(
+        "--gen-model", type=str, default="qwen2.5:3b", help="Model identifier for answer generation"
+    )
+    parser.add_argument(
+        "--golden", type=str, default=default_golden, help="Path to golden questions JSON"
+    )
     parser.add_argument("--pdf", type=str, default=default_pdf, help="Path to fixture PDF")
-    parser.add_argument("--output", type=str, default="eval/results/faithfulness.json", help="Path to output JSON")
-    parser.add_argument("--answers", type=str, default=DEFAULT_CI_ANSWERS, help="Path to answers JSON for judge validation")
-    parser.add_argument("--heldout-answers", type=str, default=DEFAULT_HELDOUT_ANSWERS, help="Path to held-out answers JSON for judge validation")
+    parser.add_argument(
+        "--output", type=str, default="eval/results/faithfulness.json", help="Path to output JSON"
+    )
+    parser.add_argument(
+        "--answers",
+        type=str,
+        default=DEFAULT_CI_ANSWERS,
+        help="Path to answers JSON for judge validation",
+    )
+    parser.add_argument(
+        "--heldout-answers",
+        type=str,
+        default=DEFAULT_HELDOUT_ANSWERS,
+        help="Path to held-out answers JSON for judge validation",
+    )
     parser.add_argument("--n", type=int, default=20, help="Number of questions to evaluate")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for question sampling")
-    parser.add_argument("--validate-judge", action="store_true", help="Validate judge model on supported and negative controls")
-    parser.add_argument("--no-resume", action="store_true", help="Overwrite existing results without resuming")
+    parser.add_argument(
+        "--validate-judge",
+        action="store_true",
+        help="Validate judge model on supported and negative controls",
+    )
+    parser.add_argument(
+        "--no-resume", action="store_true", help="Overwrite existing results without resuming"
+    )
     args = parser.parse_args()
 
     if args.validate_judge:

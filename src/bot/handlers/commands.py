@@ -1,0 +1,96 @@
+"""Command handlers for Telegram bot (/start, /help, /list, /delete, /clear, /addurl)."""
+
+import logging
+
+from telegram import Update
+from telegram.ext import ContextTypes
+
+logger = logging.getLogger(__name__)
+
+
+class CommandHandlersMixin:
+    """Mixin providing slash-command handlers for BotHandlers."""
+
+    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Send welcome message and overview of capabilities and commands."""
+        welcome_message = (
+            "👋 Welcome to PDF RAG Chatbot!\n\n"
+            "I can help you analyze PDF, Markdown, and text documents, as well as web pages, "
+            "and answer questions about them.\n\n"
+            "📤 Send me a PDF, .md, or .txt file\n"
+            "🌐 Send /addurl <url> to ingest a static web page\n"
+            "🔗 Or send a direct link to a PDF\n"
+            "❓ Ask questions about your uploaded documents\n\n"
+            "Commands:\n"
+            "/list - Show your uploaded documents\n"
+            "/delete <filename> - Delete a specific document\n"
+            "/clear - Delete all your documents\n"
+            "/addurl <url> - Ingest a web page\n"
+            "/help - Show this message"
+        )
+        await update.message.reply_text(welcome_message)
+
+    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show help information."""
+        await self.start_command(update, context)
+
+    async def list_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """List all documents currently ingested for the user."""
+        user_id = update.effective_user.id
+        try:
+            documents = self.document_store.list_documents(user_id)
+            if not documents:
+                await update.message.reply_text("📭 You haven't uploaded any documents yet.")
+                return
+
+            message = "📚 Your uploaded documents:\n\n"
+            for doc in documents:
+                size_mb = doc["file_size"] / (1024 * 1024)
+                message += f"📄 {doc['filename']}\n"
+                message += f"   Size: {size_mb:.2f} MB | Chunks: {doc['chunk_count']}\n"
+                message += f"   Uploaded: {doc['upload_date']}\n\n"
+
+            await update.message.reply_text(message)
+        except Exception as e:
+            logger.exception("Failed to list documents: %s", e)
+            await update.message.reply_text("❌ Failed to retrieve document list.")
+
+    async def delete_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Delete a specified document for the user."""
+        user_id = update.effective_user.id
+        if not context.args:
+            await update.message.reply_text("❌ Please specify a filename: /delete <filename>")
+            return
+
+        filename = " ".join(context.args)
+        try:
+            deleted = self.document_store.delete_document(user_id, filename)
+            if deleted:
+                await update.message.reply_text(f"✅ Deleted document: {filename}")
+            else:
+                await update.message.reply_text(f"❌ Document not found: {filename}")
+        except Exception as e:
+            logger.exception("Failed to delete document: %s", e)
+            await update.message.reply_text("❌ Failed to delete document.")
+
+    async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Clear all documents for the user."""
+        user_id = update.effective_user.id
+        try:
+            count = self.document_store.clear_user_documents(user_id)
+            if count > 0:
+                await update.message.reply_text(f"✅ Deleted {count} document(s).")
+            else:
+                await update.message.reply_text("📭 You don't have any documents to delete.")
+        except Exception as e:
+            logger.exception("Failed to clear documents: %s", e)
+            await update.message.reply_text("❌ Failed to clear documents.")
+
+    async def addurl_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Ingest a web page specified by URL."""
+        if not context.args:
+            await update.message.reply_text("❌ Please specify a URL: /addurl <url>")
+            return
+
+        url = context.args[0].strip()
+        await self._handle_web_url_ingest(update, context, url)

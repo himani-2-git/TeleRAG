@@ -1,16 +1,18 @@
 """Unit tests for multi-format document ingestion (Markdown, TXT, Web) and SSRF validation."""
 
 import unittest
-from unittest.mock import patch, Mock
-from src.processors.markdown_processor import MarkdownProcessor
-from src.processors.web_processor import (
-    validate_url_ssrf,
-    extract_html_content,
-    WebProcessor,
-)
-from src.processors.text_chunker import TextChunker
-from src.rag.retriever import DocumentRetriever
+from unittest.mock import Mock, patch
+
 from src.bot.handlers import BotHandlers
+from src.config import Config
+from src.processors.markdown_processor import MarkdownProcessor
+from src.processors.text_chunker import TextChunker
+from src.processors.web_processor import (
+    WebProcessor,
+    extract_html_content,
+    validate_url_ssrf,
+)
+from src.rag.retriever import DocumentRetriever
 
 
 class TestMultiFormatIngestion(unittest.TestCase):
@@ -25,7 +27,7 @@ class TestMultiFormatIngestion(unittest.TestCase):
             embedding_generator=Mock(),
             retriever=Mock(),
             llm_client=Mock(),
-            config=Mock(),
+            config=Config(telegram_bot_token="test"),
         )
 
     def test_markdown_heading_chunking_and_labels(self):
@@ -62,7 +64,9 @@ Markdown and web pages are parsed.
 
     def test_markdown_long_section_chunking(self):
         """Test that a section exceeding chunk_size is split while keeping heading label."""
-        long_paragraph = "This is a detailed sentence about TeleRAG RAG architecture. " * 30  # ~1800 chars
+        long_paragraph = (
+            "This is a detailed sentence about TeleRAG RAG architecture. " * 30
+        )  # ~1800 chars
         md_text = f"# Big Chapter\n\n{long_paragraph}"
 
         processor = MarkdownProcessor(chunk_size=500, overlap=100)
@@ -90,30 +94,28 @@ Markdown and web pages are parsed.
                 "source_type": "pdf",
                 "page_start": 3,
                 "page_end": 4,
-                "content": "PDF content on pages 3-4."
+                "content": "PDF content on pages 3-4.",
             },
             {
                 "filename": "README.md",
                 "source_type": "markdown",
                 "section_label": "Setup > Installation",
-                "content": "Run pip install -r requirements.txt."
+                "content": "Run pip install -r requirements.txt.",
             },
             {
                 "filename": "Python Docs (docs.python.org)",
                 "source_type": "web",
                 "section_label": "Python Docs (docs.python.org)",
-                "content": "Python 3.12 release notes."
+                "content": "Python 3.12 release notes.",
             },
-            {
-                "filename": "notes.txt",
-                "source_type": "text",
-                "content": "Plain text note."
-            }
+            {"filename": "notes.txt", "source_type": "text", "content": "Plain text note."},
         ]
 
         context = self.retriever.format_context(chunks)
         self.assertIn("[guide.pdf, p. 3-4]\nPDF content on pages 3-4.", context)
-        self.assertIn("[README.md, Setup > Installation]\nRun pip install -r requirements.txt.", context)
+        self.assertIn(
+            "[README.md, Setup > Installation]\nRun pip install -r requirements.txt.", context
+        )
         self.assertIn("[Python Docs (docs.python.org)]\nPython 3.12 release notes.", context)
         self.assertIn("[notes.txt]\nPlain text note.", context)
 
@@ -192,7 +194,7 @@ class TestSSRFValidation(unittest.TestCase):
         # Initial URL is safe, redirect target is unsafe
         mock_validate.side_effect = [
             (True, ""),  # initial URL
-            (False, "Access to private network address is forbidden.")  # redirect target
+            (False, "Access to private network address is forbidden."),  # redirect target
         ]
 
         mock_resp = Mock()

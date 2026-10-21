@@ -1,8 +1,8 @@
 """Markdown processor for heading-aware chunking and citation labeling."""
 
-import re
-from typing import List, Tuple, Optional
 import logging
+import re
+
 from .text_chunker import TextChunk, TextChunker
 
 logger = logging.getLogger(__name__)
@@ -16,24 +16,24 @@ class MarkdownProcessor:
         self.overlap = overlap
         self.chunker = TextChunker(chunk_size=chunk_size, overlap=overlap)
 
-    def extract_sections(self, text: str, default_label: str = "Overview") -> List[Tuple[str, str]]:
+    def extract_sections(self, text: str, default_label: str = "Overview") -> list[tuple[str, str]]:
         """Split markdown text into sections based on heading hierarchy.
-        
+
         Args:
             text: Raw markdown text.
             default_label: Label for any content preceding the first heading.
-            
+
         Returns:
             List of (heading_path, section_content) tuples.
         """
         lines = text.splitlines()
-        sections: List[Tuple[str, List[str]]] = []
-        hierarchy: List[Tuple[int, str]] = []
+        sections: list[tuple[str, list[str]]] = []
+        hierarchy: list[tuple[int, str]] = []
 
         current_label = default_label
-        current_lines: List[str] = []
+        current_lines: list[str] = []
 
-        heading_regex = re.compile(r'^(#{1,6})\s+(.+)$')
+        heading_regex = re.compile(r"^(#{1,6})\s+(.+)$")
 
         for line in lines:
             match = heading_regex.match(line.strip())
@@ -62,15 +62,19 @@ class MarkdownProcessor:
             sections.append((current_label, current_lines))
 
         # Join lines into strings
-        return [(label, "\n".join(sec_lines).strip()) for label, sec_lines in sections if "\n".join(sec_lines).strip()]
+        return [
+            (label, "\n".join(sec_lines).strip())
+            for label, sec_lines in sections
+            if "\n".join(sec_lines).strip()
+        ]
 
-    def process_markdown(self, text: str, source_name: str = "document.md") -> List[TextChunk]:
+    def process_markdown(self, text: str, source_name: str = "document.md") -> list[TextChunk]:
         """Process markdown content into chunks with heading path labels.
-        
+
         Args:
             text: Raw markdown string.
             source_name: Name of the markdown file.
-            
+
         Returns:
             List of TextChunk instances with section_label set to heading hierarchy.
         """
@@ -79,7 +83,7 @@ class MarkdownProcessor:
             return []
 
         sections = self.extract_sections(text, default_label="Overview")
-        all_chunks: List[TextChunk] = []
+        all_chunks: list[TextChunk] = []
         global_pos = 0
 
         for label, section_text in sections:
@@ -118,5 +122,7 @@ class MarkdownProcessor:
         for idx, chunk in enumerate(all_chunks):
             chunk.chunk_index = idx
 
-        logger.info(f"Processed markdown into {len(all_chunks)} chunks across {len(sections)} sections")
+        logger.info(
+            f"Processed markdown into {len(all_chunks)} chunks across {len(sections)} sections"
+        )
         return all_chunks

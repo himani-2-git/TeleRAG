@@ -1,14 +1,11 @@
 """Unit tests for grounding check module."""
 
 import unittest
-import numpy as np
 
 from src.rag.grounding import (
-    GroundingReport,
-    cosine_similarity,
     grounding_report,
-    strip_footers,
     split_sentences,
+    strip_footers,
 )
 
 
@@ -111,7 +108,9 @@ class TestGrounding(unittest.TestCase):
         self.assertEqual(report_marker.total_sentences, 0)
 
         # Friendly refusal message
-        refusal = "🤔 I couldn't find relevant information in your documents to answer this question."
+        refusal = (
+            "🤔 I couldn't find relevant information in your documents to answer this question."
+        )
         report_msg = grounding_report(refusal, chunks, embedder)
         self.assertFalse(report_msg.applicable)
         self.assertEqual(report_msg.citation_coverage, 1.0)
@@ -123,9 +122,7 @@ class TestGrounding(unittest.TestCase):
 
     def test_grounding_footers_ignored(self):
         """Verify footers in the answer string do not count as sentences."""
-        embedder = FakeEmbedder(
-            mapping={"alpha": [1.0, 0.0, 0.0, 0.0]}
-        )
+        embedder = FakeEmbedder(mapping={"alpha": [1.0, 0.0, 0.0, 0.0]})
         chunks = [{"content": "Alpha details."}]
         answer_with_footers = (
             "Alpha details are verified.\n\n"

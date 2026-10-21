@@ -1,9 +1,10 @@
 """Post-generation grounding check for RAG answers."""
 
-from dataclasses import dataclass, field
 import logging
 import re
-from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass, field
+from typing import Any
+
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -12,12 +13,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class GroundingReport:
     """Report detailing citation and factual grounding metrics."""
+
     applicable: bool
     citation_coverage: float
     total_sentences: int
     supported_sentences: int
-    unsupported_sentences: List[str] = field(default_factory=list)
-    max_scores: List[float] = field(default_factory=list)
+    unsupported_sentences: list[str] = field(default_factory=list)
+    max_scores: list[float] = field(default_factory=list)
 
 
 def strip_footers(text: str) -> str:
@@ -41,13 +43,13 @@ def strip_footers(text: str) -> str:
     return cleaned.strip()
 
 
-def split_sentences(text: str) -> List[str]:
+def split_sentences(text: str) -> list[str]:
     """Split clean text into sentences."""
     if not text:
         return []
     # Normalize whitespace/newlines
     lines = [line.strip() for line in text.split("\n") if line.strip()]
-    sentences: List[str] = []
+    sentences: list[str] = []
     for line in lines:
         # Split line on terminal punctuation followed by space or end of line
         parts = re.split(r"(?<=[.!?])\s+", line)
@@ -110,8 +112,8 @@ def _get_chunk_text_and_embedding(chunk: Any, embedder: Any) -> tuple[str, np.nd
             emb = np.array(chunk["embedding"], dtype=float)
     elif hasattr(chunk, "content"):
         text = getattr(chunk, "content", "")
-        if hasattr(chunk, "embedding") and getattr(chunk, "embedding") is not None:
-            emb = np.array(getattr(chunk, "embedding"), dtype=float)
+        if hasattr(chunk, "embedding") and chunk.embedding is not None:
+            emb = np.array(chunk.embedding, dtype=float)
     elif isinstance(chunk, str):
         text = chunk
 
@@ -130,19 +132,19 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def grounding_report(
-    answer: Optional[str],
-    chunks: Union[List[Dict[str, Any]], List[Any]],
+    answer: str | None,
+    chunks: list[dict[str, Any]] | list[Any],
     embedder: Any,
     threshold: float = 0.45,
 ) -> GroundingReport:
     """Compute sentence-level grounding report comparing answer against retrieved chunks.
-    
+
     Args:
         answer: The model's answer string (may include footers).
         chunks: Retrieved chunks (dicts, Chunk objects, or strings).
         embedder: Embedding generator instance or function.
         threshold: Minimum cosine similarity required to consider a sentence supported.
-        
+
     Returns:
         GroundingReport instance.
     """
@@ -194,14 +196,14 @@ def grounding_report(
         )
 
     # 5. Extract chunk embeddings
-    chunk_embeddings: List[np.ndarray] = []
+    chunk_embeddings: list[np.ndarray] = []
     for c in chunks:
         _, emb = _get_chunk_text_and_embedding(c, embedder)
         chunk_embeddings.append(emb)
 
     supported_count = 0
-    unsupported: List[str] = []
-    max_scores: List[float] = []
+    unsupported: list[str] = []
+    max_scores: list[float] = []
 
     for sentence in sentences:
         s_vec = _get_embedding(embedder, sentence)

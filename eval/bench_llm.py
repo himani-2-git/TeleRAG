@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import time
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -49,10 +49,12 @@ def is_refusal_response(response: str) -> bool:
     return any(p in clean for p in refusal_patterns)
 
 
-def print_benchmark_table(results: Dict[str, Any]) -> None:
+def print_benchmark_table(results: dict[str, Any]) -> None:
     """Print ASCII summary table of benchmark results."""
     print("\n" + "=" * 90)
-    print(f"{'model':<20} | {'median latency':<16} | {'p95 latency':<13} | {'answerable answered %':<23} | {'unanswerable refused %':<24}")
+    print(
+        f"{'model':<20} | {'median latency':<16} | {'p95 latency':<13} | {'answerable answered %':<23} | {'unanswerable refused %':<24}"
+    )
     print("-" * 90)
     for model, m in results.items():
         med = m.get("median_latency_s", m.get("median latency", 0.0))
@@ -68,16 +70,17 @@ def print_benchmark_table(results: Dict[str, Any]) -> None:
 
 
 def run_llm_benchmark(
-    models: List[str],
+    models: list[str],
     pdf_path: str = "eval/fixtures/ci_fixture.pdf",
     golden_path: str = "eval/golden_ci.json",
-    output_path: str = "eval/results/llm_bench.json"
-) -> Dict[str, Any]:
+    output_path: str = "eval/results/llm_bench.json",
+) -> dict[str, Any]:
     """Run LLM latency and accuracy benchmark across specified models."""
     try:
         config = get_config(require_telegram=False)
     except Exception:
         from src.config import Config
+
         config = Config(
             telegram_bot_token="",
             llm_api_key=os.getenv("LLM_API_KEY", ""),
@@ -89,29 +92,29 @@ def run_llm_benchmark(
             similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
             retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
         )
-    
+
     # 1. Ingest fixture
     logger.info("Extracting and chunking %s...", pdf_path)
     chunks = extract_chunks_with_pages(pdf_path)
-    
+
     # 2. Embed chunks in batch
     embedder = EmbeddingGenerator(model_name=config.embedding_model)
     logger.info("Generating embeddings for %d chunks...", len(chunks))
     contents = [c.get("content", "") for c in chunks]
     embeddings = embedder.generate_embeddings(contents)
-    for chunk, emb in zip(chunks, embeddings):
+    for chunk, emb in zip(chunks, embeddings, strict=False):
         chunk["embedding"] = emb
-        
+
     retriever = DocumentRetriever(
         top_k=config.top_k_results,
         similarity_threshold=config.similarity_threshold,
-        retrieval_mode=getattr(config, "retrieval_mode", "hybrid")
+        retrieval_mode=getattr(config, "retrieval_mode", "hybrid"),
     )
-    
+
     # 3. Load 12 questions (9 answerable + 3 unanswerable)
-    with open(golden_path, "r", encoding="utf-8") as f:
+    with open(golden_path, encoding="utf-8") as f:
         all_questions = json.load(f)
-        
+
     answerable = [q for q in all_questions if q.get("answerable", True)]
     unanswerable = [q for q in all_questions if not q.get("answerable", True)]
     selected_questions = answerable[:9] + unanswerable[:3]
@@ -119,36 +122,36 @@ def run_llm_benchmark(
         "Selected %d questions (%d answerable, %d unanswerable)",
         len(selected_questions),
         len([q for q in selected_questions if q.get("answerable", True)]),
-        len([q for q in selected_questions if not q.get("answerable", True)])
+        len([q for q in selected_questions if not q.get("answerable", True)]),
     )
-    
+
     # Load existing results if output_path exists so partial results from earlier runs aren't lost
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
     if os.path.exists(output_path):
         try:
-            with open(output_path, "r", encoding="utf-8") as f:
+            with open(output_path, encoding="utf-8") as f:
                 results = json.load(f)
         except Exception as e:
             logger.warning("Could not load existing %s: %s", output_path, e)
             results = {}
-            
+
     for model_name in models:
         model_name = model_name.strip()
         if not model_name:
             continue
-            
+
         logger.info("=" * 60)
         logger.info("Benchmarking model: %s", model_name)
         logger.info("=" * 60)
-        
+
         client = LLMClient(
             api_key=config.llm_api_key,
             model=model_name,
             base_url=config.llm_base_url,
             timeout=300.0,
-            max_tokens=config.llm_max_tokens
+            max_tokens=config.llm_max_tokens,
         )
-        
+
         # Warm-up request
         logger.info("Sending warm-up request to %s...", model_name)
         try:
@@ -156,14 +159,14 @@ def run_llm_benchmark(
             logger.info("Warm-up complete.")
         except Exception as e:
             logger.warning("Warm-up failed: %s", e)
-            
-        latencies: List[float] = []
+
+        latencies: list[float] = []
         ans_answered = 0
         ans_total = 0
         unans_refused = 0
         unans_total = 0
         failed_count = 0
-        
+
         for q in selected_questions:
             q_text = q["question"]
             is_ans = q.get("answerable", True)
@@ -171,12 +174,12 @@ def run_llm_benchmark(
                 ans_total += 1
             else:
                 unans_total += 1
-                
+
             try:
                 # 1. Retrieve context using the exact same public path as the bot
                 q_emb = embedder.generate_query_embedding(q_text)
                 top_chunks = retriever.retrieve(query=q_text, query_embedding=q_emb, chunks=chunks)
-                
+
                 # If top dense score is below SIMILARITY_THRESHOLD, retriever returns [] (abstains)
                 if not top_chunks:
                     elapsed = 0.0
@@ -186,21 +189,28 @@ def run_llm_benchmark(
                         unans_refused += 1
                     logger.info(
                         "[%s] Q: '%s' -> %.2fs (Abstained: below threshold, refused=%s)",
-                        model_name, q_text[:30], elapsed, refused
+                        model_name,
+                        q_text[:30],
+                        elapsed,
+                        refused,
                     )
                     continue
-                    
+
                 # 2. Chunks passed threshold: call LLM
                 context_text = retriever.format_context(top_chunks)
                 t0 = time.time()
                 response = client.generate_answer(q_text, context_text)
                 elapsed = time.time() - t0
-                
+
                 if response is None:
-                    logger.warning("[%s] Q: '%s' -> LLM returned None (generation failure)", model_name, q_text[:30])
+                    logger.warning(
+                        "[%s] Q: '%s' -> LLM returned None (generation failure)",
+                        model_name,
+                        q_text[:30],
+                    )
                     failed_count += 1
                     continue
-                    
+
                 latencies.append(elapsed)
                 refused = is_refusal_response(response)
                 if is_ans:
@@ -209,21 +219,20 @@ def run_llm_benchmark(
                 else:
                     if refused:
                         unans_refused += 1
-                        
+
                 logger.info(
-                    "[%s] Q: '%s' -> %.2fs (Refused: %s)",
-                    model_name, q_text[:30], elapsed, refused
+                    "[%s] Q: '%s' -> %.2fs (Refused: %s)", model_name, q_text[:30], elapsed, refused
                 )
             except Exception as e:
                 logger.error("[%s] Error evaluating question '%s': %s", model_name, q_text[:30], e)
                 failed_count += 1
                 continue
-                
+
         median_lat = float(np.median(latencies)) if latencies else 0.0
         p95_lat = float(np.percentile(latencies, 95)) if latencies else 0.0
         ans_pct = float(100.0 * ans_answered / ans_total) if ans_total else 0.0
         unans_pct = float(100.0 * unans_refused / unans_total) if unans_total else 0.0
-        
+
         model_result = {
             "model": model_name,
             "prompt_version": getattr(config, "prompt_version", "v1"),
@@ -237,41 +246,50 @@ def run_llm_benchmark(
             "unanswerable refused %": round(unans_pct, 1),
             "sample_size": len(selected_questions),
             "failed_count": failed_count,
-            "latencies_s": [round(x, 2) for x in latencies]
+            "latencies_s": [round(x, 2) for x in latencies],
         }
         results[model_name] = model_result
-        
+
         out_dir = os.path.dirname(output_path)
         if out_dir:
             os.makedirs(out_dir, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
         logger.info("Saved benchmark results after model '%s' to %s", model_name, output_path)
-        
+
     # Print formatted table at the end
     print_benchmark_table(results)
-    
+
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Benchmark LLM latency and refusal on fixture questions.")
-    parser.add_argument("--models", type=str, default="qwen2.5:3b,llama3.2:3b",
-                        help="Comma-separated list of LLM model identifiers")
-    parser.add_argument("--pdf", type=str, default="eval/fixtures/ci_fixture.pdf",
-                        help="Path to PDF fixture")
-    parser.add_argument("--golden", type=str, default="eval/golden_ci.json",
-                        help="Path to golden questions JSON")
-    parser.add_argument("--output", type=str, default="eval/results/llm_bench.json",
-                        help="Path to save JSON benchmark output")
+    parser = argparse.ArgumentParser(
+        description="Benchmark LLM latency and refusal on fixture questions."
+    )
+    parser.add_argument(
+        "--models",
+        type=str,
+        default="qwen2.5:3b,llama3.2:3b",
+        help="Comma-separated list of LLM model identifiers",
+    )
+    parser.add_argument(
+        "--pdf", type=str, default="eval/fixtures/ci_fixture.pdf", help="Path to PDF fixture"
+    )
+    parser.add_argument(
+        "--golden", type=str, default="eval/golden_ci.json", help="Path to golden questions JSON"
+    )
+    parser.add_argument(
+        "--output",
+        type=str,
+        default="eval/results/llm_bench.json",
+        help="Path to save JSON benchmark output",
+    )
     args = parser.parse_args()
-    
+
     model_list = [m.strip() for m in args.models.split(",") if m.strip()]
     run_llm_benchmark(
-        models=model_list,
-        pdf_path=args.pdf,
-        golden_path=args.golden,
-        output_path=args.output
+        models=model_list, pdf_path=args.pdf, golden_path=args.golden, output_path=args.output
     )
 
 

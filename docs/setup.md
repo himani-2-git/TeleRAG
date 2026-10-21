@@ -357,4 +357,4 @@ Once at least one document is uploaded, simply send natural language questions:
 ### 4. PDF Text Extraction Returns 0 Chunks
 * **Symptom**: *"❌ No text content could be extracted from PDF."*
 * **Cause**: The PDF is a scanned image or raster graphic without an embedded OCR text layer.
-* **Resolution**: TeleRAG uses `PyPDF2` text extraction; use an OCR tool (e.g. Adobe Acrobat OCR or ocrmypdf) to convert scanned PDFs into searchable text before uploading.
+* **Resolution**: TeleRAG uses `pypdf` text extraction; use an OCR tool (e.g. Adobe Acrobat OCR or ocrmypdf) to convert scanned PDFs into searchable text before uploading.

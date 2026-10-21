@@ -1,9 +1,11 @@
 """Unit tests for faithfulness evaluation with NLI CrossEncoder and LLM judges."""
 
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import Mock
 
 import numpy as np
@@ -24,15 +26,23 @@ from eval.run_faithfulness import (
 class TestFaithfulness(unittest.TestCase):
     """Test suite for faithfulness evaluation module."""
 
+    def setUp(self):
+        self._stdout_trap = io.StringIO()
+        self._stdout_redirector = redirect_stdout(self._stdout_trap)
+        self._stdout_redirector.__enter__()
+
+    def tearDown(self):
+        self._stdout_redirector.__exit__(None, None, None)
+
     def test_extract_json_block(self):
         """Verify extraction from markdown code blocks and raw JSON."""
-        md_json = "Here is the response:\n```json\n{\"claims\": [{\"claim\": \"test\", \"entailed\": true}]}\n```\nDone."
+        md_json = 'Here is the response:\n```json\n{"claims": [{"claim": "test", "entailed": true}]}\n```\nDone.'
         extracted = extract_json_block(md_json)
         self.assertIsNotNone(extracted)
         self.assertIn("claims", extracted)
         self.assertEqual(len(extracted["claims"]), 1)
 
-        raw_json = "{\"claims\": []}"
+        raw_json = '{"claims": []}'
         extracted_raw = extract_json_block(raw_json)
         self.assertIsNotNone(extracted_raw)
         self.assertEqual(extracted_raw["claims"], [])
@@ -43,8 +53,16 @@ class TestFaithfulness(unittest.TestCase):
         mock_judge.send_request.return_value = json.dumps(
             {
                 "claims": [
-                    {"claim": "Replication provides high availability", "entailed": True, "reason": "Matches doc"},
-                    {"claim": "Raft uses 5 phases", "entailed": False, "reason": "Doc states 3 states"},
+                    {
+                        "claim": "Replication provides high availability",
+                        "entailed": True,
+                        "reason": "Matches doc",
+                    },
+                    {
+                        "claim": "Raft uses 5 phases",
+                        "entailed": False,
+                        "reason": "Doc states 3 states",
+                    },
                 ]
             }
         )
@@ -296,12 +314,32 @@ class TestFaithfulness(unittest.TestCase):
             out_json = os.path.join(tmpdir, "val_out.json")
 
             dev_data = [
-                {"id": "ref_1", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
-                {"id": "neg_1", "question": "What is high availability?", "answer": "Quantum failure sentence.", "is_negative_control": True},
+                {
+                    "id": "ref_1",
+                    "question": "What is high availability?",
+                    "answer": "Replication is the primary technique for high availability.",
+                    "is_negative_control": False,
+                },
+                {
+                    "id": "neg_1",
+                    "question": "What is high availability?",
+                    "answer": "Quantum failure sentence.",
+                    "is_negative_control": True,
+                },
             ]
             heldout_data = [
-                {"id": "href_1", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
-                {"id": "hneg_1", "question": "What is high availability?", "answer": "Quantum heldout failure sentence.", "is_negative_control": True},
+                {
+                    "id": "href_1",
+                    "question": "What is high availability?",
+                    "answer": "Replication is the primary technique for high availability.",
+                    "is_negative_control": False,
+                },
+                {
+                    "id": "hneg_1",
+                    "question": "What is high availability?",
+                    "answer": "Quantum heldout failure sentence.",
+                    "is_negative_control": True,
+                },
             ]
             with open(dev_json, "w", encoding="utf-8") as f:
                 json.dump(dev_data, f)
@@ -348,12 +386,32 @@ class TestFaithfulness(unittest.TestCase):
             out_json = os.path.join(tmpdir, "val_out.json")
 
             dev_data = [
-                {"id": "dev_ref", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
-                {"id": "dev_neg", "question": "What is high availability?", "answer": "Bogus fail.", "is_negative_control": True},
+                {
+                    "id": "dev_ref",
+                    "question": "What is high availability?",
+                    "answer": "Replication is the primary technique for high availability.",
+                    "is_negative_control": False,
+                },
+                {
+                    "id": "dev_neg",
+                    "question": "What is high availability?",
+                    "answer": "Bogus fail.",
+                    "is_negative_control": True,
+                },
             ]
             heldout_data = [
-                {"id": "heldout_ref", "question": "What is high availability?", "answer": "Replication is the primary technique for high availability.", "is_negative_control": False},
-                {"id": "heldout_neg", "question": "What is high availability?", "answer": "Bogus fail.", "is_negative_control": True},
+                {
+                    "id": "heldout_ref",
+                    "question": "What is high availability?",
+                    "answer": "Replication is the primary technique for high availability.",
+                    "is_negative_control": False,
+                },
+                {
+                    "id": "heldout_neg",
+                    "question": "What is high availability?",
+                    "answer": "Bogus fail.",
+                    "is_negative_control": True,
+                },
             ]
             with open(dev_json, "w", encoding="utf-8") as f:
                 json.dump(dev_data, f)
@@ -374,14 +432,21 @@ class TestFaithfulness(unittest.TestCase):
             self.assertIn("heldout", res)
 
             # Dev section contains only dev IDs
-            dev_ids = [r["id"] for r in res["dev"]["reference_results"] + res["dev"]["negative_control_results"]]
+            dev_ids = [
+                r["id"]
+                for r in res["dev"]["reference_results"] + res["dev"]["negative_control_results"]
+            ]
             self.assertIn("dev_ref", dev_ids)
             self.assertIn("dev_neg", dev_ids)
             self.assertNotIn("heldout_ref", dev_ids)
             self.assertNotIn("heldout_neg", dev_ids)
 
             # Heldout section contains only heldout IDs
-            heldout_ids = [r["id"] for r in res["heldout"]["reference_results"] + res["heldout"]["negative_control_results"]]
+            heldout_ids = [
+                r["id"]
+                for r in res["heldout"]["reference_results"]
+                + res["heldout"]["negative_control_results"]
+            ]
             self.assertIn("heldout_ref", heldout_ids)
             self.assertIn("heldout_neg", heldout_ids)
             self.assertNotIn("dev_ref", heldout_ids)
@@ -493,7 +558,7 @@ class TestFaithfulness(unittest.TestCase):
                 gen_client=mock_gen,
             )
 
-            self.assertEqual(summary["mean_faithfulness"], 1.0)
+            self.assertEqual(summary["mean_faithfulness"], "n/a")
             q_id = list(summary["questions"].keys())[0]
             rec = summary["questions"][q_id]
             self.assertFalse(rec["applicable"])
@@ -528,10 +593,9 @@ class TestFaithfulness(unittest.TestCase):
             self.assertIn("heldout_reference_accept_rate", summary)
             self.assertIn("heldout_negative_control_false_accept_rate", summary)
 
-            with open(out_json, "r", encoding="utf-8") as f:
+            with open(out_json, encoding="utf-8") as f:
                 saved = json.load(f)
             self.assertEqual(saved["judge_validation_verdict"], "UNVALIDATED")
-
 
 
 if __name__ == "__main__":

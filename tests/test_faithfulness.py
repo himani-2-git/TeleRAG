@@ -1,9 +1,11 @@
 """Unit tests for faithfulness evaluation with NLI CrossEncoder and LLM judges."""
 
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import Mock
 
 import numpy as np
@@ -23,6 +25,14 @@ from eval.run_faithfulness import (
 
 class TestFaithfulness(unittest.TestCase):
     """Test suite for faithfulness evaluation module."""
+
+    def setUp(self):
+        self._stdout_trap = io.StringIO()
+        self._stdout_redirector = redirect_stdout(self._stdout_trap)
+        self._stdout_redirector.__enter__()
+
+    def tearDown(self):
+        self._stdout_redirector.__exit__(None, None, None)
 
     def test_extract_json_block(self):
         """Verify extraction from markdown code blocks and raw JSON."""

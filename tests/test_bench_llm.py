@@ -1,9 +1,11 @@
 """Tests for the LLM benchmark harness (eval/bench_llm.py)."""
 
+import io
 import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import Mock, patch
 
 from eval.bench_llm import is_refusal_response, run_llm_benchmark
@@ -11,6 +13,14 @@ from eval.bench_llm import is_refusal_response, run_llm_benchmark
 
 class TestBenchLLM(unittest.TestCase):
     """Test LLM benchmarking loop, abstention handling, and metric aggregation."""
+
+    def setUp(self):
+        self._stdout_trap = io.StringIO()
+        self._stdout_redirector = redirect_stdout(self._stdout_trap)
+        self._stdout_redirector.__enter__()
+
+    def tearDown(self):
+        self._stdout_redirector.__exit__(None, None, None)
 
     def test_is_refusal_response_detection(self):
         """Verify is_refusal_response recognizes refusal strings and INSUFFICIENT_CONTEXT."""

@@ -899,5 +899,81 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         thinking_msg.delete.assert_called_once()
 
 
+class TestIngestionProgressAndLimits(unittest.IsolatedAsyncioTestCase):
+    """Tests for chunk limits and progress notifications during ingestion."""
+
+    def setUp(self):
+        self.doc_store = Mock()
+        self.embedding_gen = Mock()
+        self.embedding_gen.generate_embeddings.side_effect = lambda texts: (
+            [[0.1] * 10] * len(texts) if isinstance(texts, list) else [0.1] * 10
+        )
+        self.config = Config(
+            telegram_bot_token="test",
+            max_chunks_per_document=100,
+        )
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=self.doc_store,
+            embedding_generator=self.embedding_gen,
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=self.config,
+        )
+
+    def test_config_max_chunks_default(self):
+        default_cfg = Config(telegram_bot_token="test")
+        self.assertEqual(default_cfg.max_chunks_per_document, 5000)
+
+    async def test_embed_chunks_rejects_exceeding_max(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+
+        chunks = [f"chunk {i}" for i in range(120)]
+        result = await self.handlers._embed_chunks_with_progress(update, chunks)
+
+        self.assertIsNone(result)
+        self.embedding_gen.generate_embeddings.assert_not_called()
+        update.message.reply_text.assert_called_once()
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("exceeds the maximum limit of 100 chunks", msg)
+        self.assertIn("120 chunks created", msg)
+
+    async def test_embed_chunks_small_file_notifies_user(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+
+        chunks = ["chunk 1", "chunk 2", "chunk 3"]
+        result = await self.handlers._embed_chunks_with_progress(update, chunks)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 3)
+        update.message.reply_text.assert_called_once()
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("Created 3 chunks", msg)
+        self.assertIn("take several minutes", msg)
+
+    async def test_embed_chunks_large_file_progress_updates(self):
+        # Configure higher limit so 600 chunks is accepted (> 500 chunks triggers progress)
+        self.handlers.config.max_chunks_per_document = 1000
+        status_msg = Mock()
+        status_msg.edit_text = AsyncMock()
+        update = Mock()
+        update.message.reply_text = AsyncMock(return_value=status_msg)
+
+        chunks = [f"chunk {i}" for i in range(600)]
+        result = await self.handlers._embed_chunks_with_progress(update, chunks)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 600)
+        # Verify status message was edited multiple times with progress percentages
+        self.assertGreater(status_msg.edit_text.call_count, 5)
+        edit_texts = [call.args[0] for call in status_msg.edit_text.call_args_list]
+        self.assertTrue(any("10%" in t for t in edit_texts))
+        self.assertTrue(any("50%" in t for t in edit_texts))
+        self.assertTrue(any("100%" in t for t in edit_texts))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -20,6 +20,45 @@ logger = logging.getLogger(__name__)
 class DocumentHandlersMixin:
     """Mixin providing document and URL processing handlers for BotHandlers."""
 
+    async def _embed_chunks_with_progress(
+        self,
+        update: Update,
+        chunk_texts: list[str],
+    ) -> list[list[float]] | None:
+        """Validate chunk limit, notify user, and generate embeddings with progress every 10% for docs >500 chunks."""
+        total = len(chunk_texts)
+        if total > self.config.max_chunks_per_document:
+            await update.message.reply_text(
+                f"❌ Document exceeds the maximum limit of {self.config.max_chunks_per_document} chunks "
+                f"({total} chunks created). Please upload a smaller document."
+            )
+            return None
+
+        status_msg = await update.message.reply_text(
+            f"📊 Created {total} chunks. Ingestion and embedding of large files can take several minutes..."
+        )
+
+        if total > 500:
+            step = max(1, total // 10)
+            embeddings: list[list[float]] = []
+            for i in range(0, total, step):
+                batch = chunk_texts[i : i + step]
+                batch_embs = await asyncio.to_thread(
+                    self.embedding_generator.generate_embeddings, batch
+                )
+                embeddings.extend(batch_embs)
+                pct = min(100, int((len(embeddings) / total) * 100))
+                try:
+                    await status_msg.edit_text(
+                        f"⏳ Embedding chunks: {pct}% ({len(embeddings)}/{total})...\n"
+                        "Large files can take several minutes."
+                    )
+                except Exception as e:
+                    logger.debug("Failed to edit progress message: %s", e)
+            return embeddings
+
+        return await asyncio.to_thread(self.embedding_generator.generate_embeddings, chunk_texts)
+
     async def _handle_web_url_ingest(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
     ):
@@ -56,7 +95,9 @@ class DocumentHandlersMixin:
                 return
 
             chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = self.embedding_generator.generate_embeddings(chunk_texts)
+            embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
+            if embeddings is None:
+                return
 
             chunks_data = [
                 {
@@ -182,7 +223,9 @@ class DocumentHandlersMixin:
                 return
 
             chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = self.embedding_generator.generate_embeddings(chunk_texts)
+            embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
+            if embeddings is None:
+                return
 
             chunks_data = [
                 {
@@ -305,7 +348,9 @@ class DocumentHandlersMixin:
                 return
 
             chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = self.embedding_generator.generate_embeddings(chunk_texts)
+            embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
+            if embeddings is None:
+                return
 
             chunks_data = [
                 {

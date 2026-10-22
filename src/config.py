@@ -20,6 +20,7 @@ class Config:
 
     # File Processing
     max_file_size_mb: int = 20
+    max_chunks_per_document: int = 5000
     chunk_size: int = 1000
     chunk_overlap: int = 200
 
@@ -77,6 +78,7 @@ def get_config(require_telegram: bool = True) -> Config:
         llm_api_key=llm_key or "",
         llm_base_url=llm_base_url,
         max_file_size_mb=int(os.getenv("MAX_FILE_SIZE_MB", "20")),
+        max_chunks_per_document=int(os.getenv("MAX_CHUNKS_PER_DOCUMENT", "5000")),
         chunk_size=int(os.getenv("CHUNK_SIZE", "1000")),
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
         embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),

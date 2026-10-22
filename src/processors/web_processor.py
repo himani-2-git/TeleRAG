@@ -96,6 +96,35 @@ def validate_url_ssrf(url: str) -> tuple[bool, str]:
         return False, "URL validation failed."
 
 
+def build_web_document_name(url: str, title: str = "") -> str:
+    """Build stored document name from page title or URL path, trimmed to 60 characters.
+
+    Args:
+        url: Original URL of the web page.
+        title: Extracted page title (optional).
+
+    Returns:
+        Document name string of at most 60 characters.
+    """
+    cleaned_title = title.strip() if title else ""
+    parsed = urlparse(url)
+    domain = parsed.netloc or ""
+    path = parsed.path.strip("/")
+
+    if cleaned_title and cleaned_title != domain:
+        doc_name = cleaned_title
+    elif path:
+        doc_name = path
+    elif cleaned_title:
+        doc_name = cleaned_title
+    elif domain:
+        doc_name = domain
+    else:
+        doc_name = "web_document"
+
+    return doc_name[:60]
+
+
 def extract_html_content(html: str, url: str) -> tuple[str, str, str]:
     """Extract clean title, domain, and main text from HTML string.
 
@@ -261,7 +290,7 @@ class WebProcessor:
             Tuple of (citation_label, clean_text, raw_bytes, chunks).
         """
         title, domain, clean_text, raw_bytes = self.fetch_url(url)
-        citation_label = f"{title} ({domain})"
+        citation_label = build_web_document_name(url, title)
         raw_chunks = self.chunker.create_chunks(clean_text)
 
         chunks: list[TextChunk] = []

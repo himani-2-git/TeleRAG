@@ -1,18 +1,46 @@
 """Question-answering message handlers and streaming typing actions."""
 
 import asyncio
+import html
 import logging
+import re
 import time
 from typing import Any
 
 from telegram import Update
 from telegram.constants import ChatAction
-from telegram.error import NetworkError, TelegramError, TimedOut
+from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 from telegram.ext import ContextTypes
 
 from ...rag.pipeline import format_source_footer
 
 logger = logging.getLogger(__name__)
+
+
+def format_telegram_html(text: str) -> str:
+    """Format markdown text for Telegram HTML parse mode.
+
+    Converts fenced code blocks to <pre><code>...</code></pre> with escaped content,
+    and applies html.escape to all other text (including Sources footers).
+    """
+    pattern = re.compile(r"```[a-zA-Z0-9_\-\+\.]*\n?(.*?)```", re.DOTALL)
+    parts = []
+    last_idx = 0
+    for match in pattern.finditer(text):
+        pre_text = text[last_idx : match.start()]
+        if pre_text:
+            parts.append(html.escape(pre_text, quote=False))
+        code_body = match.group(1)
+        if code_body.endswith("\n"):
+            code_body = code_body[:-1]
+        parts.append(f"<pre><code>{html.escape(code_body, quote=False)}</code></pre>")
+        last_idx = match.end()
+
+    tail = text[last_idx:]
+    if tail:
+        parts.append(html.escape(tail, quote=False))
+
+    return "".join(parts)
 
 
 class QuestionHandlersMixin:
@@ -97,8 +125,9 @@ class QuestionHandlersMixin:
         )
 
     async def _deliver_answer(self, update: Update, thinking_msg: Any, text: str):
-        """Deliver final response as a new reply to user message, then delete thinking message."""
-        await self._reply_with_retry(update, text)
+        """Deliver final response formatted as HTML with fallback to plain text, then delete thinking message."""
+        formatted_html = format_telegram_html(text)
+        await self._reply_with_retry(update, formatted_html, parse_mode="HTML", fallback_text=text)
         if thinking_msg:
             try:
                 await thinking_msg.delete()
@@ -133,13 +162,47 @@ class QuestionHandlersMixin:
                 if not stop_event.is_set():
                     await self._send_typing_action(context, chat_id)
 
-    async def _reply_with_retry(self, update: Update, text: str):
-        """Send message reply with automatic single retry on TimedOut or NetworkError."""
+    async def _reply_with_retry(
+        self,
+        update: Update,
+        text: str,
+        parse_mode: str | None = None,
+        fallback_text: str | None = None,
+    ):
+        """Send message reply with automatic single retry on TimedOut or NetworkError,
+        and optional plain text fallback if HTML parsing is rejected.
+        """
+        kwargs = {}
+        if parse_mode is not None:
+            kwargs["parse_mode"] = parse_mode
+
         try:
-            return await update.message.reply_text(text)
+            return await update.message.reply_text(text, **kwargs)
+        except BadRequest as e:
+            if parse_mode and fallback_text is not None:
+                logger.warning(
+                    f"Sending reply rejected with {parse_mode} [{type(e).__name__}]: {e}. Falling back to plain text."
+                )
+                return await self._reply_with_retry(update, fallback_text, parse_mode=None)
+            logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}")
+            return None
         except (TimedOut, NetworkError) as e:
             logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}. Retrying once...")
-            return await update.message.reply_text(text)
+            try:
+                return await update.message.reply_text(text, **kwargs)
+            except TelegramError as retry_err:
+                if parse_mode and fallback_text is not None:
+                    logger.warning(
+                        f"Reply retry failed with {parse_mode} [{type(retry_err).__name__}]: {retry_err}. Falling back to plain text."
+                    )
+                    return await self._reply_with_retry(update, fallback_text, parse_mode=None)
+                logger.warning(f"Sending reply failed [{type(retry_err).__name__}]: {retry_err}")
+                return None
         except TelegramError as e:
+            if parse_mode and fallback_text is not None:
+                logger.warning(
+                    f"Sending reply failed with {parse_mode} [{type(e).__name__}]: {e}. Falling back to plain text."
+                )
+                return await self._reply_with_retry(update, fallback_text, parse_mode=None)
             logger.warning(f"Sending reply failed [{type(e).__name__}]: {e}")
             return None

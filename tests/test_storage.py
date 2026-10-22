@@ -1,7 +1,6 @@
 """Tests for document storage operations."""
 
 import os
-import shutil
 import tempfile
 import unittest
 
@@ -14,13 +13,14 @@ class TestDatabase(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.temp_dir = tempfile.mkdtemp()
+        self._temp_dir_obj = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.temp_dir = self._temp_dir_obj.name
         self.db_path = os.path.join(self.temp_dir, "test.db")
         self.db = Database(self.db_path)
 
     def tearDown(self):
         """Clean up test fixtures."""
-        shutil.rmtree(self.temp_dir)
+        self._temp_dir_obj.cleanup()
 
     def test_store_document(self):
         """Test document storage."""
@@ -74,14 +74,15 @@ class TestDocumentStore(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.temp_dir = tempfile.mkdtemp()
+        self._temp_dir_obj = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.temp_dir = self._temp_dir_obj.name
         self.db_path = os.path.join(self.temp_dir, "test.db")
         self.embeddings_path = os.path.join(self.temp_dir, "embeddings")
         self.store = DocumentStore(self.db_path, self.embeddings_path)
 
     def tearDown(self):
         """Clean up test fixtures."""
-        shutil.rmtree(self.temp_dir)
+        self._temp_dir_obj.cleanup()
 
     def test_store_with_embeddings(self):
         """Test storing document with embeddings."""
@@ -194,7 +195,8 @@ class TestNumPyVectorStoreAndMigration(unittest.TestCase):
     """Test NumPyVectorStore npy format, migration script, and caching."""
 
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp()
+        self._temp_dir_obj = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.temp_dir = self._temp_dir_obj.name
         self.db_path = os.path.join(self.temp_dir, "test.db")
         self.embeddings_path = os.path.join(self.temp_dir, "embeddings")
         os.makedirs(self.embeddings_path, exist_ok=True)
@@ -205,7 +207,7 @@ class TestNumPyVectorStoreAndMigration(unittest.TestCase):
         self.vs = NumPyVectorStore(self.db_path, self.embeddings_path, db=self.db)
 
     def tearDown(self):
-        shutil.rmtree(self.temp_dir)
+        self._temp_dir_obj.cleanup()
 
     def test_numpy_vector_store_npy_format_and_load_once(self):
         """Test that NumPyVectorStore stores float32 .npy files and loads embeddings correctly."""

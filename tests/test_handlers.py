@@ -802,13 +802,11 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
 
     async def test_clear_and_list_lifecycle(self):
         """Test uploading two documents, calling /clear, verifying /list is empty, and /clear on empty list returns no-documents message."""
-        import shutil
         import tempfile
 
         from src.storage.document_store import DocumentStore
 
-        temp_dir = tempfile.mkdtemp()
-        try:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
             db_path = os.path.join(temp_dir, "test.db")
             emb_path = os.path.join(temp_dir, "embeddings")
             real_doc_store = DocumentStore(db_path=db_path, embeddings_path=emb_path)
@@ -870,8 +868,6 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
             update.message.reply_text.assert_called_once_with(
                 "📭 You don't have any documents to delete."
             )
-        finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
 
     async def test_delete_not_found(self):
         update = Mock()

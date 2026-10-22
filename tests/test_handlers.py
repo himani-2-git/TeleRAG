@@ -752,6 +752,50 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Please specify the exact name or document number from /list.", msg)
         self.doc_store.delete_document.assert_not_called()
 
+    async def test_list_command_empty(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        self.doc_store.list_documents.return_value = []
+
+        await self.handlers.list_command(update, context)
+        update.message.reply_text.assert_called_once_with(
+            "📭 You haven't uploaded any documents yet."
+        )
+
+    async def test_list_command_formatting(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        self.doc_store.list_documents.return_value = [
+            {
+                "filename": "alpha.pdf",
+                "file_size": 1024 * 1024,
+                "chunk_count": 5,
+                "upload_date": "2026-10-21T22:51:00",
+            },
+            {
+                "filename": "beta.md",
+                "file_size": 2 * 1024 * 1024,
+                "chunk_count": 12,
+                "upload_date": "2026-10-22T08:15:00",
+            },
+        ]
+
+        await self.handlers.list_command(update, context)
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("1. 📄 alpha.pdf", msg)
+        self.assertIn("   Size: 1.00 MB | Chunks: 5", msg)
+        self.assertIn("   Uploaded: 21 Oct 2026, 22:51", msg)
+
+        self.assertIn("2. 📄 beta.md", msg)
+        self.assertIn("   Size: 2.00 MB | Chunks: 12", msg)
+        self.assertIn("   Uploaded: 22 Oct 2026, 08:15", msg)
+
     async def test_delete_not_found(self):
         update = Mock()
         update.effective_user.id = 123

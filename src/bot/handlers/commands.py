@@ -1,6 +1,8 @@
 """Command handlers for Telegram bot (/start, /help, /list, /delete, /clear, /addurl)."""
 
 import logging
+from datetime import datetime
+from typing import Any
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -34,6 +36,24 @@ class CommandHandlersMixin:
         """Show help information."""
         await self.start_command(update, context)
 
+    @staticmethod
+    def _format_upload_date(raw_date: Any) -> str:
+        """Format document upload timestamp in local time as '21 Oct 2026, 22:51'."""
+        if not raw_date:
+            return "Unknown"
+        if isinstance(raw_date, datetime):
+            dt = raw_date
+        else:
+            try:
+                date_str = str(raw_date).replace("Z", "+00:00")
+                dt = datetime.fromisoformat(date_str)
+            except (ValueError, TypeError):
+                return str(raw_date)
+
+        if dt.tzinfo is not None:
+            dt = dt.astimezone()
+        return dt.strftime("%d %b %Y, %H:%M")
+
     async def list_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """List all documents currently ingested for the user."""
         user_id = update.effective_user.id
@@ -44,11 +64,12 @@ class CommandHandlersMixin:
                 return
 
             message = "📚 Your uploaded documents:\n\n"
-            for doc in documents:
+            for i, doc in enumerate(documents, start=1):
                 size_mb = doc["file_size"] / (1024 * 1024)
-                message += f"📄 {doc['filename']}\n"
+                uploaded_str = self._format_upload_date(doc.get("upload_date"))
+                message += f"{i}. 📄 {doc['filename']}\n"
                 message += f"   Size: {size_mb:.2f} MB | Chunks: {doc['chunk_count']}\n"
-                message += f"   Uploaded: {doc['upload_date']}\n\n"
+                message += f"   Uploaded: {uploaded_str}\n\n"
 
             await update.message.reply_text(message)
         except Exception as e:

@@ -23,7 +23,7 @@ class CommandHandlersMixin:
             "❓ Ask questions about your uploaded documents\n\n"
             "Commands:\n"
             "/list - Show your uploaded documents\n"
-            "/delete <filename> - Delete a specific document\n"
+            "/delete 2 or /delete part-of-name - Delete a specific document\n"
             "/clear - Delete all your documents\n"
             "/addurl <url> - Ingest a web page\n"
             "/help - Show this message"
@@ -59,16 +59,65 @@ class CommandHandlersMixin:
         """Delete a specified document for the user."""
         user_id = update.effective_user.id
         if not context.args:
-            await update.message.reply_text("❌ Please specify a filename: /delete <filename>")
+            await update.message.reply_text(
+                "❌ Please specify a document to delete: /delete 2 or /delete part-of-name"
+            )
             return
 
-        filename = " ".join(context.args)
+        raw_arg = " ".join(context.args).strip()
+        target = raw_arg.strip(" <>\"'").strip()
+        if not target:
+            await update.message.reply_text(
+                "❌ Please specify a document to delete: /delete 2 or /delete part-of-name"
+            )
+            return
+
         try:
-            deleted = self.document_store.delete_document(user_id, filename)
-            if deleted:
-                await update.message.reply_text(f"✅ Deleted document: {filename}")
+            documents = self.document_store.list_documents(user_id)
+            if not documents:
+                await update.message.reply_text(
+                    "Document not found. Send /list to see names and numbers."
+                )
+                return
+
+            exact_matches = [d for d in documents if d["filename"].lower() == target.lower()]
+            if len(exact_matches) == 1:
+                target_doc = exact_matches[0]
+            elif len(exact_matches) > 1:
+                matches_list = "\n".join(f"• {d['filename']}" for d in exact_matches)
+                await update.message.reply_text(
+                    f"Multiple documents match '{target}':\n{matches_list}\n"
+                    "Please specify the exact name or document number from /list."
+                )
+                return
+            elif target.isdigit() and 1 <= int(target) <= len(documents):
+                target_doc = documents[int(target) - 1]
             else:
-                await update.message.reply_text(f"❌ Document not found: {filename}")
+                substring_matches = [
+                    d for d in documents if target.lower() in d["filename"].lower()
+                ]
+                if len(substring_matches) == 1:
+                    target_doc = substring_matches[0]
+                elif len(substring_matches) > 1:
+                    matches_list = "\n".join(f"• {d['filename']}" for d in substring_matches)
+                    await update.message.reply_text(
+                        f"Multiple documents match '{target}':\n{matches_list}\n"
+                        "Please specify the exact name or document number from /list."
+                    )
+                    return
+                else:
+                    await update.message.reply_text(
+                        "Document not found. Send /list to see names and numbers."
+                    )
+                    return
+
+            deleted = self.document_store.delete_document(user_id, target_doc["filename"])
+            if deleted:
+                await update.message.reply_text(f"✅ Deleted document: {target_doc['filename']}")
+            else:
+                await update.message.reply_text(
+                    "Document not found. Send /list to see names and numbers."
+                )
         except Exception as e:
             logger.exception("Failed to delete document: %s", e)
             await update.message.reply_text("❌ Failed to delete document.")

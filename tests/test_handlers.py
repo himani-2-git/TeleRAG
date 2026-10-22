@@ -621,5 +621,154 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.handlers.active_requests, 1)
 
 
+class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
+    """Tests for bot slash commands (/start, /help, /delete, etc.)."""
+
+    def setUp(self):
+        self.doc_store = Mock()
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=self.doc_store,
+            embedding_generator=Mock(),
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=Config(telegram_bot_token="test"),
+        )
+
+    async def test_start_and_help_command_text(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        await self.handlers.start_command(update, context)
+        start_msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("/delete 2 or /delete part-of-name", start_msg)
+        self.assertNotIn("<filename>", start_msg)
+
+        update.message.reply_text.reset_mock()
+        await self.handlers.help_command(update, context)
+        help_msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("/delete 2 or /delete part-of-name", help_msg)
+        self.assertNotIn("<filename>", help_msg)
+
+    async def test_delete_missing_args(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = []
+
+        await self.handlers.delete_command(update, context)
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("Please specify a document to delete", msg)
+
+    async def test_delete_by_1_based_index(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["2"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "first.pdf"},
+            {"filename": "second.pdf"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "second.pdf")
+        update.message.reply_text.assert_called_once_with("✅ Deleted document: second.pdf")
+
+    async def test_delete_strip_brackets_and_quotes(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ['<"sample', 'doc.pdf">']
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "sample doc.pdf"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "sample doc.pdf")
+        update.message.reply_text.assert_called_once_with("✅ Deleted document: sample doc.pdf")
+
+    async def test_delete_case_insensitive_exact_match(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["SAMPLE.PDF"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "sample.pdf"},
+            {"filename": "sample.pdf.bak"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "sample.pdf")
+        update.message.reply_text.assert_called_once_with("✅ Deleted document: sample.pdf")
+
+    async def test_delete_unique_substring_match(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["report"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "annual_report_2024.pdf"},
+            {"filename": "invoice.pdf"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "annual_report_2024.pdf")
+        update.message.reply_text.assert_called_once_with(
+            "✅ Deleted document: annual_report_2024.pdf"
+        )
+
+    async def test_delete_multiple_matches_disambiguation(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["report"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "annual_report_2023.pdf"},
+            {"filename": "annual_report_2024.pdf"},
+        ]
+
+        await self.handlers.delete_command(update, context)
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("Multiple documents match 'report':", msg)
+        self.assertIn("• annual_report_2023.pdf", msg)
+        self.assertIn("• annual_report_2024.pdf", msg)
+        self.assertIn("Please specify the exact name or document number from /list.", msg)
+        self.doc_store.delete_document.assert_not_called()
+
+    async def test_delete_not_found(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["nonexistent"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "annual_report_2024.pdf"},
+        ]
+
+        await self.handlers.delete_command(update, context)
+        update.message.reply_text.assert_called_once_with(
+            "Document not found. Send /list to see names and numbers."
+        )
+        self.doc_store.delete_document.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

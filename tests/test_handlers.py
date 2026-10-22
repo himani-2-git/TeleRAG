@@ -1,6 +1,7 @@
 """Tests for bot handlers and security validations."""
 
 import asyncio
+import os
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
@@ -798,6 +799,79 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("2. 📄 beta.md", msg)
         self.assertIn("   Size: 2.00 MB | Chunks: 12", msg)
         self.assertIn("   Uploaded: 22 Oct 2026, 08:15", msg)
+
+    async def test_clear_and_list_lifecycle(self):
+        """Test uploading two documents, calling /clear, verifying /list is empty, and /clear on empty list returns no-documents message."""
+        import shutil
+        import tempfile
+
+        from src.storage.document_store import DocumentStore
+
+        temp_dir = tempfile.mkdtemp()
+        try:
+            db_path = os.path.join(temp_dir, "test.db")
+            emb_path = os.path.join(temp_dir, "embeddings")
+            real_doc_store = DocumentStore(db_path=db_path, embeddings_path=emb_path)
+
+            mock_embedder = Mock()
+            mock_embedder.generate_embeddings.side_effect = lambda texts: (
+                [[0.1] * 10] * len(texts) if isinstance(texts, list) else [0.1] * 10
+            )
+
+            handlers = BotHandlers(
+                pdf_processor=Mock(),
+                text_chunker=Mock(),
+                document_store=real_doc_store,
+                embedding_generator=mock_embedder,
+                retriever=Mock(),
+                llm_client=Mock(),
+                config=Config(telegram_bot_token="test"),
+            )
+
+            user_id = 777
+
+            # Upload two documents
+            real_doc_store.store_document(
+                user_id=user_id,
+                filename="first.pdf",
+                file_content=b"pdf content 1",
+                chunks=[{"chunk_index": 0, "content": "text 1", "char_count": 6}],
+                embeddings=[[0.1] * 10],
+                source_type="pdf",
+            )
+            real_doc_store.store_document(
+                user_id=user_id,
+                filename="second.pdf",
+                file_content=b"pdf content 2",
+                chunks=[{"chunk_index": 0, "content": "text 2", "char_count": 6}],
+                embeddings=[[0.2] * 10],
+                source_type="pdf",
+            )
+
+            # Call /clear
+            update = Mock()
+            update.effective_user.id = user_id
+            update.message.reply_text = AsyncMock()
+            context = Mock()
+
+            await handlers.clear_command(update, context)
+            update.message.reply_text.assert_called_once_with("✅ Deleted 2 document(s).")
+
+            # Assert /list is empty
+            update.message.reply_text.reset_mock()
+            await handlers.list_command(update, context)
+            update.message.reply_text.assert_called_once_with(
+                "📭 You haven't uploaded any documents yet."
+            )
+
+            # Call /clear on an empty list
+            update.message.reply_text.reset_mock()
+            await handlers.clear_command(update, context)
+            update.message.reply_text.assert_called_once_with(
+                "📭 You don't have any documents to delete."
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     async def test_delete_not_found(self):
         update = Mock()

@@ -4,7 +4,10 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+from telegram.error import BadRequest
+
 from src.bot.handlers import BotHandlers
+from src.bot.handlers.questions import format_telegram_html
 from src.config import Config
 from src.rag.pipeline import is_insufficient_context, is_summary_query
 
@@ -812,6 +815,88 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
             "Document not found. Send /list to see names and numbers."
         )
         self.doc_store.delete_document.assert_not_called()
+
+
+class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
+    """Tests for Telegram HTML code formatting and plain-text fallback."""
+
+    def setUp(self):
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=Mock(),
+            embedding_generator=Mock(),
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=Config(telegram_bot_token="test"),
+        )
+
+    def test_format_telegram_html_plain_and_sources(self):
+        raw = "Condition: x < 10 & y > 5\n\nSources:\n• <data.pdf> (p. 1)"
+        formatted = format_telegram_html(raw)
+        self.assertIn("x &lt; 10 &amp; y &gt; 5", formatted)
+        self.assertIn("&lt;data.pdf&gt;", formatted)
+
+    def test_format_telegram_html_fenced_code_blocks(self):
+        raw = (
+            "Here is a snippet:\n"
+            "```python\n"
+            "def check(a, b):\n"
+            "    return a < b & True\n"
+            "```\n"
+            "And another:\n"
+            "```\n"
+            "echo <hello>\n"
+            "```\n\n"
+            "Sources:\n• doc.txt"
+        )
+        formatted = format_telegram_html(raw)
+        self.assertIn(
+            "<pre><code>def check(a, b):\n    return a &lt; b &amp; True</code></pre>", formatted
+        )
+        self.assertIn("<pre><code>echo &lt;hello&gt;</code></pre>", formatted)
+        self.assertIn("Sources:\n• doc.txt", formatted)
+
+    async def test_deliver_answer_sends_html(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        raw_answer = "Hello ```python\nprint(1 < 2)\n```\n\nSources:\n• <doc.pdf>"
+        await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
+
+        update.message.reply_text.assert_called_once()
+        call_args, call_kwargs = update.message.reply_text.call_args
+        self.assertEqual(call_kwargs.get("parse_mode"), "HTML")
+        self.assertIn("<pre><code>print(1 &lt; 2)</code></pre>", call_args[0])
+        self.assertIn("&lt;doc.pdf&gt;", call_args[0])
+        thinking_msg.delete.assert_called_once()
+
+    async def test_deliver_answer_fallback_on_telegram_reject(self):
+        update = Mock()
+        # First call with HTML fails with BadRequest, second plain text call succeeds
+        update.message.reply_text = AsyncMock(
+            side_effect=[
+                BadRequest("Can't parse entities: can't find end tag"),
+                Mock(),
+            ]
+        )
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        raw_answer = "Hello ```python\nprint(1 < 2)\n```\n\nSources:\n• <doc.pdf>"
+        await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        # First attempt: HTML
+        first_call = update.message.reply_text.call_args_list[0]
+        self.assertEqual(first_call[1].get("parse_mode"), "HTML")
+        # Fallback attempt: plain text (no parse_mode) with raw text
+        second_call = update.message.reply_text.call_args_list[1]
+        self.assertNotIn("parse_mode", second_call[1])
+        self.assertEqual(second_call[0][0], raw_answer)
+        thinking_msg.delete.assert_called_once()
 
 
 if __name__ == "__main__":

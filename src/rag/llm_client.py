@@ -27,7 +27,7 @@ class LLMClient:
         retry_delay: float = 1.0,
         base_url: str = "http://localhost:11434/v1",
         timeout: tuple[float, float] | float = (5.0, 120.0),
-        max_tokens: int = 300,
+        max_tokens: int = 1024,
         prompt_config: PromptConfig | None = None,
     ):
         self.api_key = api_key
@@ -159,7 +159,12 @@ class LLMClient:
     def _extract_response(self, data: dict[str, Any]) -> str | None:
         """Extract response text from API response data."""
         try:
-            return data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]
+            content = choice["message"]["content"]
+            finish_reason = choice.get("finish_reason")
+            if finish_reason == "length" and content is not None:
+                content = f"{content.rstrip()}\n\n(Answer was cut off; ask a narrower question for the full detail.)"
+            return content
         except (KeyError, IndexError) as e:
             logger.error("Failed to extract response: %s", e)
             return None

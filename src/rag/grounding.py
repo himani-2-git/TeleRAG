@@ -26,11 +26,18 @@ def strip_footers(text: str) -> str:
     """Strip Sources footer and 'Answered in' timing footer from text."""
     if not text:
         return ""
+    # Strip truncation note if present
+    cleaned = re.sub(
+        r"(?:\n\s*|\A)\(Answer was cut off; ask a narrower question for the full detail\.\)\s*$",
+        "",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
     # Strip timing footer (e.g., 'Answered in 2 s with qwen2.5:3b')
     cleaned = re.sub(
         r"(?:\n\s*|\A)Answered in \d+(?:\.\d+)?\s*s\s+with\s+.*$",
         "",
-        text,
+        cleaned,
         flags=re.DOTALL | re.IGNORECASE,
     )
     # Strip sources footer (e.g., 'Sources:\n[ci_fixture.pdf, p. 1] ...')

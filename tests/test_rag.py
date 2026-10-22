@@ -342,6 +342,54 @@ class TestLLMClient(unittest.TestCase):
             self.assertEqual(cfg.llm_api_key, "custom-key")
             self.assertEqual(cfg.llm_base_url, "http://localhost:11434/v1")
 
+    def test_extract_response_length_finish_reason_appends_cutoff_notice(self):
+        """Test that finish_reason='length' appends truncation notice."""
+        data = {
+            "choices": [
+                {
+                    "message": {"content": "Partial sentence that gets cut"},
+                    "finish_reason": "length",
+                }
+            ]
+        }
+        res = self.client._extract_response(data)
+        self.assertIn("Partial sentence that gets cut", res)
+        self.assertTrue(
+            res.endswith("\n\n(Answer was cut off; ask a narrower question for the full detail.)")
+        )
 
-if __name__ == "__main__":
-    unittest.main()
+    def test_extract_response_stop_finish_reason_leaves_answer_unchanged(self):
+        """Test that finish_reason='stop' leaves answer intact without note."""
+        data = {
+            "choices": [
+                {
+                    "message": {"content": "Complete sentence."},
+                    "finish_reason": "stop",
+                }
+            ]
+        }
+        res = self.client._extract_response(data)
+        self.assertEqual(res, "Complete sentence.")
+
+    def test_config_llm_max_tokens_default_1024(self):
+        """Test that default LLM_MAX_TOKENS is 1024 in Config and get_config."""
+        import os
+
+        from src.config import Config, get_config
+
+        cfg = Config(telegram_bot_token="test")
+        self.assertEqual(cfg.llm_max_tokens, 1024)
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("LLM_MAX_TOKENS", None)
+            loaded = get_config(require_telegram=False)
+            self.assertEqual(loaded.llm_max_tokens, 1024)
+
+    def test_strip_footers_removes_truncation_notice(self):
+        """Test that strip_footers strips the truncation disclaimer before grounding check."""
+        from src.rag.grounding import strip_footers
+
+        text = (
+            "Actual answer.\n\n(Answer was cut off; ask a narrower question for the full detail.)"
+        )
+        cleaned = strip_footers(text)
+        self.assertEqual(cleaned, "Actual answer.")

@@ -32,7 +32,7 @@ class Config:
 
     # LLM Settings (Ollama default, configurable to hosted providers)
     llm_model: str = "qwen2.5:3b"
-    llm_max_tokens: int = 300
+    llm_max_tokens: int = 1024
     llm_timeout_seconds: int = 120
     max_retries: int = 3
     retry_delay: float = 1.0
@@ -85,7 +85,7 @@ def get_config(require_telegram: bool = True) -> Config:
         retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
         orchestrator=os.getenv("ORCHESTRATOR", "plain").lower(),
         llm_model=llm_model,
-        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
+        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "1024")),
         llm_timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
         retry_delay=float(os.getenv("RETRY_DELAY", "1.0")),

@@ -13,6 +13,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from ...processors.pdf_fetcher import fetch_pdf_bytes
+from ..errors import UserFacingError
 
 logger = logging.getLogger(__name__)
 
@@ -77,57 +78,60 @@ class DocumentHandlersMixin:
         )
 
         try:
-            web_processor = WebProcessor(
-                chunk_size=self.config.chunk_size,
-                overlap=self.config.chunk_overlap,
-                timeout=15,
-                max_bytes=2 * 1024 * 1024,
-            )
-
-            citation_label, _clean_text, raw_bytes, chunks = await asyncio.to_thread(
-                web_processor.process_url, url
-            )
-
-            if not chunks:
-                await update.message.reply_text(
-                    "❌ No text content could be extracted from web page."
+            try:
+                web_processor = WebProcessor(
+                    chunk_size=self.config.chunk_size,
+                    overlap=self.config.chunk_overlap,
+                    timeout=15,
+                    max_bytes=2 * 1024 * 1024,
                 )
-                return
 
-            chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
-            if embeddings is None:
-                return
+                citation_label, _clean_text, raw_bytes, chunks = await asyncio.to_thread(
+                    web_processor.process_url, url
+                )
 
-            chunks_data = [
-                {
-                    "chunk_index": chunk.chunk_index,
-                    "content": chunk.content,
-                    "char_count": chunk.char_count,
-                    "page": None,
-                    "page_start": None,
-                    "page_end": None,
-                    "section_label": chunk.section_label,
-                    "source_type": "web",
-                }
-                for chunk in chunks
-            ]
+                if not chunks:
+                    await update.message.reply_text(
+                        "❌ No text content could be extracted from web page."
+                    )
+                    return
 
-            self.document_store.store_document(
-                user_id=user_id,
-                filename=citation_label,
-                file_content=raw_bytes,
-                chunks=chunks_data,
-                embeddings=embeddings,
-                source_type="web",
-            )
+                chunk_texts = [chunk.content for chunk in chunks]
+                embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
+                if embeddings is None:
+                    return
 
-            await update.message.reply_text(
-                f"✅ Successfully ingested web page: {citation_label}\n"
-                f"📊 Created {len(chunks)} chunks\n\n"
-                f"You can now ask questions about this page!"
-            )
-        except ValueError as e:
+                chunks_data = [
+                    {
+                        "chunk_index": chunk.chunk_index,
+                        "content": chunk.content,
+                        "char_count": chunk.char_count,
+                        "page": None,
+                        "page_start": None,
+                        "page_end": None,
+                        "section_label": chunk.section_label,
+                        "source_type": "web",
+                    }
+                    for chunk in chunks
+                ]
+
+                self.document_store.store_document(
+                    user_id=user_id,
+                    filename=citation_label,
+                    file_content=raw_bytes,
+                    chunks=chunks_data,
+                    embeddings=embeddings,
+                    source_type="web",
+                )
+
+                await update.message.reply_text(
+                    f"✅ Successfully ingested web page: {citation_label}\n"
+                    f"📊 Created {len(chunks)} chunks\n\n"
+                    f"You can now ask questions about this page!"
+                )
+            except ValueError as e:
+                raise UserFacingError(str(e)) from e
+        except UserFacingError as e:
             await update.message.reply_text(f"❌ {e}")
         except Exception:
             logger.exception("Failed to ingest web page: %s", url)
@@ -166,96 +170,99 @@ class DocumentHandlersMixin:
 
         temp_file = None
         try:
-            file = await document.get_file()
-            suffix = ".pdf" if is_pdf else (".md" if is_md else ".txt")
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-            await file.download_to_drive(temp_file.name)
+            try:
+                file = await document.get_file()
+                suffix = ".pdf" if is_pdf else (".md" if is_md else ".txt")
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+                await file.download_to_drive(temp_file.name)
 
-            with open(temp_file.name, "rb") as f:
-                file_content = f.read()
+                with open(temp_file.name, "rb") as f:
+                    file_content = f.read()
 
-            if is_pdf:
-                is_valid, error_msg = self.pdf_processor.validate_pdf(
-                    temp_file.name, document.file_size
-                )
-                if not is_valid:
-                    await update.message.reply_text(f"❌ {error_msg}")
-                    return
-                pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
-                chunks = self.text_chunker.create_chunks_with_pages(pages_data)
-                source_type = "pdf"
-            elif is_md:
-                from ...processors.markdown_processor import MarkdownProcessor
-
-                md_processor = MarkdownProcessor(
-                    chunk_size=self.config.chunk_size, overlap=self.config.chunk_overlap
-                )
-                md_text = file_content.decode("utf-8", errors="replace")
-                chunks = md_processor.process_markdown(md_text, source_name=fn)
-                source_type = "markdown"
-            else:
-                txt_text = file_content.decode("utf-8", errors="replace")
-                if not txt_text.strip():
-                    await update.message.reply_text("❌ No text content found in file.")
-                    return
-                raw_chunks = self.text_chunker.create_chunks(txt_text)
-                chunks = []
-                for i, rc in enumerate(raw_chunks):
-                    from ...processors.text_chunker import TextChunk
-
-                    c = TextChunk(
-                        content=rc.content,
-                        chunk_index=i,
-                        start_pos=rc.start_pos,
-                        end_pos=rc.end_pos,
-                        char_count=rc.char_count,
-                        source_type="text",
-                        source_name=fn,
-                        section_label=fn,
+                if is_pdf:
+                    is_valid, error_msg = self.pdf_processor.validate_pdf(
+                        temp_file.name, document.file_size
                     )
-                    chunks.append(c)
-                source_type = "text"
+                    if not is_valid:
+                        await update.message.reply_text(f"❌ {error_msg}")
+                        return
+                    pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
+                    chunks = self.text_chunker.create_chunks_with_pages(pages_data)
+                    source_type = "pdf"
+                elif is_md:
+                    from ...processors.markdown_processor import MarkdownProcessor
 
-            if not chunks:
-                await update.message.reply_text(
-                    f"❌ No text content found in {doc_type_label} file."
+                    md_processor = MarkdownProcessor(
+                        chunk_size=self.config.chunk_size, overlap=self.config.chunk_overlap
+                    )
+                    md_text = file_content.decode("utf-8", errors="replace")
+                    chunks = md_processor.process_markdown(md_text, source_name=fn)
+                    source_type = "markdown"
+                else:
+                    txt_text = file_content.decode("utf-8", errors="replace")
+                    if not txt_text.strip():
+                        await update.message.reply_text("❌ No text content found in file.")
+                        return
+                    raw_chunks = self.text_chunker.create_chunks(txt_text)
+                    chunks = []
+                    for i, rc in enumerate(raw_chunks):
+                        from ...processors.text_chunker import TextChunk
+
+                        c = TextChunk(
+                            content=rc.content,
+                            chunk_index=i,
+                            start_pos=rc.start_pos,
+                            end_pos=rc.end_pos,
+                            char_count=rc.char_count,
+                            source_type="text",
+                            source_name=fn,
+                            section_label=fn,
+                        )
+                        chunks.append(c)
+                    source_type = "text"
+
+                if not chunks:
+                    await update.message.reply_text(
+                        f"❌ No text content found in {doc_type_label} file."
+                    )
+                    return
+
+                chunk_texts = [chunk.content for chunk in chunks]
+                embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
+                if embeddings is None:
+                    return
+
+                chunks_data = [
+                    {
+                        "chunk_index": chunk.chunk_index,
+                        "content": chunk.content,
+                        "char_count": chunk.char_count,
+                        "page": chunk.page,
+                        "page_start": chunk.page_start,
+                        "page_end": chunk.page_end,
+                        "section_label": chunk.section_label,
+                        "source_type": chunk.source_type or source_type,
+                    }
+                    for chunk in chunks
+                ]
+
+                self.document_store.store_document(
+                    user_id=user_id,
+                    filename=fn,
+                    file_content=file_content,
+                    chunks=chunks_data,
+                    embeddings=embeddings,
+                    source_type=source_type,
                 )
-                return
 
-            chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
-            if embeddings is None:
-                return
-
-            chunks_data = [
-                {
-                    "chunk_index": chunk.chunk_index,
-                    "content": chunk.content,
-                    "char_count": chunk.char_count,
-                    "page": chunk.page,
-                    "page_start": chunk.page_start,
-                    "page_end": chunk.page_end,
-                    "section_label": chunk.section_label,
-                    "source_type": chunk.source_type or source_type,
-                }
-                for chunk in chunks
-            ]
-
-            self.document_store.store_document(
-                user_id=user_id,
-                filename=fn,
-                file_content=file_content,
-                chunks=chunks_data,
-                embeddings=embeddings,
-                source_type=source_type,
-            )
-
-            await update.message.reply_text(
-                f"✅ Successfully processed {fn}\n"
-                f"📊 Created {len(chunks)} chunks\n\n"
-                f"You can now ask questions about this document!"
-            )
-        except ValueError as e:
+                await update.message.reply_text(
+                    f"✅ Successfully processed {fn}\n"
+                    f"📊 Created {len(chunks)} chunks\n\n"
+                    f"You can now ask questions about this document!"
+                )
+            except ValueError as e:
+                raise UserFacingError(str(e)) from e
+        except UserFacingError as e:
             await update.message.reply_text(f"❌ {e}")
         except Exception:
             logger.exception("Failed to process document: %s", fn)
@@ -316,8 +323,11 @@ class DocumentHandlersMixin:
 
         max_bytes = self.config.max_file_size_mb * 1024 * 1024
         try:
-            pdf_bytes = await asyncio.to_thread(fetch_pdf_bytes, url, max_bytes, 30)
-        except ValueError as e:
+            try:
+                pdf_bytes = await asyncio.to_thread(fetch_pdf_bytes, url, max_bytes, 30)
+            except ValueError as e:
+                raise UserFacingError(str(e)) from e
+        except UserFacingError as e:
             await update.message.reply_text(f"❌ {e}")
             return
         except Exception:
@@ -329,57 +339,60 @@ class DocumentHandlersMixin:
 
         temp_file = None
         try:
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            temp_file.write(pdf_bytes)
-            temp_file.close()
+            try:
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                temp_file.write(pdf_bytes)
+                temp_file.close()
 
-            file_size = len(pdf_bytes)
-            await update.message.reply_text("📥 Processing PDF...")
+                file_size = len(pdf_bytes)
+                await update.message.reply_text("📥 Processing PDF...")
 
-            is_valid, error_msg = self.pdf_processor.validate_pdf(temp_file.name, file_size)
-            if not is_valid:
-                await update.message.reply_text(f"❌ {error_msg}")
-                return
+                is_valid, error_msg = self.pdf_processor.validate_pdf(temp_file.name, file_size)
+                if not is_valid:
+                    await update.message.reply_text(f"❌ {error_msg}")
+                    return
 
-            pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
-            chunks = self.text_chunker.create_chunks_with_pages(pages_data)
-            if not chunks:
-                await update.message.reply_text("❌ No text content found in PDF.")
-                return
+                pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
+                chunks = self.text_chunker.create_chunks_with_pages(pages_data)
+                if not chunks:
+                    await update.message.reply_text("❌ No text content found in PDF.")
+                    return
 
-            chunk_texts = [chunk.content for chunk in chunks]
-            embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
-            if embeddings is None:
-                return
+                chunk_texts = [chunk.content for chunk in chunks]
+                embeddings = await self._embed_chunks_with_progress(update, chunk_texts)
+                if embeddings is None:
+                    return
 
-            chunks_data = [
-                {
-                    "chunk_index": chunk.chunk_index,
-                    "content": chunk.content,
-                    "char_count": chunk.char_count,
-                    "page": chunk.page,
-                    "page_start": chunk.page_start,
-                    "page_end": chunk.page_end,
-                }
-                for chunk in chunks
-            ]
+                chunks_data = [
+                    {
+                        "chunk_index": chunk.chunk_index,
+                        "content": chunk.content,
+                        "char_count": chunk.char_count,
+                        "page": chunk.page,
+                        "page_start": chunk.page_start,
+                        "page_end": chunk.page_end,
+                    }
+                    for chunk in chunks
+                ]
 
-            filename = self._extract_filename_from_url(url)
-            self.document_store.store_document(
-                user_id=user_id,
-                filename=filename,
-                file_content=pdf_bytes,
-                chunks=chunks_data,
-                embeddings=embeddings,
-            )
+                filename = self._extract_filename_from_url(url)
+                self.document_store.store_document(
+                    user_id=user_id,
+                    filename=filename,
+                    file_content=pdf_bytes,
+                    chunks=chunks_data,
+                    embeddings=embeddings,
+                )
 
-            await update.message.reply_text(
-                f"✅ Successfully processed {filename}\n"
-                f"📊 Created {len(chunks)} chunks\n"
-                f"🔗 Source: {url[:50]}...\n\n"
-                f"You can now ask questions about this document!"
-            )
-        except ValueError as e:
+                await update.message.reply_text(
+                    f"✅ Successfully processed {filename}\n"
+                    f"📊 Created {len(chunks)} chunks\n"
+                    f"🔗 Source: {url[:50]}...\n\n"
+                    f"You can now ask questions about this document!"
+                )
+            except ValueError as e:
+                raise UserFacingError(str(e)) from e
+        except UserFacingError as e:
             await update.message.reply_text(f"❌ {e}")
         except Exception:
             logger.exception("Failed to process downloaded PDF from URL: %s", url)

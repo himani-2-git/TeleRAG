@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from telegram.error import BadRequest
 
+from src.bot.errors import UserFacingError
 from src.bot.handlers import BotHandlers
 from src.bot.handlers.questions import format_telegram_html, split_telegram_message, utf16_len
 from src.config import Config
@@ -1181,6 +1182,125 @@ class TestIngestionProgressAndLimits(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("10%" in t for t in edit_texts))
         self.assertTrue(any("50%" in t for t in edit_texts))
         self.assertTrue(any("100%" in t for t in edit_texts))
+
+
+class TestUserFacingErrors(unittest.IsolatedAsyncioTestCase):
+    """Tests verifying that only UserFacingError messages are shown to users and unexpected errors are hidden."""
+
+    def setUp(self):
+        self.config = Config(telegram_bot_token="test")
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=Mock(),
+            embedding_generator=Mock(),
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=self.config,
+        )
+
+    async def test_handle_document_user_facing_error_displayed(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.document.file_name = "test.txt"
+        update.message.document.file_size = 500
+        update.message.reply_text = AsyncMock()
+
+        def fake_download(path):
+            with open(path, "wb") as f:
+                f.write(b"sample file content")
+
+        file_mock = Mock()
+        file_mock.download_to_drive = AsyncMock(side_effect=fake_download)
+        update.message.document.get_file = AsyncMock(return_value=file_mock)
+
+        # 1. Text chunker raises ValueError (which is converted to UserFacingError)
+        self.handlers.text_chunker.create_chunks.side_effect = ValueError("Document is empty")
+
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_document(update, context)
+        update.message.reply_text.assert_any_call("❌ Document is empty")
+
+        # 2. Text chunker directly raises UserFacingError
+        update.message.reply_text.reset_mock()
+        self.handlers.text_chunker.create_chunks.side_effect = UserFacingError(
+            "Custom user facing error"
+        )
+        await self.handlers.handle_document(update, context)
+        update.message.reply_text.assert_any_call("❌ Custom user facing error")
+
+    async def test_handle_document_unexpected_error_shows_generic_message(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.document.file_name = "test.txt"
+        update.message.document.file_size = 500
+        update.message.reply_text = AsyncMock()
+
+        def fake_download(path):
+            with open(path, "wb") as f:
+                f.write(b"sample file content")
+
+        file_mock = Mock()
+        file_mock.download_to_drive = AsyncMock(side_effect=fake_download)
+        update.message.document.get_file = AsyncMock(return_value=file_mock)
+
+        # Unexpected internal runtime error
+        self.handlers.text_chunker.create_chunks.side_effect = RuntimeError(
+            "database disk corrupted: 0xdeadbeef"
+        )
+
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        with self.assertLogs("src.bot.handlers.documents", level="ERROR") as cm:
+            await self.handlers.handle_document(update, context)
+
+        # Verify logger.exception recorded the error
+        self.assertTrue(any("database disk corrupted" in log for log in cm.output))
+
+        # Verify raw exception is NOT sent to user, generic message is sent instead
+        reply_calls = [call[0][0] for call in update.message.reply_text.call_args_list]
+        self.assertNotIn("database disk corrupted: 0xdeadbeef", reply_calls)
+        self.assertTrue(
+            any(
+                "❌ An unexpected error occurred while processing your document" in call
+                for call in reply_calls
+            )
+        )
+
+    @patch("src.processors.web_processor.validate_url_ssrf", return_value=(True, ""))
+    @patch("src.processors.web_processor.WebProcessor.process_url")
+    async def test_handle_web_url_user_facing_error_vs_unexpected_error(
+        self, mock_process, mock_ssrf
+    ):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        # Path 1: UserFacingError / ValueError from validator
+        mock_process.side_effect = ValueError("Unsupported page encoding")
+        await self.handlers._handle_web_url_ingest(update, context, "https://example.com/page")
+        update.message.reply_text.assert_any_call("❌ Unsupported page encoding")
+
+        # Path 2: Unexpected exception
+        update.message.reply_text.reset_mock()
+        mock_process.side_effect = OSError("Connection reset by peer: Errno 104")
+        with self.assertLogs("src.bot.handlers.documents", level="ERROR") as cm:
+            await self.handlers._handle_web_url_ingest(update, context, "https://example.com/page")
+
+        self.assertTrue(any("Failed to ingest web page" in log for log in cm.output))
+        reply_calls = [call[0][0] for call in update.message.reply_text.call_args_list]
+        self.assertNotIn("Connection reset by peer: Errno 104", reply_calls)
+        self.assertTrue(
+            any(
+                "❌ An unexpected error occurred while processing the web page" in call
+                for call in reply_calls
+            )
+        )
 
 
 if __name__ == "__main__":

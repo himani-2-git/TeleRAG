@@ -165,7 +165,7 @@ class RAGPipeline:
         self.grounding_min_coverage = grounding_min_coverage
 
     def _is_insufficient_context(self, answer: str) -> bool:
-        marker = getattr(self.prompt_config, "insufficient_context_marker", "INSUFFICIENT_CONTEXT")
+        marker = self.prompt_config.insufficient_context_marker
         return is_insufficient_context(answer, marker)
 
     def node_retrieve(self, state: RAGState) -> RAGState:

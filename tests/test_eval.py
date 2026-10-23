@@ -14,12 +14,42 @@ from eval.report import (
     rate,
 )
 from eval.run_eval import rate as run_eval_rate
+from eval.run_eval import resolve_similarity_threshold as run_eval_resolve_sim
 from eval.run_eval import run_evaluation
 from eval.run_faithfulness import rate as run_faithfulness_rate
+from eval.run_grounding_gate import resolve_similarity_threshold as grounding_resolve_sim
 
 
 class TestEvalRateAndMetrics(unittest.TestCase):
     """Test rate function, zero-denominator safety, and reporting formatting."""
+
+    def test_gates_ignore_environment_similarity_threshold(self):
+        """Gates must not read .env or SIMILARITY_THRESHOLD; defaults come from thresholds.json."""
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump({"similarity_threshold": 0.3}, f)
+            th_path = f.name
+
+        try:
+            # Regardless of environment variable value
+            for env_val in ["0.99", "0.01", "invalid", "100.0"]:
+                with patch.dict(os.environ, {"SIMILARITY_THRESHOLD": env_val}):
+                    eval_sim = run_eval_resolve_sim(thresholds_path=th_path)
+                    ground_sim = grounding_resolve_sim(thresholds_path=th_path)
+                    self.assertEqual(eval_sim, 0.3)
+                    self.assertEqual(ground_sim, 0.3)
+                    self.assertEqual(eval_sim, ground_sim)
+
+            # Explicit flag overrides thresholds.json
+            with patch.dict(os.environ, {"SIMILARITY_THRESHOLD": "0.99"}):
+                self.assertEqual(
+                    run_eval_resolve_sim(similarity_threshold=0.45, thresholds_path=th_path), 0.45
+                )
+                self.assertEqual(
+                    grounding_resolve_sim(similarity_threshold=0.45, thresholds_path=th_path), 0.45
+                )
+        finally:
+            if os.path.exists(th_path):
+                os.unlink(th_path)
 
     def test_rate_calculation(self):
         """Test rate computes accurate division and returns None when denominator is 0."""

@@ -325,7 +325,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             side_effect=[TimedOut("Connection timed out"), None]
         )
 
-        await self.handlers._send_typing_action(context, 12345)
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._send_typing_action(context, 12345)
 
         self.assertEqual(context.bot.send_chat_action.call_count, 2)
 
@@ -337,7 +338,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         # First attempt fails with NetworkError, retry succeeds
         update.message.reply_text = AsyncMock(side_effect=[NetworkError("Connection reset"), None])
 
-        await self.handlers._reply_with_retry(update, "Hello world")
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._reply_with_retry(update, "Hello world")
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         update.message.reply_text.assert_called_with("Hello world")
@@ -1010,7 +1012,8 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         thinking_msg.delete = AsyncMock()
 
         raw_answer = "Hello ```python\nprint(1 < 2)\n```\n\nSources:\n• <doc.pdf>"
-        await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         # First attempt: HTML
@@ -1128,7 +1131,8 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         thinking_msg.delete = AsyncMock()
 
         answer_text = ("Part of long response.\n\n") * 200
-        await self.handlers._deliver_answer(update, thinking_msg, answer_text)
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._deliver_answer(update, thinking_msg, answer_text)
 
         self.assertEqual(update.message.reply_text.call_count, 3)
         # Call 1: HTML for chunk 1
@@ -1152,7 +1156,8 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         thinking_msg = Mock()
         thinking_msg.delete = AsyncMock()
 
-        await self.handlers._deliver_answer(update, thinking_msg, "Short test answer")
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._deliver_answer(update, thinking_msg, "Short test answer")
 
         # 3 calls: HTML attempt -> plain text fallback attempt -> error notice
         self.assertEqual(update.message.reply_text.call_count, 3)

@@ -167,7 +167,8 @@ class TestLLMClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         messages = [{"role": "user", "content": "Test"}]
-        response = self.client.send_request(messages)
+        with self.assertLogs("src.rag.llm_client", level="ERROR"):
+            response = self.client.send_request(messages)
         self.assertIsNone(response)
 
     @patch("requests.post")
@@ -179,7 +180,8 @@ class TestLLMClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         messages = [{"role": "user", "content": "Test"}]
-        response = self.client.send_request(messages)
+        with self.assertLogs("src.rag.llm_client", level="ERROR"):
+            response = self.client.send_request(messages)
 
         self.assertIsNone(response)
         # Verify it didn't retry 3 times on 404
@@ -241,8 +243,9 @@ class TestLLMClient(unittest.TestCase):
         client = LLMClient(api_key="key", model="qwen", max_retries=5, retry_delay=0.01)
         messages = [{"role": "user", "content": "Test 429"}]
 
-        with patch("time.sleep") as mock_sleep:
-            response = client.send_request(messages)
+        with self.assertLogs("src.rag.llm_client", level="WARNING"):
+            with patch("time.sleep") as mock_sleep:
+                response = client.send_request(messages)
 
         self.assertIsNone(response)
         # Should attempt initial request + at most 1 retry = 2 total requests, not 5
@@ -278,9 +281,10 @@ class TestLLMClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = LLMClient(api_key="key", model="qwen", max_retries=3, retry_delay=0.01)
-        with patch("time.sleep"):
-            with self.assertRaises(LLMUnavailableError):
-                client.generate_answer("What is this?", "Some context")
+        with self.assertLogs("src.rag.llm_client", level="ERROR"):
+            with patch("time.sleep"):
+                with self.assertRaises(LLMUnavailableError):
+                    client.generate_answer("What is this?", "Some context")
         self.assertEqual(mock_post.call_count, 3)
 
     @patch("requests.post")
@@ -292,8 +296,9 @@ class TestLLMClient(unittest.TestCase):
         mock_post.return_value = mock_response
 
         client = LLMClient(api_key="key", model="qwen", max_retries=3, retry_delay=1.5)
-        with patch("time.sleep") as mock_sleep:
-            client.send_request([{"role": "user", "content": "hi"}])
+        with self.assertLogs("src.rag.llm_client", level="ERROR"):
+            with patch("time.sleep") as mock_sleep:
+                client.send_request([{"role": "user", "content": "hi"}])
         self.assertEqual(mock_sleep.call_count, 2)
         mock_sleep.assert_has_calls([unittest.mock.call(1.5), unittest.mock.call(3.0)])
 

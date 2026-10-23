@@ -73,7 +73,7 @@ Traditional document chunkers extract all text as a single concatenated string, 
 * Chunks that straddle page boundaries map to multiple pages. In our empirical analysis, 71.4% of baseline retrieval "misses" were off by exactly one page due to boundary straddling.
 * TeleRAG implements `extract_text_with_pages()`, preserving `[(page_num, text)]`.
 * During chunking, character indices are mapped back to their physical page intervals, recording `page_start` and `page_end` on every chunk.
-* Database schema migrations seamlessly introduce nullable `page`, `page_start`, and `page_end` columns with automatic backward compatibility for existing records.
+* Database schema migrations introduce nullable `page`, `page_start`, and `page_end` columns with automatic backward compatibility for existing records.
 
 ### 3.2 Dense Semantic Retrieval (Bi-Encoder)
 * **Model**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions).
@@ -194,7 +194,7 @@ To explore gating without data leakage:
 ## 7. Verification Matrix & CI Quality Gates
 
 ### 7.1 Automated Unit Test Suite
-The repository maintains comprehensive automated unit tests across 11 test modules:
+The repository maintains comprehensive automated unit tests across 16 test modules:
 * `tests/test_citations.py`: Page citation formatting and programmatic source footer deduplication.
 * `tests/test_handlers.py`: SSRF scheme checks, loopback/private IP blocking, multi-hop redirect defense, queueing, and new-reply delivery.
 * `tests/test_hybrid.py`: BM25 tokenization, RRF rank aggregation, empty corpus handling, and strict abstention invariant.
@@ -209,7 +209,7 @@ The repository maintains comprehensive automated unit tests across 11 test modul
 
 ### 7.2 Continuous Integration Quality Gates
 A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request to `main` across Python 3.10, 3.11, and 3.12:
-1. **Unit Test Suite**: Executes all 75 unit tests across the 11 modules.
+1. **Unit Test Suite**: Executes all 199 unit tests across the 16 modules.
 2. **Retrieval Evaluation Quality Gate**: Evaluates retrieval on the synthetic 8-page document (`eval/fixtures/ci_fixture.pdf`) and 15-question golden set (`eval/golden_ci.json`), enforcing `min_hit_at_5 >= 0.85`, `min_mrr >= 0.70`, and `min_abstention_easy >= 0.90`.
 3. **Grounding Quality Gate**: Evaluates citation coverage across reference answers and verifies rejection of negative controls (`eval/run_grounding_gate.py`), asserting mean reference coverage $\ge 0.85$ and negative control score $\le 0.40$.
 

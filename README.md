@@ -1,5 +1,7 @@
 # TeleRAG
 
+![CI](https://github.com/himani-2-git/TeleRAG/actions/workflows/ci.yml/badge.svg)
+
 A lightweight Telegram bot for grounded question answering over PDFs, markdown, text files and static web pages, running on local embeddings with no external vector database required by default (Chroma is optional).
 
 **Project status**: v1.1.0: versioned prompts, grounding gate, faithfulness evaluation (experimental, unvalidated judge), markdown/text/web ingestion, optional Chroma and LangGraph.

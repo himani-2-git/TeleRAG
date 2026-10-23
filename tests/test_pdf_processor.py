@@ -85,7 +85,8 @@ class TestTextChunker(unittest.TestCase):
 
     def test_empty_text(self):
         """Test empty text handling."""
-        chunks = self.chunker.create_chunks("")
+        with self.assertLogs("src.processors.text_chunker", level="WARNING"):
+            chunks = self.chunker.create_chunks("")
         self.assertEqual(len(chunks), 0)
 
     def test_validate_chunks(self):

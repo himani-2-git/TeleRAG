@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, Mock, patch
 from telegram.error import BadRequest
 
 from src.bot.handlers import BotHandlers
-from src.bot.handlers.questions import format_telegram_html
+from src.bot.handlers.questions import format_telegram_html, split_telegram_message, utf16_len
 from src.config import Config
 from src.rag.pipeline import is_insufficient_context, is_summary_query
 
@@ -966,6 +966,144 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         second_call = update.message.reply_text.call_args_list[1]
         self.assertNotIn("parse_mode", second_call[1])
         self.assertEqual(second_call[0][0], raw_answer)
+        thinking_msg.delete.assert_called_once()
+
+    def test_split_telegram_message_lengths(self):
+        # 4096-character answer
+        ans_4096 = ("This is a paragraph of text explaining details.\n\n") * 100
+        self.assertGreaterEqual(len(ans_4096), 4096)
+        chunks_4096 = split_telegram_message(ans_4096, limit=4000)
+        self.assertGreaterEqual(len(chunks_4096), 2)
+        for c in chunks_4096:
+            self.assertLessEqual(utf16_len(c), 4000)
+
+        # 5000-character answer
+        ans_5000 = ("Key section in the document describes distributed consensus.\n\n") * 85
+        self.assertGreaterEqual(len(ans_5000), 5000)
+        chunks_5000 = split_telegram_message(ans_5000, limit=4000)
+        self.assertGreaterEqual(len(chunks_5000), 2)
+        for c in chunks_5000:
+            self.assertLessEqual(utf16_len(c), 4000)
+
+        # 9000-character answer
+        ans_9000 = ("Sentence explaining system architecture in complete detail. ") * 160
+        self.assertGreaterEqual(len(ans_9000), 9000)
+        chunks_9000 = split_telegram_message(ans_9000, limit=4000)
+        self.assertGreaterEqual(len(chunks_9000), 3)
+        for c in chunks_9000:
+            self.assertLessEqual(utf16_len(c), 4000)
+
+    def test_split_telegram_message_code_blocks(self):
+        # Answer with code block spanning split point
+        code_lines = "\n".join(f"    item_{i} = calculate_value({i})" for i in range(250))
+        code_body = f"<pre><code>def process_items():\n{code_lines}\n    return True</code></pre>"
+        self.assertGreater(len(code_body), 6000)
+
+        # When splitting code directly, chunk 0 must close with </code></pre> and chunk 1 re-open with <pre><code>
+        code_chunks = split_telegram_message(code_body, limit=4000)
+        self.assertGreaterEqual(len(code_chunks), 2)
+        self.assertTrue(code_chunks[0].endswith("</code></pre>"))
+        self.assertTrue(code_chunks[1].startswith("<pre><code>"))
+
+        # When surrounded with headers and footers
+        raw = (
+            f"Header explanation before code block.\n\n{code_body}\n\nTrailing remarks after code."
+        )
+        chunks = split_telegram_message(raw, limit=4000)
+        self.assertGreaterEqual(len(chunks), 3)
+        for i, chunk in enumerate(chunks):
+            self.assertLessEqual(utf16_len(chunk), 4000)
+            self.assertEqual(
+                chunk.count("<pre><code>"),
+                chunk.count("</code></pre>"),
+                f"Chunk {i} tags unbalanced: {chunk[:30]}...{chunk[-30:]}",
+            )
+
+    def test_split_telegram_message_emoji_near_limit(self):
+        # 3999 ASCII characters + 2-unit emoji + trailing text
+        text = ("a" * 3999) + "😀" + ("b" * 100)
+        chunks = split_telegram_message(text, limit=4000)
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(utf16_len(chunks[0]), 3999)
+        self.assertEqual(chunks[0], "a" * 3999)
+        self.assertTrue(chunks[1].startswith("😀"))
+        self.assertLessEqual(utf16_len(chunks[1]), 4000)
+
+    async def test_deliver_answer_multichunk_ordering_and_footer(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        answer_part = ("Detailed explanation of distributed systems.\n\n") * 100
+        sources_part = "Sources:\n• consensus.pdf (p. 1-5)"
+        timing_part = "Answered in 3 s with test-model"
+        full_text = f"{answer_part}\n{sources_part}\n\n{timing_part}"
+
+        await self.handlers._deliver_answer(update, thinking_msg, full_text)
+
+        # Delivered in order across multiple messages
+        self.assertGreaterEqual(update.message.reply_text.call_count, 2)
+        calls = update.message.reply_text.call_args_list
+
+        # First chunk does NOT have Sources footer or timing line
+        first_chunk_text = calls[0][0][0]
+        self.assertNotIn("Sources:", first_chunk_text)
+        self.assertNotIn("Answered in", first_chunk_text)
+
+        # Last chunk has Sources footer and timing line
+        last_chunk_text = calls[-1][0][0]
+        self.assertIn("Sources:", last_chunk_text)
+        self.assertIn("Answered in 3 s with test-model", last_chunk_text)
+
+        thinking_msg.delete.assert_called_once()
+
+    async def test_deliver_answer_multichunk_mocked_bad_request_on_one_chunk(self):
+        update = Mock()
+        # 2 chunks expected:
+        # Chunk 1: HTML fails with BadRequest, plain text fallback succeeds
+        # Chunk 2: HTML succeeds
+        update.message.reply_text = AsyncMock(
+            side_effect=[
+                BadRequest("Can't parse entities: can't find end tag"),
+                Mock(),  # Plain text fallback for chunk 1 succeeds
+                Mock(),  # Chunk 2 HTML succeeds
+            ]
+        )
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        answer_text = ("Part of long response.\n\n") * 200
+        await self.handlers._deliver_answer(update, thinking_msg, answer_text)
+
+        self.assertEqual(update.message.reply_text.call_count, 3)
+        # Call 1: HTML for chunk 1
+        self.assertEqual(update.message.reply_text.call_args_list[0][1].get("parse_mode"), "HTML")
+        # Call 2: plain text for chunk 1
+        self.assertNotIn("parse_mode", update.message.reply_text.call_args_list[1][1])
+        # Call 3: HTML for chunk 2
+        self.assertEqual(update.message.reply_text.call_args_list[2][1].get("parse_mode"), "HTML")
+        thinking_msg.delete.assert_called_once()
+
+    async def test_deliver_answer_failure_replies_with_plain_text_error(self):
+        update = Mock()
+        # When _reply_with_retry returns None (both HTML and fallback fail)
+        update.message.reply_text = AsyncMock(
+            side_effect=[
+                BadRequest("Failed HTML"),
+                BadRequest("Failed fallback"),
+                Mock(),  # Error notice succeeds
+            ]
+        )
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        await self.handlers._deliver_answer(update, thinking_msg, "Short test answer")
+
+        # 3 calls: HTML attempt -> plain text fallback attempt -> error notice
+        self.assertEqual(update.message.reply_text.call_count, 3)
+        error_notice_call = update.message.reply_text.call_args_list[2]
+        self.assertIn("❌ Failed to send response", error_notice_call[0][0])
         thinking_msg.delete.assert_called_once()
 
 

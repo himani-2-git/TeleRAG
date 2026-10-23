@@ -216,24 +216,32 @@ All settings are configured via environment variables and loaded into `src.confi
 | Variable | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `TELEGRAM_BOT_TOKEN` | `str` | *Required* | Telegram Bot API token from `@BotFather`. |
-| `STORAGE_DIR` | `str` | `data` | Base directory for SQLite DB, raw files, and `.npy` embeddings. |
-| `EMBEDDING_MODEL` | `str` | `all-MiniLM-L6-v2` | SentenceTransformer model name for dense retrieval. |
-| `LLM_BASE_URL` | `str` | `http://localhost:11434` | Ollama or vLLM HTTP API base URL. |
+| `LLM_API_KEY` | `str` | `""` | API key for remote OpenAI-compatible LLM endpoints. |
+| `LLM_BASE_URL` | `str` | `http://localhost:11434/v1` | OpenAI-compatible endpoint URL. |
 | `LLM_MODEL` | `str` | `qwen2.5:3b` | Target LLM model identifier. |
+| `LLM_MAX_TOKENS` | `int` | `1024` | Maximum generation tokens for LLM answers. |
 | `LLM_TIMEOUT_SECONDS` | `int` | `120` | Read timeout for LLM generation requests. |
+| `MAX_RETRIES` | `int` | `3` | Maximum retry attempts for transient LLM errors. |
+| `RETRY_DELAY` | `float` | `1.0` | Base backoff delay in seconds between retries. |
+| `MAX_FILE_SIZE_MB` | `int` | `20` | Maximum upload file size in megabytes. |
+| `MAX_CHUNKS_PER_DOCUMENT` | `int` | `5000` | Maximum chunk limit per document. |
 | `CHUNK_SIZE` | `int` | `1000` | Target character length per text chunk. |
 | `CHUNK_OVERLAP` | `int` | `200` | Character overlap between consecutive chunks. |
-| `TOP_K_CHUNKS` | `int` | `3` | Number of final chunks passed to the LLM prompt. |
-| `MAX_FILE_SIZE_MB` | `int` | `20` | Maximum upload size for PDFs and files. |
-| `RETRIEVAL_MODE` | `str` | `hybrid` | Retrieval strategy: `dense`, `bm25`, or `hybrid`. |
-| `RETRIEVAL_THRESHOLD` | `float`| `0.20` | Minimum dense cosine similarity score before abstaining. |
-| `RETRIEVAL_RERANKER` | `bool` | `True` | Whether to apply CrossEncoder reranking to retrieved candidates. |
-| `RETRIEVAL_RERANKER_MODEL`| `str` | `cross-encoder/ms-marco-MiniLM-L-6-v2` | CrossEncoder model identifier. |
+| `EMBEDDING_MODEL` | `str` | `all-MiniLM-L6-v2` | SentenceTransformer model name for dense retrieval. |
+| `TOP_K_RESULTS` | `int` | `2` | Number of retrieved context chunks passed to the LLM. |
+| `SIMILARITY_THRESHOLD` | `float` | `0.3` | Minimum cosine similarity score before abstaining. |
+| `RETRIEVAL_MODE` | `str` | `hybrid` | Retrieval strategy: `dense`, `hybrid`, or `hybrid_rerank`. |
+| `ORCHESTRATOR` | `str` | `plain` | Pipeline orchestrator: `plain` or `langgraph`. |
 | `PROMPT_VERSION` | `str` | `v1` | Version of prompts loaded from `prompts/<version>.yaml`. |
-| `GROUNDING_THRESHOLD` | `float`| `0.50` | NLI entailment threshold for grounding verification. |
-| `GROUNDING_ENFORCE` | `bool` | `False` | Refuse answers failing grounding check when `True`. |
-| `GROUNDING_MIN_COVERAGE` | `float`| `0.70` | Ratio of supported sentences required to pass grounding. |
-| `ORCHESTRATOR` | `str` | `linear` | RAG orchestrator: `linear` or `langgraph`. |
+| `GROUNDING_THRESHOLD` | `float` | `0.45` | NLI entailment threshold for grounding verification. |
+| `GROUNDING_ENFORCE` | `bool` | `false` | Refuse answers failing grounding check when `true`. |
+| `GROUNDING_MIN_COVERAGE` | `float` | `0.5` | Ratio of supported sentences required to pass grounding. |
+| `DATABASE_PATH` | `str` | `data/documents.db` | SQLite database file path. |
+| `EMBEDDINGS_PATH` | `str` | `data/embeddings` | Directory path for cached NumPy embeddings. |
+| `VECTOR_BACKEND` | `str` | `numpy` | Vector store backend: `numpy` or `chroma`. |
+| `CHROMA_PATH` | `str` | `data/chroma` | Directory path for ChromaDB storage. |
+| `LOG_LEVEL` | `str` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`). |
+| `LOG_FILE` | `str` | `logs/bot.log` | Log file path. |
 
 ---
 

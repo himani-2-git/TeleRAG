@@ -210,6 +210,90 @@ class TestSSRFValidation(unittest.TestCase):
 
         self.assertIn("Redirect blocked by SSRF policy", str(ctx.exception))
 
+    @patch("src.processors.web_processor.socket.getaddrinfo")
+    def test_web_processor_decimal_hex_octal_ip_blocked(self, mock_getaddrinfo):
+        """Decimal, hex, and octal integer formats resolving to 127.0.0.1 must be blocked."""
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("127.0.0.1", 80))]
+        variants = [
+            "http://2130706433/page",
+            "http://0x7f000001/page",
+            "http://017700000001/page",
+        ]
+        for url in variants:
+            is_safe, msg = validate_url_ssrf(url)
+            self.assertFalse(is_safe)
+            self.assertIn("forbidden", msg.lower())
+
+    @patch("src.processors.web_processor.socket.getaddrinfo")
+    def test_web_processor_mixed_dns_answer_blocked(self, mock_getaddrinfo):
+        """Resolver answer list [public, private] must be blocked."""
+        mock_getaddrinfo.return_value = [
+            (2, 1, 6, "", ("93.184.216.34", 80)),
+            (2, 1, 6, "", ("10.0.0.1", 80)),
+        ]
+        is_safe, msg = validate_url_ssrf("https://dual.example.com/page")
+        self.assertFalse(is_safe)
+        self.assertIn("forbidden", msg.lower())
+
+    @patch("src.processors.web_processor.requests.get")
+    @patch("src.processors.web_processor.socket.getaddrinfo")
+    def test_web_processor_redirect_to_metadata_blocked(self, mock_getaddrinfo, mock_get):
+        """A redirect to 169.254.169.254 must be blocked."""
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("93.184.216.34", 80))]
+        mock_resp = Mock()
+        mock_resp.is_redirect = True
+        mock_resp.status_code = 302
+        mock_resp.headers = {"Location": "http://169.254.169.254/latest/meta-data/"}
+        mock_get.return_value = mock_resp
+
+        processor = WebProcessor()
+        with self.assertRaises(ValueError) as ctx:
+            processor.fetch_url("https://example.com/safe")
+        self.assertIn("Redirect blocked by SSRF policy", str(ctx.exception))
+
+    @patch("src.processors.web_processor.requests.get")
+    @patch("src.processors.web_processor.socket.getaddrinfo")
+    def test_web_processor_redirect_loop_blocked(self, mock_getaddrinfo, mock_get):
+        """A redirect loop must be aborted after max_redirects."""
+        mock_getaddrinfo.return_value = [(2, 1, 6, "", ("93.184.216.34", 80))]
+        mock_resp = Mock()
+        mock_resp.is_redirect = True
+        mock_resp.status_code = 302
+        mock_resp.headers = {"Location": "https://example.com/loop"}
+        mock_get.return_value = mock_resp
+
+        processor = WebProcessor()
+        with self.assertRaises(ValueError) as ctx:
+            processor.fetch_url("https://example.com/loop")
+        self.assertIn("Too many redirects", str(ctx.exception))
+
+    def test_web_processor_credentials_in_url_blocked(self):
+        """URLs containing credentials must be rejected."""
+        is_safe, msg = validate_url_ssrf("http://user:pass@example.com/page")
+        self.assertFalse(is_safe)
+        self.assertIn("credentials", msg.lower())
+
+    def test_web_processor_ipv4_mapped_ipv6_blocked(self):
+        """IPv4-mapped IPv6 address ::ffff:127.0.0.1 must be blocked."""
+        is_safe, msg = validate_url_ssrf("http://[::ffff:127.0.0.1]/page")
+        self.assertFalse(is_safe)
+        self.assertIn("forbidden", msg.lower())
+
+    def test_web_processor_link_local_multicast_reserved_blocked(self):
+        """Link-local, multicast, and reserved IP ranges must be blocked."""
+        restricted_urls = [
+            "http://169.254.1.1/page",
+            "http://224.0.0.1/page",
+            "http://240.0.0.1/page",
+            "http://0.0.0.0/page",
+            "http://[fe80::1]/page",
+            "http://[ff02::1]/page",
+        ]
+        for url in restricted_urls:
+            is_safe, msg = validate_url_ssrf(url)
+            self.assertFalse(is_safe, f"{url} should be blocked")
+            self.assertIn("forbidden", msg.lower())
+
 
 class TestWebDocumentNaming(unittest.TestCase):
     """Test URL ingestion document naming rules."""

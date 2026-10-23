@@ -164,7 +164,7 @@ class QuestionHandlersMixin:
             return
 
         question = message_text
-        documents = self.document_store.list_documents(user_id)
+        documents = await asyncio.to_thread(self.document_store.list_documents, user_id)
         if not documents:
             await update.message.reply_text(
                 "📭 You haven't uploaded any documents yet.\n"

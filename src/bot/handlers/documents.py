@@ -18,6 +18,16 @@ from ..errors import UserFacingError
 logger = logging.getLogger(__name__)
 
 
+def _read_file_bytes(path: str) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def _write_file_bytes(path: str, data: bytes) -> None:
+    with open(path, "wb") as f:
+        f.write(data)
+
+
 class DocumentHandlersMixin:
     """Mixin providing document and URL processing handlers for BotHandlers."""
 
@@ -115,7 +125,8 @@ class DocumentHandlersMixin:
                     for chunk in chunks
                 ]
 
-                self.document_store.store_document(
+                await asyncio.to_thread(
+                    self.document_store.store_document,
                     user_id=user_id,
                     filename=citation_label,
                     file_content=raw_bytes,
@@ -176,18 +187,21 @@ class DocumentHandlersMixin:
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
                 await file.download_to_drive(temp_file.name)
 
-                with open(temp_file.name, "rb") as f:
-                    file_content = f.read()
+                file_content = await asyncio.to_thread(_read_file_bytes, temp_file.name)
 
                 if is_pdf:
-                    is_valid, error_msg = self.pdf_processor.validate_pdf(
-                        temp_file.name, document.file_size
+                    is_valid, error_msg = await asyncio.to_thread(
+                        self.pdf_processor.validate_pdf, temp_file.name, document.file_size
                     )
                     if not is_valid:
                         await update.message.reply_text(f"❌ {error_msg}")
                         return
-                    pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
-                    chunks = self.text_chunker.create_chunks_with_pages(pages_data)
+                    pages_data = await asyncio.to_thread(
+                        self.pdf_processor.extract_text_with_pages, temp_file.name
+                    )
+                    chunks = await asyncio.to_thread(
+                        self.text_chunker.create_chunks_with_pages, pages_data
+                    )
                     source_type = "pdf"
                 elif is_md:
                     from ...processors.markdown_processor import MarkdownProcessor
@@ -196,14 +210,14 @@ class DocumentHandlersMixin:
                         chunk_size=self.config.chunk_size, overlap=self.config.chunk_overlap
                     )
                     md_text = file_content.decode("utf-8", errors="replace")
-                    chunks = md_processor.process_markdown(md_text, source_name=fn)
+                    chunks = await asyncio.to_thread(md_processor.process_markdown, md_text, fn)
                     source_type = "markdown"
                 else:
                     txt_text = file_content.decode("utf-8", errors="replace")
                     if not txt_text.strip():
                         await update.message.reply_text("❌ No text content found in file.")
                         return
-                    raw_chunks = self.text_chunker.create_chunks(txt_text)
+                    raw_chunks = await asyncio.to_thread(self.text_chunker.create_chunks, txt_text)
                     chunks = []
                     for i, rc in enumerate(raw_chunks):
                         from ...processors.text_chunker import TextChunk
@@ -246,7 +260,8 @@ class DocumentHandlersMixin:
                     for chunk in chunks
                 ]
 
-                self.document_store.store_document(
+                await asyncio.to_thread(
+                    self.document_store.store_document,
                     user_id=user_id,
                     filename=fn,
                     file_content=file_content,
@@ -341,19 +356,25 @@ class DocumentHandlersMixin:
         try:
             try:
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-                temp_file.write(pdf_bytes)
                 temp_file.close()
+                await asyncio.to_thread(_write_file_bytes, temp_file.name, pdf_bytes)
 
                 file_size = len(pdf_bytes)
                 await update.message.reply_text("📥 Processing PDF...")
 
-                is_valid, error_msg = self.pdf_processor.validate_pdf(temp_file.name, file_size)
+                is_valid, error_msg = await asyncio.to_thread(
+                    self.pdf_processor.validate_pdf, temp_file.name, file_size
+                )
                 if not is_valid:
                     await update.message.reply_text(f"❌ {error_msg}")
                     return
 
-                pages_data = self.pdf_processor.extract_text_with_pages(temp_file.name)
-                chunks = self.text_chunker.create_chunks_with_pages(pages_data)
+                pages_data = await asyncio.to_thread(
+                    self.pdf_processor.extract_text_with_pages, temp_file.name
+                )
+                chunks = await asyncio.to_thread(
+                    self.text_chunker.create_chunks_with_pages, pages_data
+                )
                 if not chunks:
                     await update.message.reply_text("❌ No text content found in PDF.")
                     return
@@ -376,7 +397,8 @@ class DocumentHandlersMixin:
                 ]
 
                 filename = self._extract_filename_from_url(url)
-                self.document_store.store_document(
+                await asyncio.to_thread(
+                    self.document_store.store_document,
                     user_id=user_id,
                     filename=filename,
                     file_content=pdf_bytes,

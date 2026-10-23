@@ -1,5 +1,6 @@
 """Command handlers for Telegram bot (/start, /help, /list, /delete, /clear, /addurl)."""
 
+import asyncio
 import logging
 from datetime import datetime
 from typing import Any
@@ -58,7 +59,7 @@ class CommandHandlersMixin:
         """List all documents currently ingested for the user."""
         user_id = update.effective_user.id
         try:
-            documents = self.document_store.list_documents(user_id)
+            documents = await asyncio.to_thread(self.document_store.list_documents, user_id)
             if not documents:
                 await update.message.reply_text("📭 You haven't uploaded any documents yet.")
                 return
@@ -94,7 +95,7 @@ class CommandHandlersMixin:
             return
 
         try:
-            documents = self.document_store.list_documents(user_id)
+            documents = await asyncio.to_thread(self.document_store.list_documents, user_id)
             if not documents:
                 await update.message.reply_text(
                     "Document not found. Send /list to see names and numbers."
@@ -132,7 +133,9 @@ class CommandHandlersMixin:
                     )
                     return
 
-            deleted = self.document_store.delete_document(user_id, target_doc["filename"])
+            deleted = await asyncio.to_thread(
+                self.document_store.delete_document, user_id, target_doc["filename"]
+            )
             if deleted:
                 await update.message.reply_text(f"✅ Deleted document: {target_doc['filename']}")
             else:
@@ -147,7 +150,7 @@ class CommandHandlersMixin:
         """Clear all documents for the user."""
         user_id = update.effective_user.id
         try:
-            count = self.document_store.clear_user_documents(user_id)
+            count = await asyncio.to_thread(self.document_store.clear_user_documents, user_id)
             if count > 0:
                 await update.message.reply_text(f"✅ Deleted {count} document(s).")
             else:

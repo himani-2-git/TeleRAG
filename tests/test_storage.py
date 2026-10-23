@@ -255,9 +255,42 @@ class TestNumPyVectorStoreAndMigration(unittest.TestCase):
         arr = np.load(npy_path)
         self.assertEqual(arr.shape, (2, 2))
 
-        # Second run should skip (idempotent)
+        # Verify that legacy JSON embedding files were removed after .npy verification
+        self.assertFalse(os.path.exists(os.path.join(self.embeddings_path, "doc_42_chunk_0.json")))
+        self.assertFalse(os.path.exists(os.path.join(self.embeddings_path, "doc_42_chunk_1.json")))
+
+        # Second run should skip (idempotent, returns 0)
         second_run = migrate_embeddings(self.embeddings_path)
         self.assertEqual(second_run, 0)
+
+    def test_migrate_embeddings_retains_jsons_on_verification_failure(self):
+        """Test that if .npy verification fails, old JSON files are NOT deleted."""
+        import json
+        from unittest.mock import patch
+
+        import numpy as np
+
+        from scripts.migrate_embeddings import migrate_embeddings
+
+        json_path_0 = os.path.join(self.embeddings_path, "doc_99_chunk_0.json")
+        with open(json_path_0, "w") as f:
+            json.dump({"embedding": [5.0, 6.0]}, f)
+
+        # Force np.load to raise an error during verification
+        original_np_load = np.load
+
+        def faulty_load(path, *args, **kwargs):
+            if "99.npy" in str(path):
+                raise ValueError("Simulated corrupt .npy file")
+            return original_np_load(path, *args, **kwargs)
+
+        with self.assertLogs("scripts.migrate_embeddings", level="ERROR"):
+            with patch("numpy.load", side_effect=faulty_load):
+                migrated = migrate_embeddings(self.embeddings_path)
+                self.assertEqual(migrated, 0)
+
+        # JSON file MUST still exist because verification failed
+        self.assertTrue(os.path.exists(json_path_0))
 
     def test_bm25_cache_and_invalidation(self):
         """Test HybridRetriever BM25 caching per (user_id, corpus fingerprint) and invalidation."""

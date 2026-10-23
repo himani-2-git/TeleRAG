@@ -57,6 +57,23 @@ def migrate_embeddings(embeddings_dir: str = "data/embeddings") -> int:
 
         emb_arr = np.array(embeddings, dtype=np.float32)
         np.save(npy_path, emb_arr)
+
+        # Verify the saved .npy file before deleting old JSON files
+        try:
+            verified = np.load(npy_path)
+            if len(verified) != len(chunk_files) or not np.array_equal(verified, emb_arr):
+                raise ValueError("Verification failed: written .npy content mismatch")
+        except Exception as e:
+            logger.error("Failed to verify %s: %s; keeping JSON files.", npy_path, e)
+            continue
+
+        # Remove old JSON embeddings only after successful verification
+        for _, path in chunk_files:
+            try:
+                os.remove(path)
+            except OSError as e:
+                logger.warning("Could not remove old JSON embedding %s: %s", path, e)
+
         migrated_count += 1
         logger.info("Migrated document %d (%d chunks) to %s", doc_id, len(embeddings), npy_path)
 

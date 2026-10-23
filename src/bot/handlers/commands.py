@@ -26,7 +26,7 @@ class CommandHandlersMixin:
             "❓ Ask questions about your uploaded documents\n\n"
             "Commands:\n"
             "/list - Show your uploaded documents\n"
-            "/delete 2 or /delete part-of-name - Delete a specific document\n"
+            "/delete 2 or /delete part-of-name - Delete document (precedence: exact name, then list number, then unique substring)\n"
             "/clear - Delete all your documents\n"
             "/addurl <url> - Ingest a web page\n"
             "/help - Show this message"

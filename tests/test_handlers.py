@@ -757,6 +757,59 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Please specify the exact name or document number from /list.", msg)
         self.doc_store.delete_document.assert_not_called()
 
+    async def test_delete_precedence_numeric_filename_vs_list_index(self):
+        """Test /delete precedence: exact name match first, then list number, then unique substring."""
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        # Documents: 1 -> alpha.pdf, 2 -> 2.pdf, 3 -> gamma.pdf
+        docs = [
+            {"filename": "alpha.pdf"},
+            {"filename": "2.pdf"},
+            {"filename": "gamma.pdf"},
+        ]
+        self.doc_store.list_documents.return_value = docs
+        self.doc_store.delete_document.return_value = True
+
+        # Case 1: argument '2.pdf' matches exact filename '2.pdf'
+        context.args = ["2.pdf"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "2.pdf")
+        update.message.reply_text.assert_called_with("✅ Deleted document: 2.pdf")
+
+        # Case 2: argument '2' has no exact match for '2', so it resolves by list number 2 -> '2.pdf'
+        self.doc_store.delete_document.reset_mock()
+        update.message.reply_text.reset_mock()
+        context.args = ["2"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "2.pdf")
+        update.message.reply_text.assert_called_with("✅ Deleted document: 2.pdf")
+
+        # Case 3: when a document is named literally '2' and doc 2 is 'second.pdf',
+        # '/delete 2' MUST match exact name '2' first, not list item 2 ('second.pdf')
+        docs_with_literal_2 = [
+            {"filename": "first.pdf"},
+            {"filename": "second.pdf"},
+            {"filename": "2"},
+        ]
+        self.doc_store.list_documents.return_value = docs_with_literal_2
+        self.doc_store.delete_document.reset_mock()
+        update.message.reply_text.reset_mock()
+        context.args = ["2"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "2")
+        update.message.reply_text.assert_called_with("✅ Deleted document: 2")
+
+        # Case 4: argument '1' resolves to list number 1 -> 'first.pdf'
+        self.doc_store.delete_document.reset_mock()
+        update.message.reply_text.reset_mock()
+        context.args = ["1"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "first.pdf")
+        update.message.reply_text.assert_called_with("✅ Deleted document: first.pdf")
+
     async def test_list_command_empty(self):
         update = Mock()
         update.effective_user.id = 123

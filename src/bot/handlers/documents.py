@@ -13,6 +13,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from ...processors.pdf_fetcher import fetch_pdf_bytes
+from ...storage.document_store import sanitize_filename
 from ..errors import UserFacingError
 
 logger = logging.getLogger(__name__)
@@ -154,7 +155,7 @@ class DocumentHandlersMixin:
         """Handle document uploads for PDF, Markdown, and text formats."""
         user_id = update.effective_user.id
         document = update.message.document
-        fn = document.file_name or "document"
+        fn = sanitize_filename(document.file_name or "document")
         fn_lower = fn.lower()
 
         is_pdf = fn_lower.endswith(".pdf")
@@ -302,7 +303,7 @@ class DocumentHandlersMixin:
         if not filename or not filename.endswith(".pdf"):
             suffix = hashlib.sha256(url.encode()).hexdigest()[:8]
             filename = f"document_{suffix}.pdf"
-        return filename
+        return sanitize_filename(filename)
 
     def _is_safe_url(self, url: str) -> tuple[bool, str]:
         """Validate URL against SSRF and unsupported schemes."""

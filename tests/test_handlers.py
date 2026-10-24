@@ -499,6 +499,54 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("guide.pdf", reply)
         mock_thinking_msg.delete.assert_called_once()
 
+    async def test_insufficient_context_in_sentence_or_paragraph_suppresses_sources_footer(self):
+        """When the LLM contains INSUFFICIENT_CONTEXT anywhere, reply with refusal and suppress Sources."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{"id": 1, "filename": "guide.pdf"}]
+        chunks = [
+            {
+                "content": "Some programming context.",
+                "filename": "guide.pdf",
+                "page_start": 5,
+                "page_end": 5,
+                "chunk_index": 0,
+            }
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+
+        # Model returns marker inside a sentence
+        self.mock_llm.generate_answer.return_value = (
+            "...for these values, INSUFFICIENT_CONTEXT would apply as..."
+        )
+        self.mock_llm.validate_response.return_value = (
+            "...for these values, INSUFFICIENT_CONTEXT would apply as..."
+        )
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "How do I calculate X?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn(
+            "I couldn't find relevant information in your documents to answer this question.", reply
+        )
+        self.assertNotIn("Sources:", reply)
+        self.assertNotIn("guide.pdf", reply)
+        self.assertNotIn("Answered in", reply)
+
     async def test_normal_answer_includes_sources_footer(self):
         """A normal grounded LLM answer must still retain its verified Sources footer."""
         user_id = 123
@@ -581,12 +629,26 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_marker_only_insufficient_context(self):
-        """Verify marker-only check strips whitespace/quotes/backticks and checks prefix."""
+        """Verify marker check detects INSUFFICIENT_CONTEXT anywhere case-insensitively."""
+        # Marker at start
         self.assertTrue(is_insufficient_context("INSUFFICIENT_CONTEXT"))
         self.assertTrue(is_insufficient_context("`INSUFFICIENT_CONTEXT`"))
         self.assertTrue(is_insufficient_context(" 'INSUFFICIENT_CONTEXT' "))
         self.assertTrue(is_insufficient_context('"INSUFFICIENT_CONTEXT"'))
         self.assertTrue(is_insufficient_context("insufficient_context: cannot find it"))
+        # Marker in middle of paragraph
+        self.assertTrue(
+            is_insufficient_context(
+                "Here is introductory text.\n\nINSUFFICIENT_CONTEXT\n\nMore details."
+            )
+        )
+        # Marker in a sentence
+        self.assertTrue(
+            is_insufficient_context("...for these values, INSUFFICIENT_CONTEXT would apply as...")
+        )
+        self.assertTrue(
+            is_insufficient_context("...for these values, insufficient_context would apply as...")
+        )
         # Non-marker phrases should not be caught
         self.assertFalse(is_insufficient_context("I don't have enough information."))
         self.assertFalse(is_insufficient_context("The context does not mention this."))

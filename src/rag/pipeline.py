@@ -37,11 +37,10 @@ def is_summary_query(query: str) -> bool:
 
 
 def is_insufficient_context(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
-    """Check if the answer begins with the insufficient context marker."""
-    if not answer:
+    """Check if the answer contains the insufficient context marker (case-insensitive)."""
+    if not answer or not marker:
         return False
-    stripped = answer.strip("`'\" \t\r\n")
-    return stripped.upper().startswith(marker.upper())
+    return marker.upper() in answer.upper()
 
 
 def format_source_footer(chunks: list[dict[str, Any]]) -> str:

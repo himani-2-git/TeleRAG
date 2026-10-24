@@ -39,14 +39,14 @@ def is_summary_query(query: str) -> bool:
 
 def is_insufficient_context(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
     """Check if the answer contains the insufficient context marker (case-insensitive)."""
-    if not answer or not marker:
+    if not answer or not marker or not isinstance(answer, str) or not isinstance(marker, str):
         return False
     return marker.upper() in answer.upper()
 
 
 def format_source_footer(chunks: list[dict[str, Any]]) -> str:
     """Format the citation footer block for retrieved chunks."""
-    if not chunks:
+    if not chunks or not isinstance(chunks, (list, tuple)):
         return ""
 
     sources = []
@@ -88,7 +88,7 @@ def format_source_footer(chunks: list[dict[str, Any]]) -> str:
 
 def count_substantive_words(text: str) -> int:
     """Count words after removing bracketed citations, Sources lines, and whitespace."""
-    if not text:
+    if not text or not isinstance(text, str):
         return 0
     # Remove bracketed citations like [aipython.pdf, p. 11]
     cleaned = re.sub(r"\[.*?\]", "", text, flags=re.DOTALL)
@@ -301,6 +301,22 @@ class RAGPipeline:
 
         answer = state.get("answer", "")
         retrieved = state.get("retrieved_chunks", [])
+        report = state.get("grounding_report")
+
+        if report is not None and getattr(report, "applicable", False):
+            supporting_indices = getattr(report, "supporting_chunk_indices", None)
+            if supporting_indices is not None:
+                if supporting_indices:
+                    supporting_chunks = [
+                        retrieved[i] for i in supporting_indices if i < len(retrieved)
+                    ]
+                    footer = format_source_footer(supporting_chunks)
+                    final_text = f"{answer}{footer}" if footer else answer
+                else:
+                    final_text = f"{answer.rstrip()}\n\n(Could not verify this answer against the cited pages.)"
+                return {**state, "final_response": final_text}
+
+        # If grounding data is unavailable, keep the current behavior
         footer = format_source_footer(retrieved)
         final_text = f"{answer}{footer}" if footer else answer
 

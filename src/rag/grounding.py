@@ -20,6 +20,8 @@ class GroundingReport:
     supported_sentences: int
     unsupported_sentences: list[str] = field(default_factory=list)
     max_scores: list[float] = field(default_factory=list)
+    chunk_support_counts: list[int] = field(default_factory=list)
+    supporting_chunk_indices: list[int] = field(default_factory=list)
 
 
 def strip_footers(text: str) -> str:
@@ -211,14 +213,20 @@ def grounding_report(
     supported_count = 0
     unsupported: list[str] = []
     max_scores: list[float] = []
+    chunk_support = [0] * len(chunks)
+    chunk_max_sim = [0.0] * len(chunks)
 
     for sentence in sentences:
         s_vec = _get_embedding(embedder, sentence)
         best_sim = 0.0
-        for c_vec in chunk_embeddings:
+        for idx, c_vec in enumerate(chunk_embeddings):
             sim = cosine_similarity(s_vec, c_vec)
             if sim > best_sim:
                 best_sim = sim
+            if sim > chunk_max_sim[idx]:
+                chunk_max_sim[idx] = sim
+            if sim >= threshold:
+                chunk_support[idx] += 1
 
         max_scores.append(best_sim)
         if best_sim >= threshold:
@@ -228,6 +236,9 @@ def grounding_report(
 
     coverage = supported_count / len(sentences) if sentences else 1.0
 
+    supporting_indices = [i for i in range(len(chunks)) if chunk_support[i] > 0]
+    supporting_indices.sort(key=lambda i: (-chunk_support[i], -chunk_max_sim[i], i))
+
     return GroundingReport(
         applicable=True,
         citation_coverage=coverage,
@@ -235,4 +246,6 @@ def grounding_report(
         supported_sentences=supported_count,
         unsupported_sentences=unsupported,
         max_scores=max_scores,
+        chunk_support_counts=chunk_support,
+        supporting_chunk_indices=supporting_indices,
     )

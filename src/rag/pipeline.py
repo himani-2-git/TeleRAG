@@ -2,6 +2,7 @@
 
 import importlib.util
 import logging
+import re
 from typing import Any, TypedDict
 
 from .grounding import grounding_report
@@ -83,6 +84,24 @@ def format_source_footer(chunks: list[dict[str, Any]]) -> str:
 
     footer_lines = ["\n\nSources:"] + [f"• {s}" for s in sources]
     return "\n".join(footer_lines)
+
+
+def count_substantive_words(text: str) -> int:
+    """Count words after removing bracketed citations, Sources lines, and whitespace."""
+    if not text:
+        return 0
+    # Remove bracketed citations like [aipython.pdf, p. 11]
+    cleaned = re.sub(r"\[.*?\]", "", text, flags=re.DOTALL)
+    # Remove Sources: blocks to end of text
+    cleaned = re.sub(r"(?:\n\s*|\A)sources:\s*.*$", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
+    # Remove any individual line starting with sources
+    lines = [
+        line
+        for line in cleaned.splitlines()
+        if not re.match(r"^\s*sources\b", line, flags=re.IGNORECASE)
+    ]
+    cleaned = " ".join(lines).strip()
+    return len(cleaned.split())
 
 
 class RAGState(TypedDict, total=False):
@@ -190,16 +209,7 @@ class RAGPipeline:
                 "refusal_reason": "LLM_UNAVAILABLE",
             }
 
-        if not raw_ans:
-            return {
-                **state,
-                "raw_answer": None,
-                "answer": "❌ The model is currently unavailable. Please try again shortly.",
-                "refused": True,
-                "refusal_reason": "LLM_UNAVAILABLE",
-            }
-
-        answer = self.llm_client.validate_response(raw_ans)
+        answer = self.llm_client.validate_response(raw_ans) if raw_ans else ""
 
         if self._is_insufficient_context(answer):
             refusal_msg = self.prompt_config.refusal_message
@@ -210,6 +220,34 @@ class RAGPipeline:
                 "refused": True,
                 "refusal_reason": "INSUFFICIENT_CONTEXT",
             }
+
+        if count_substantive_words(answer) < 3:
+            logger.info("Generated answer has fewer than 3 substantive words; retrying once.")
+            try:
+                retry_raw = self.llm_client.generate_answer(question, context_text)
+            except LLMUnavailableError:
+                retry_raw = None
+
+            if retry_raw:
+                raw_ans = retry_raw
+                answer = self.llm_client.validate_response(raw_ans)
+                if self._is_insufficient_context(answer):
+                    return {
+                        **state,
+                        "raw_answer": raw_ans,
+                        "answer": self.prompt_config.refusal_message,
+                        "refused": True,
+                        "refusal_reason": "INSUFFICIENT_CONTEXT",
+                    }
+
+            if count_substantive_words(answer) < 3:
+                return {
+                    **state,
+                    "raw_answer": raw_ans,
+                    "answer": "I couldn't produce a usable answer; try rephrasing the question.",
+                    "refused": True,
+                    "refusal_reason": "UNUSABLE_ANSWER",
+                }
 
         return {**state, "raw_answer": raw_ans, "answer": answer, "refused": False}
 

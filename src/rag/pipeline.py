@@ -71,26 +71,13 @@ INSUFFICIENT_CONTEXT_PATTERNS: tuple[str, ...] = (
 
 
 def is_insufficient_context(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
-<<<<<<< HEAD
-    """Check if the LLM response indicates the context does not contain the answer."""
-    if not answer:
+    """Check if the answer indicates insufficient context via marker or refusal phrases."""
+    if not answer or not marker:
         return False
-    clean = answer.strip()
-    lower = clean.lower()
-
-    # Starts with insufficient context marker (trimmed, case-insensitive, punctuation-stripped)
-    stripped = clean.strip("`'\" \t\r\n").lower()
-    marker_clean = marker.strip().lower()
-    if stripped.startswith(marker_clean) or stripped.startswith("insufficient_context"):
+    lower = answer.lower()
+    if marker.lower() in lower:
         return True
-
     return any(pattern in lower for pattern in INSUFFICIENT_CONTEXT_PATTERNS)
-=======
-    """Check if the answer contains the insufficient context marker (case-insensitive)."""
-    if not answer or not marker or not isinstance(answer, str) or not isinstance(marker, str):
-        return False
-    return marker.upper() in answer.upper()
->>>>>>> main
 
 
 def format_source_footer(chunks: list[dict[str, Any]]) -> str:

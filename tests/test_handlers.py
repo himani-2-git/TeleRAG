@@ -631,10 +631,6 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             user_chunks=chunks,
         )
 
-<<<<<<< HEAD
-    def test_insufficient_context_markers_and_phrases(self):
-        """Verify marker check and phrase-based fallback detect refusals."""
-=======
     def test_count_substantive_words(self):
         """Verify substantive word counting removes citations, sources lines, and whitespace."""
         self.assertEqual(count_substantive_words("[aipython.pdf, p. 11]"), 0)
@@ -736,31 +732,14 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Sources:", reply)
         self.assertIn("aipython.pdf (p. 11)", reply)
 
-    def test_marker_only_insufficient_context(self):
-        """Verify marker check detects INSUFFICIENT_CONTEXT anywhere case-insensitively."""
+    def test_insufficient_context_markers_and_phrases(self):
+        """Verify marker check and phrase-based fallback detect refusals."""
         # Marker at start
->>>>>>> main
         self.assertTrue(is_insufficient_context("INSUFFICIENT_CONTEXT"))
         self.assertTrue(is_insufficient_context("`INSUFFICIENT_CONTEXT`"))
         self.assertTrue(is_insufficient_context(" 'INSUFFICIENT_CONTEXT' "))
         self.assertTrue(is_insufficient_context('"INSUFFICIENT_CONTEXT"'))
         self.assertTrue(is_insufficient_context("insufficient_context: cannot find it"))
-<<<<<<< HEAD
-        # Paraphrased refusals must be treated as refusals
-        self.assertTrue(is_insufficient_context("The context does not mention this topic."))
-        self.assertTrue(
-            is_insufficient_context("This information is not mentioned in the provided documents.")
-        )
-        self.assertTrue(
-            is_insufficient_context("The provided context does not contain details about this.")
-        )
-        # Normal answer quoting a document is NOT treated as a refusal
-        self.assertFalse(
-            is_insufficient_context(
-                "The document explains that Raft replicates log entries across nodes."
-            )
-        )
-=======
         # Marker in middle of paragraph
         self.assertTrue(
             is_insufficient_context(
@@ -774,10 +753,22 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             is_insufficient_context("...for these values, insufficient_context would apply as...")
         )
-        # Non-marker phrases should not be caught
+        # Paraphrased refusals must be treated as refusals
+        self.assertTrue(is_insufficient_context("The context does not mention this topic."))
+        self.assertTrue(
+            is_insufficient_context("This information is not mentioned in the provided documents.")
+        )
+        self.assertTrue(
+            is_insufficient_context("The provided context does not contain details about this.")
+        )
+        self.assertTrue(is_insufficient_context("The context does not mention this."))
+        # Non-refusal and normal answers
         self.assertFalse(is_insufficient_context("I don't have enough information."))
-        self.assertFalse(is_insufficient_context("The context does not mention this."))
->>>>>>> main
+        self.assertFalse(
+            is_insufficient_context(
+                "The document explains that Raft replicates log entries across nodes."
+            )
+        )
         self.assertFalse(is_insufficient_context(""))
 
     async def test_queue_accounting_increments_before_notice_and_decrements_in_finally(self):

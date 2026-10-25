@@ -1,10 +1,8 @@
 # TeleRAG
 
-![CI](https://github.com/himani-2-git/TeleRAG/actions/workflows/ci.yml/badge.svg)
-
 A lightweight Telegram bot for grounded question answering over PDFs, markdown, text files and static web pages, running on local embeddings with no external vector database required by default (Chroma is optional).
 
-**Project status**: v1.1.0: versioned prompts, grounding gate, faithfulness evaluation (experimental, unvalidated judge), markdown/text/web ingestion, optional Chroma and LangGraph.
+**Project status**: post-v1.1.0 hardening: pipeline refactor, input and SSRF hardening, long-answer handling, and 209 unit tests with CI quality gates. Includes versioned prompts, a grounding gate, faithfulness evaluation (experimental, unvalidated judge), markdown/text/web ingestion, and optional Chroma and LangGraph.
 
 [![Python Version](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -21,10 +19,9 @@ A lightweight Telegram bot for grounded question answering over PDFs, markdown, 
 - Generates answers with an instruction-tuned LLM (local Ollama or hosted OpenAI-compatible provider) and appends a verified Sources citation footer.
 - Supports modular storage (`VECTOR_BACKEND=numpy` default, `chroma` optional) and execution (`ORCHESTRATOR=plain` default, `langgraph` optional).
 
-
 ## Why I Built It & What I Learned
 
-I built TeleRAG to learn what it takes to make a document question-answering bot that I can actually trust, not just one that sounds confident. It answers questions about PDFs, markdown files and web pages on Telegram, cites its sources, and refuses when the answer isn't in the document. I run it on my own laptop with a small local model, which was slow at first: a 7B model took 10-20 minutes per answer, so I moved to a 3B model and now get answers in about 20-40 seconds. The most useful thing I learned is that measuring is harder than building. My first faithfulness score was a perfect 1.00 and I didn't believe it, so I tested the judge with deliberately wrong answers and found it was too lenient. After trying several judges I still don't have one I can fully trust, and the README says so. Next I want to compare my small local model against a stronger hosted one using the same tests.
+I built TeleRAG to learn what it takes to make a document question-answering bot that I can actually trust, not just one that sounds confident. It answers questions about PDFs, markdown files and web pages on Telegram, cites its sources, and refuses when the answer isn't in the document. I run it on my own laptop with a small local model, which was slow at first: a 7B model took 10-20 minutes per answer, so I moved to a 3B model and now typically get answers in 20 to 120 seconds depending on document size and answer length. The most useful thing I learned is that measuring is harder than building. My first faithfulness score was a perfect 1.00 and I didn't believe it, so I tested the judge with deliberately wrong answers and found it was too lenient. After trying several judges I still don't have one I can fully trust, and the README says so. Next I want to compare my small local model against a stronger hosted one using the same tests.
 
 ## Results at a glance
 
@@ -32,9 +29,10 @@ I built TeleRAG to learn what it takes to make a document question-answering bot
 - **Retrieval MRR (Span)**: 0.8073 (hybrid) and 0.8507 (hybrid + reranker) at 57.8 ms and 2,020.6 ms mean search latency on CPU.
 - **Off-Topic Query Abstention**: 100.0% (10/10) easy negative rejection via dense cosine similarity threshold ($\tau = 0.3$).
 - **In-Domain Hard Negative Abstention**: 40.0% (2/5) rejection on held-out test set via cross-encoder gate ($T = -2.80$) with 0% answerable recall loss.
-- **Local Generation Latency**: Median ~18 s (P95 ~21 s) on laptop CPU (Dell Inspiron i5, 16 GB RAM) with `qwen2.5:3b` (vs. 10-20 min with 7B).
+- **Local Generation Latency**: Median ~18 s (P95 ~21 s) on the 10-chunk CI fixture with `qwen2.5:3b` (Dell Inspiron i5, 16 GB RAM, CPU only); 23 to 116 s per answer on a 1,023-chunk textbook through the Telegram bot (vs. 10-20 min with 7B).
 - **Faithfulness (Experimental / UNVALIDATED JUDGE)**: Mean 0.535 (53.5%) across 20 answerable questions evaluated by `cross-encoder/nli-deberta-v3-base`. Note: judge achieved 75.0% (9/12) DEV reference accept rate and is unvalidated.
 - **Passage Granularity**: Default 1,000-char chunks (200 overlap) produce 0.0% chunks exceeding the 256-token embedding window (vs. 71.43% for 1,500 chars).
+
 ## Architecture
 
 ```
@@ -75,6 +73,15 @@ Ensure [Ollama](https://ollama.ai) is running locally (`ollama pull qwen2.5:3b`)
 ```bash
 python main.py
 ```
+
+### Bot commands
+
+- Send a PDF, `.md` or `.txt` file, or a direct link to a PDF, to add a document
+- `/addurl <url>`: ingest a static web page
+- `/list`: show your documents, numbered
+- `/delete <number or part of a name>`: remove one document
+- `/clear`: remove all your documents
+- `/help`: show the command list
 
 ## Configuration
 
@@ -130,9 +137,9 @@ Evaluated on the synthetic distributed systems document (`eval/fixtures/ci_fixtu
 
 | Strategy | Mode | Hit@1 (Span) | Hit@1 (Strict) | Hit@5 (Span) | Hit@5 (Strict) | MRR (Span) | MRR (Strict) | Easy Abst. | Hard Abst. | Mean Latency |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Hybrid (CI Gate)** | BM25 + Dense RRF ($k=60$) | 100.0% (12/12) | 16.7% (2/12) | 100.0% (12/12) | 83.3% (10/12) | 1.0000 | 0.4861 | 100% (3/3) | n/a (0/0) | 30.4 ms |
+| **Hybrid (CI Gate)** | BM25 + Dense RRF ($k=60$) | 100.0% (12/12) | 16.7% (2/12) | 100.0% (12/12) | 83.3% (10/12) | 1.0000 | 0.4861 | 100% (3/3) | n/a (0/0) | ~20-100 ms (varies by run) |
 
-For detailed breakdown, latency benchmarks, ablation experiments, and faithfulness analysis, see [docs/technical-report.md](docs/technical-report.md).
+For detailed breakdown, latency benchmarks, ablation experiments, faithfulness analysis, and an informal manual stress test, see [docs/evaluation.md](docs/evaluation.md).
 
 ## Running Tests and Evaluations
 
@@ -163,6 +170,7 @@ python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers e
 8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use.
 9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias.
 10. **Faithfulness Evaluation & Judge Validation Caveats**: The Think Python 2e faithfulness score (mean 0.535) is directional and conservative (DEV reference accept rate 75.0%), and must not be interpreted as a hallucination rate.
+11. **Small Local Model Errors**: With `qwen2.5:3b` the bot sometimes gives wrong or muddled answers even when retrieval finds the right pages (see the informal manual stress test in [docs/evaluation.md](docs/evaluation.md)). Check important answers against the cited pages.
 
 For complete benchmark breakdowns and analysis, see [docs/evaluation.md](docs/evaluation.md).
 
@@ -171,4 +179,5 @@ For complete benchmark breakdowns and analysis, see [docs/evaluation.md](docs/ev
 - [Setup Guide](docs/setup.md): Complete installation, multi-format ingestion, SSRF protection, commands, and troubleshooting.
 - [Architecture Guide](docs/architecture.md): Deep-dive into document ingestion, retrieval pipeline, vector stores, and orchestration.
 - [Evaluation Report](docs/evaluation.md): In-depth benchmarks, retrieval metrics, faithfulness evaluation, and ablation results.
+- [Design Decisions](docs/design-decisions.md): Notes on the main technical choices.
 - [Technical Report](docs/technical-report.md): Formal engineering report with mathematical formulations and comprehensive benchmark methodology.

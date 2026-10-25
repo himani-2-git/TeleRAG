@@ -1,10 +1,14 @@
 """Tests for bot handlers and security validations."""
 
 import asyncio
+import os
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
+from telegram.error import BadRequest
+
 from src.bot.handlers import BotHandlers
+from src.bot.handlers.questions import format_telegram_html
 from src.config import Config
 from src.rag.pipeline import is_insufficient_context, is_summary_query
 
@@ -630,6 +634,426 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             await self.handlers.handle_message(update, context)
 
         self.assertEqual(self.handlers.active_requests, 1)
+
+
+class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
+    """Tests for bot slash commands (/start, /help, /delete, etc.)."""
+
+    def setUp(self):
+        self.doc_store = Mock()
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=self.doc_store,
+            embedding_generator=Mock(),
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=Config(telegram_bot_token="test"),
+        )
+
+    async def test_start_and_help_command_text(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        await self.handlers.start_command(update, context)
+        start_msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("/delete 2 or /delete part-of-name", start_msg)
+        self.assertNotIn("<filename>", start_msg)
+
+        update.message.reply_text.reset_mock()
+        await self.handlers.help_command(update, context)
+        help_msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("/delete 2 or /delete part-of-name", help_msg)
+        self.assertNotIn("<filename>", help_msg)
+
+    async def test_delete_missing_args(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = []
+
+        await self.handlers.delete_command(update, context)
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("Please specify a document to delete", msg)
+
+    async def test_delete_by_1_based_index(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["2"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "first.pdf"},
+            {"filename": "second.pdf"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "second.pdf")
+        update.message.reply_text.assert_called_once_with("✅ Deleted document: second.pdf")
+
+    async def test_delete_strip_brackets_and_quotes(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ['<"sample', 'doc.pdf">']
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "sample doc.pdf"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "sample doc.pdf")
+        update.message.reply_text.assert_called_once_with("✅ Deleted document: sample doc.pdf")
+
+    async def test_delete_case_insensitive_exact_match(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["SAMPLE.PDF"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "sample.pdf"},
+            {"filename": "sample.pdf.bak"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "sample.pdf")
+        update.message.reply_text.assert_called_once_with("✅ Deleted document: sample.pdf")
+
+    async def test_delete_unique_substring_match(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["report"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "annual_report_2024.pdf"},
+            {"filename": "invoice.pdf"},
+        ]
+        self.doc_store.delete_document.return_value = True
+
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_once_with(123, "annual_report_2024.pdf")
+        update.message.reply_text.assert_called_once_with(
+            "✅ Deleted document: annual_report_2024.pdf"
+        )
+
+    async def test_delete_multiple_matches_disambiguation(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["report"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "annual_report_2023.pdf"},
+            {"filename": "annual_report_2024.pdf"},
+        ]
+
+        await self.handlers.delete_command(update, context)
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("Multiple documents match 'report':", msg)
+        self.assertIn("• annual_report_2023.pdf", msg)
+        self.assertIn("• annual_report_2024.pdf", msg)
+        self.assertIn("Please specify the exact name or document number from /list.", msg)
+        self.doc_store.delete_document.assert_not_called()
+
+    async def test_list_command_empty(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        self.doc_store.list_documents.return_value = []
+
+        await self.handlers.list_command(update, context)
+        update.message.reply_text.assert_called_once_with(
+            "📭 You haven't uploaded any documents yet."
+        )
+
+    async def test_list_command_formatting(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        self.doc_store.list_documents.return_value = [
+            {
+                "filename": "alpha.pdf",
+                "file_size": 1024 * 1024,
+                "chunk_count": 5,
+                "upload_date": "2026-10-21T22:51:00",
+            },
+            {
+                "filename": "beta.md",
+                "file_size": 2 * 1024 * 1024,
+                "chunk_count": 12,
+                "upload_date": "2026-10-22T08:15:00",
+            },
+        ]
+
+        await self.handlers.list_command(update, context)
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("1. 📄 alpha.pdf", msg)
+        self.assertIn("   Size: 1.00 MB | Chunks: 5", msg)
+        self.assertIn("   Uploaded: 21 Oct 2026, 22:51", msg)
+
+        self.assertIn("2. 📄 beta.md", msg)
+        self.assertIn("   Size: 2.00 MB | Chunks: 12", msg)
+        self.assertIn("   Uploaded: 22 Oct 2026, 08:15", msg)
+
+    async def test_clear_and_list_lifecycle(self):
+        """Test uploading two documents, calling /clear, verifying /list is empty, and /clear on empty list returns no-documents message."""
+        import tempfile
+
+        from src.storage.document_store import DocumentStore
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            db_path = os.path.join(temp_dir, "test.db")
+            emb_path = os.path.join(temp_dir, "embeddings")
+            real_doc_store = DocumentStore(db_path=db_path, embeddings_path=emb_path)
+
+            mock_embedder = Mock()
+            mock_embedder.generate_embeddings.side_effect = lambda texts: (
+                [[0.1] * 10] * len(texts) if isinstance(texts, list) else [0.1] * 10
+            )
+
+            handlers = BotHandlers(
+                pdf_processor=Mock(),
+                text_chunker=Mock(),
+                document_store=real_doc_store,
+                embedding_generator=mock_embedder,
+                retriever=Mock(),
+                llm_client=Mock(),
+                config=Config(telegram_bot_token="test"),
+            )
+
+            user_id = 777
+
+            # Upload two documents
+            real_doc_store.store_document(
+                user_id=user_id,
+                filename="first.pdf",
+                file_content=b"pdf content 1",
+                chunks=[{"chunk_index": 0, "content": "text 1", "char_count": 6}],
+                embeddings=[[0.1] * 10],
+                source_type="pdf",
+            )
+            real_doc_store.store_document(
+                user_id=user_id,
+                filename="second.pdf",
+                file_content=b"pdf content 2",
+                chunks=[{"chunk_index": 0, "content": "text 2", "char_count": 6}],
+                embeddings=[[0.2] * 10],
+                source_type="pdf",
+            )
+
+            # Call /clear
+            update = Mock()
+            update.effective_user.id = user_id
+            update.message.reply_text = AsyncMock()
+            context = Mock()
+
+            await handlers.clear_command(update, context)
+            update.message.reply_text.assert_called_once_with("✅ Deleted 2 document(s).")
+
+            # Assert /list is empty
+            update.message.reply_text.reset_mock()
+            await handlers.list_command(update, context)
+            update.message.reply_text.assert_called_once_with(
+                "📭 You haven't uploaded any documents yet."
+            )
+
+            # Call /clear on an empty list
+            update.message.reply_text.reset_mock()
+            await handlers.clear_command(update, context)
+            update.message.reply_text.assert_called_once_with(
+                "📭 You don't have any documents to delete."
+            )
+
+    async def test_delete_not_found(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.args = ["nonexistent"]
+
+        self.doc_store.list_documents.return_value = [
+            {"filename": "annual_report_2024.pdf"},
+        ]
+
+        await self.handlers.delete_command(update, context)
+        update.message.reply_text.assert_called_once_with(
+            "Document not found. Send /list to see names and numbers."
+        )
+        self.doc_store.delete_document.assert_not_called()
+
+
+class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
+    """Tests for Telegram HTML code formatting and plain-text fallback."""
+
+    def setUp(self):
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=Mock(),
+            embedding_generator=Mock(),
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=Config(telegram_bot_token="test"),
+        )
+
+    def test_format_telegram_html_plain_and_sources(self):
+        raw = "Condition: x < 10 & y > 5\n\nSources:\n• <data.pdf> (p. 1)"
+        formatted = format_telegram_html(raw)
+        self.assertIn("x &lt; 10 &amp; y &gt; 5", formatted)
+        self.assertIn("&lt;data.pdf&gt;", formatted)
+
+    def test_format_telegram_html_fenced_code_blocks(self):
+        raw = (
+            "Here is a snippet:\n"
+            "```python\n"
+            "def check(a, b):\n"
+            "    return a < b & True\n"
+            "```\n"
+            "And another:\n"
+            "```\n"
+            "echo <hello>\n"
+            "```\n\n"
+            "Sources:\n• doc.txt"
+        )
+        formatted = format_telegram_html(raw)
+        self.assertIn(
+            "<pre><code>def check(a, b):\n    return a &lt; b &amp; True</code></pre>", formatted
+        )
+        self.assertIn("<pre><code>echo &lt;hello&gt;</code></pre>", formatted)
+        self.assertIn("Sources:\n• doc.txt", formatted)
+
+    async def test_deliver_answer_sends_html(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        raw_answer = "Hello ```python\nprint(1 < 2)\n```\n\nSources:\n• <doc.pdf>"
+        await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
+
+        update.message.reply_text.assert_called_once()
+        call_args, call_kwargs = update.message.reply_text.call_args
+        self.assertEqual(call_kwargs.get("parse_mode"), "HTML")
+        self.assertIn("<pre><code>print(1 &lt; 2)</code></pre>", call_args[0])
+        self.assertIn("&lt;doc.pdf&gt;", call_args[0])
+        thinking_msg.delete.assert_called_once()
+
+    async def test_deliver_answer_fallback_on_telegram_reject(self):
+        update = Mock()
+        # First call with HTML fails with BadRequest, second plain text call succeeds
+        update.message.reply_text = AsyncMock(
+            side_effect=[
+                BadRequest("Can't parse entities: can't find end tag"),
+                Mock(),
+            ]
+        )
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        raw_answer = "Hello ```python\nprint(1 < 2)\n```\n\nSources:\n• <doc.pdf>"
+        await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        # First attempt: HTML
+        first_call = update.message.reply_text.call_args_list[0]
+        self.assertEqual(first_call[1].get("parse_mode"), "HTML")
+        # Fallback attempt: plain text (no parse_mode) with raw text
+        second_call = update.message.reply_text.call_args_list[1]
+        self.assertNotIn("parse_mode", second_call[1])
+        self.assertEqual(second_call[0][0], raw_answer)
+        thinking_msg.delete.assert_called_once()
+
+
+class TestIngestionProgressAndLimits(unittest.IsolatedAsyncioTestCase):
+    """Tests for chunk limits and progress notifications during ingestion."""
+
+    def setUp(self):
+        self.doc_store = Mock()
+        self.embedding_gen = Mock()
+        self.embedding_gen.generate_embeddings.side_effect = lambda texts: (
+            [[0.1] * 10] * len(texts) if isinstance(texts, list) else [0.1] * 10
+        )
+        self.config = Config(
+            telegram_bot_token="test",
+            max_chunks_per_document=100,
+        )
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=self.doc_store,
+            embedding_generator=self.embedding_gen,
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=self.config,
+        )
+
+    def test_config_max_chunks_default(self):
+        default_cfg = Config(telegram_bot_token="test")
+        self.assertEqual(default_cfg.max_chunks_per_document, 5000)
+
+    async def test_embed_chunks_rejects_exceeding_max(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+
+        chunks = [f"chunk {i}" for i in range(120)]
+        result = await self.handlers._embed_chunks_with_progress(update, chunks)
+
+        self.assertIsNone(result)
+        self.embedding_gen.generate_embeddings.assert_not_called()
+        update.message.reply_text.assert_called_once()
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("exceeds the maximum limit of 100 chunks", msg)
+        self.assertIn("120 chunks created", msg)
+
+    async def test_embed_chunks_small_file_notifies_user(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+
+        chunks = ["chunk 1", "chunk 2", "chunk 3"]
+        result = await self.handlers._embed_chunks_with_progress(update, chunks)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 3)
+        update.message.reply_text.assert_called_once()
+        msg = update.message.reply_text.call_args[0][0]
+        self.assertIn("Created 3 chunks", msg)
+        self.assertIn("take several minutes", msg)
+
+    async def test_embed_chunks_large_file_progress_updates(self):
+        # Configure higher limit so 600 chunks is accepted (> 500 chunks triggers progress)
+        self.handlers.config.max_chunks_per_document = 1000
+        status_msg = Mock()
+        status_msg.edit_text = AsyncMock()
+        update = Mock()
+        update.message.reply_text = AsyncMock(return_value=status_msg)
+
+        chunks = [f"chunk {i}" for i in range(600)]
+        result = await self.handlers._embed_chunks_with_progress(update, chunks)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(len(result), 600)
+        # Verify status message was edited multiple times with progress percentages
+        self.assertGreater(status_msg.edit_text.call_count, 5)
+        edit_texts = [call.args[0] for call in status_msg.edit_text.call_args_list]
+        self.assertTrue(any("10%" in t for t in edit_texts))
+        self.assertTrue(any("50%" in t for t in edit_texts))
+        self.assertTrue(any("100%" in t for t in edit_texts))
 
 
 if __name__ == "__main__":

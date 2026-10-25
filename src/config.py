@@ -20,6 +20,7 @@ class Config:
 
     # File Processing
     max_file_size_mb: int = 20
+    max_chunks_per_document: int = 5000
     chunk_size: int = 1000
     chunk_overlap: int = 200
 
@@ -32,7 +33,7 @@ class Config:
 
     # LLM Settings (Ollama default, configurable to hosted providers)
     llm_model: str = "qwen2.5:3b"
-    llm_max_tokens: int = 300
+    llm_max_tokens: int = 1024
     llm_timeout_seconds: int = 120
     max_retries: int = 3
     retry_delay: float = 1.0
@@ -77,6 +78,7 @@ def get_config(require_telegram: bool = True) -> Config:
         llm_api_key=llm_key or "",
         llm_base_url=llm_base_url,
         max_file_size_mb=int(os.getenv("MAX_FILE_SIZE_MB", "20")),
+        max_chunks_per_document=int(os.getenv("MAX_CHUNKS_PER_DOCUMENT", "5000")),
         chunk_size=int(os.getenv("CHUNK_SIZE", "1000")),
         chunk_overlap=int(os.getenv("CHUNK_OVERLAP", "200")),
         embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
@@ -85,7 +87,7 @@ def get_config(require_telegram: bool = True) -> Config:
         retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
         orchestrator=os.getenv("ORCHESTRATOR", "plain").lower(),
         llm_model=llm_model,
-        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "300")),
+        llm_max_tokens=int(os.getenv("LLM_MAX_TOKENS", "1024")),
         llm_timeout_seconds=int(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
         max_retries=int(os.getenv("MAX_RETRIES", "3")),
         retry_delay=float(os.getenv("RETRY_DELAY", "1.0")),

@@ -9,6 +9,7 @@ from src.processors.markdown_processor import MarkdownProcessor
 from src.processors.text_chunker import TextChunker
 from src.processors.web_processor import (
     WebProcessor,
+    build_web_document_name,
     extract_html_content,
     validate_url_ssrf,
 )
@@ -208,6 +209,49 @@ class TestSSRFValidation(unittest.TestCase):
             processor.fetch_url("https://public-site.com/bounce")
 
         self.assertIn("Redirect blocked by SSRF policy", str(ctx.exception))
+
+
+class TestWebDocumentNaming(unittest.TestCase):
+    """Test URL ingestion document naming rules."""
+
+    def test_build_web_document_name_from_title(self):
+        name = build_web_document_name(
+            "https://example.com/blog/intro", title="Introduction to TeleRAG"
+        )
+        self.assertEqual(name, "Introduction to TeleRAG")
+        self.assertNotIn("(example.com)", name)
+
+    def test_build_web_document_name_from_path_when_no_title(self):
+        name = build_web_document_name("https://example.com/docs/api/v1/overview", title="")
+        self.assertEqual(name, "docs/api/v1/overview")
+        self.assertNotIn("(example.com)", name)
+
+    def test_build_web_document_name_from_path_when_title_matches_domain(self):
+        name = build_web_document_name("https://example.com/guides/setup.html", title="example.com")
+        self.assertEqual(name, "guides/setup.html")
+        self.assertNotIn("(example.com)", name)
+
+    def test_build_web_document_name_trimmed_to_60_chars(self):
+        long_title = "A" * 80
+        name = build_web_document_name("https://example.com/page", title=long_title)
+        self.assertEqual(len(name), 60)
+        self.assertEqual(name, "A" * 60)
+
+    @patch.object(WebProcessor, "fetch_url")
+    def test_process_url_sets_citation_label_without_domain_suffix(self, mock_fetch):
+        mock_fetch.return_value = (
+            "Getting Started with Vector Search",
+            "docs.example.com",
+            "This is a paragraph about vector search.",
+            b"fake html bytes",
+        )
+        processor = WebProcessor(chunk_size=500, overlap=50)
+        label, clean_text, raw_bytes, chunks = processor.process_url(
+            "https://docs.example.com/guide"
+        )
+        self.assertEqual(label, "Getting Started with Vector Search")
+        self.assertNotIn("(docs.example.com)", label)
+        self.assertTrue(all(c.source_name == label for c in chunks))
 
 
 if __name__ == "__main__":

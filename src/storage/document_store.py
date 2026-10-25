@@ -212,13 +212,15 @@ class DocumentStore:
                     logger.warning(f"Failed to delete legacy embedding file: {e}")
 
         # Delete from vector store
+        vs_deleted = False
         try:
-            self.vector_store.delete(document_id, user_id)
+            vs_deleted = self.vector_store.delete(document_id, user_id)
         except (OSError, ValueError, RuntimeError, KeyError) as e:
             logger.warning(f"Failed to delete from vector_store: {e}")
 
         # Delete from database
-        return self.db.delete_document(user_id, filename)
+        db_deleted = self.db.delete_document(user_id, filename)
+        return vs_deleted or db_deleted
 
     def clear_user_documents(self, user_id: int) -> int:
         """Delete all documents for a user.
@@ -231,6 +233,8 @@ class DocumentStore:
         """
         # Get all documents before deletion
         documents = self.db.get_user_documents(user_id)
+        if not documents:
+            return 0
 
         # Delete all embeddings
         for doc in documents:
@@ -261,7 +265,8 @@ class DocumentStore:
                 logger.warning(f"Failed to delete doc {document_id} from vector_store: {e}")
 
         # Delete from database
-        return self.db.clear_user_documents(user_id)
+        db_count = self.db.clear_user_documents(user_id)
+        return max(len(documents), db_count)
 
     def get_user_chunks_with_embeddings(self, user_id: int) -> list[dict[str, Any]]:
         """Get all chunks with their embeddings for a user.

@@ -32,7 +32,17 @@ class MockEmbeddingGenerator:
     def generate_query_embedding(self, query: str) -> list[float]:
         if self.model is not None:
             return self.model.encode(query, convert_to_numpy=True).tolist()
-        return [0.1] * 384
+        import hashlib
+        import re
+
+        words = set(re.findall(r"\w+", query.lower()))
+        vec = [0.0] * 384
+        for w in words:
+            h = hashlib.sha256(w.encode("utf-8")).digest()
+            for i in range(384):
+                vec[i] += (h[i % len(h)] / 255.0) - 0.5
+        norm = sum(x * x for x in vec) ** 0.5
+        return [x / norm for x in vec] if norm > 0 else [0.0] * 384
 
     def generate_embeddings(self, texts: Any) -> list[list[float]] | list[float]:
         if isinstance(texts, str):
@@ -84,6 +94,32 @@ class TestPipelinePlain(unittest.TestCase):
         result = self.orchestrator.run(question=unanswerable_q, user_id=1, user_chunks=chunks)
         self.assertTrue(result["refused"])
         self.assertEqual(result["final_response"], self.prompt_config.refusal_message)
+
+    def test_paraphrased_refusals_treated_as_refusals(self):
+        """Paraphrased refusal responses from LLM must be treated as refusals."""
+        from src.rag.pipeline import is_insufficient_context
+
+        # Paraphrased refusals
+        self.assertTrue(
+            is_insufficient_context("The context does not mention the requested detail.")
+        )
+        self.assertTrue(is_insufficient_context("This is not mentioned in the provided documents."))
+        self.assertTrue(
+            is_insufficient_context("The provided context does not provide sufficient data.")
+        )
+        self.assertTrue(is_insufficient_context("Cannot find the answer in the context."))
+
+        # Normal answer quoting a document is NOT treated as a refusal
+        self.assertFalse(
+            is_insufficient_context(
+                "According to the document, the Paxos protocol guarantees safety."
+            )
+        )
+        self.assertFalse(
+            is_insufficient_context(
+                "The context specifies that replication provides high availability."
+            )
+        )
 
     def test_answerable_question_success(self):
         """Answerable query runs cleanly without logging pipeline warnings."""

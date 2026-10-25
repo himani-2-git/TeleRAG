@@ -95,6 +95,31 @@ def extract_chunks_with_pages(
     return chunks_data
 
 
+def resolve_similarity_threshold(
+    similarity_threshold: float | None = None,
+    thresholds_path: str | None = None,
+    default_thresholds_path: str = "eval/thresholds.json",
+) -> float:
+    """Resolve similarity threshold strictly from explicit arg, thresholds.json, or 0.3 fallback.
+
+    Does NOT read .env or SIMILARITY_THRESHOLD from the environment.
+    """
+    if similarity_threshold is not None:
+        return float(similarity_threshold)
+
+    path = thresholds_path or default_thresholds_path
+    if path and os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                th = json.load(f)
+            if "similarity_threshold" in th:
+                return float(th["similarity_threshold"])
+        except Exception as e:
+            logger.warning("Failed to load similarity_threshold from %s: %s", path, e)
+
+    return 0.3
+
+
 def run_evaluation(
     pdf_path: str,
     golden_path: str,
@@ -102,6 +127,7 @@ def run_evaluation(
     out_path: str | None = None,
     min_hit5: float | None = None,
     similarity_threshold: float | None = None,
+    thresholds_path: str | None = None,
 ) -> dict[str, Any]:
     """Execute retrieval evaluation on the specified dataset.
 
@@ -121,14 +147,10 @@ def run_evaluation(
     if not os.path.exists(golden_path):
         raise FileNotFoundError(f"Golden dataset not found at {golden_path}")
 
-    if similarity_threshold is None:
-        try:
-            from src.config import get_config
-
-            config = get_config(require_telegram=False)
-            similarity_threshold = config.similarity_threshold
-        except Exception:
-            similarity_threshold = float(os.getenv("SIMILARITY_THRESHOLD", "0.3"))
+    similarity_threshold = resolve_similarity_threshold(
+        similarity_threshold=similarity_threshold,
+        thresholds_path=thresholds_path,
+    )
 
     with open(golden_path, encoding="utf-8") as f:
         golden_data = json.load(f)
@@ -476,6 +498,7 @@ def main():
         out_path=args.out,
         min_hit5=args.min_hit5,
         similarity_threshold=args.similarity_threshold,
+        thresholds_path=args.thresholds,
     )
 
     if args.thresholds:

@@ -37,11 +37,60 @@ def is_summary_query(query: str) -> bool:
     return any(cue in q for cue in SUMMARY_CUES)
 
 
+INSUFFICIENT_CONTEXT_PATTERNS: tuple[str, ...] = (
+    "insufficient_context",
+    "context does not contain",
+    "context doesn't contain",
+    "context does not provide",
+    "context doesn't provide",
+    "context does not mention",
+    "context doesn't mention",
+    "not mentioned in the context",
+    "not mentioned in the provided context",
+    "not mentioned in the provided documents",
+    "not mentioned in the documents",
+    "not mentioned in the document",
+    "not provided in the context",
+    "not found in the context",
+    "not contain relevant information",
+    "no information in the context",
+    "no information in the provided context",
+    "provided context does not contain",
+    "provided context doesn't contain",
+    "provided context does not provide",
+    "provided context doesn't provide",
+    "provided context does not mention",
+    "provided context doesn't mention",
+    "does not contain the answer",
+    "doesn't contain the answer",
+    "cannot find the answer in the context",
+    "can't find the answer in the context",
+    "no relevant information in the context",
+    "no relevant information in the provided context",
+)
+
+
 def is_insufficient_context(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
+<<<<<<< HEAD
+    """Check if the LLM response indicates the context does not contain the answer."""
+    if not answer:
+        return False
+    clean = answer.strip()
+    lower = clean.lower()
+
+    # Starts with insufficient context marker (trimmed, case-insensitive, punctuation-stripped)
+    stripped = clean.strip("`'\" \t\r\n").lower()
+    marker_clean = marker.strip().lower()
+    if stripped.startswith(marker_clean) or stripped.startswith("insufficient_context"):
+        return True
+
+    return any(pattern in lower for pattern in INSUFFICIENT_CONTEXT_PATTERNS)
+=======
     """Check if the answer contains the insufficient context marker (case-insensitive)."""
     if not answer or not marker or not isinstance(answer, str) or not isinstance(marker, str):
         return False
     return marker.upper() in answer.upper()
+>>>>>>> main
 
 
 def format_source_footer(chunks: list[dict[str, Any]]) -> str:
@@ -142,7 +191,7 @@ class RAGPipeline:
         self.grounding_min_coverage = grounding_min_coverage
 
     def _is_insufficient_context(self, answer: str) -> bool:
-        marker = getattr(self.prompt_config, "insufficient_context_marker", "INSUFFICIENT_CONTEXT")
+        marker = self.prompt_config.insufficient_context_marker
         return is_insufficient_context(answer, marker)
 
     def node_retrieve(self, state: RAGState) -> RAGState:

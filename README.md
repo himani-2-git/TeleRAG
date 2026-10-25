@@ -21,6 +21,20 @@ A lightweight Telegram bot for grounded question answering over PDFs, markdown, 
 - Generates answers with an instruction-tuned LLM (local Ollama or hosted OpenAI-compatible provider) and appends a verified Sources citation footer.
 - Supports modular storage (`VECTOR_BACKEND=numpy` default, `chroma` optional) and execution (`ORCHESTRATOR=plain` default, `langgraph` optional).
 
+
+## Why I Built It & What I Learned
+
+I built TeleRAG to learn what it takes to make a document question-answering bot that I can actually trust, not just one that sounds confident. It answers questions about PDFs, markdown files and web pages on Telegram, cites its sources, and refuses when the answer isn't in the document. I run it on my own laptop with a small local model, which was slow at first: a 7B model took 10-20 minutes per answer, so I moved to a 3B model and now get answers in about 20-40 seconds. The most useful thing I learned is that measuring is harder than building. My first faithfulness score was a perfect 1.00 and I didn't believe it, so I tested the judge with deliberately wrong answers and found it was too lenient. After trying several judges I still don't have one I can fully trust, and the README says so. Next I want to compare my small local model against a stronger hosted one using the same tests.
+
+## Results at a glance
+
+- **Retrieval Hit@5 (Span)**: 96.0% (48/50) with default hybrid retrieval (BM25 + Dense RRF), up to 98.0% (49/50) with cross-encoder reranking on *Think Python 2e* (582 chunks).
+- **Retrieval MRR (Span)**: 0.8073 (hybrid) and 0.8507 (hybrid + reranker) at 57.8 ms and 2,020.6 ms mean search latency on CPU.
+- **Off-Topic Query Abstention**: 100.0% (10/10) easy negative rejection via dense cosine similarity threshold ($\tau = 0.3$).
+- **In-Domain Hard Negative Abstention**: 40.0% (2/5) rejection on held-out test set via cross-encoder gate ($T = -2.80$) with 0% answerable recall loss.
+- **Local Generation Latency**: Median ~18 s (P95 ~21 s) on laptop CPU (Dell Inspiron i5, 16 GB RAM) with `qwen2.5:3b` (vs. 10-20 min with 7B).
+- **Faithfulness (Experimental / UNVALIDATED JUDGE)**: Mean 0.535 (53.5%) across 20 answerable questions evaluated by `cross-encoder/nli-deberta-v3-base`. Note: judge achieved 75.0% (9/12) DEV reference accept rate and is unvalidated.
+- **Passage Granularity**: Default 1,000-char chunks (200 overlap) produce 0.0% chunks exceeding the 256-token embedding window (vs. 71.43% for 1,500 chars).
 ## Architecture
 
 ```
@@ -137,7 +151,24 @@ python eval/run_eval.py --mode hybrid --pdf eval/fixtures/ci_fixture.pdf --golde
 python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
 ```
 
+## Limitations
+
+1. **Hallucination Reduction, Not Elimination**: The relevance threshold ($\tau = 0.3$) and prompt instructions reduce unsupported answers, but an LLM can still misinterpret retrieved context or hallucinate nuances.
+2. **Hard Negative Abstention**: While bi-encoder cosine gating stops 100% of off-topic queries, it does not stop in-domain unanswerable queries (e.g., asking about `asyncio` on a basic Python textbook), where chunks score 0.35–0.48.
+3. **Hardware-Dependent Generation Latency & Host Uptime**: Reranking improves Hit@1 by +10.0 pp but adds ~2s on CPU. Answer generation time depends heavily on model choice and available hardware.
+4. **Free Hosted Model Lifecycle Volatility**: Third-party free endpoints on hosted providers frequently rotate, become rate-limited, or transition to paid slugs, or can be retired entirely.
+5. **Document-Level Summaries**: For general summary/overview queries, the bot samples the first ~8 chunks in document page order rather than performing hierarchical map-reduce summarization across very long books.
+6. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection.
+7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `pypdf`.
+8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use.
+9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias.
+10. **Faithfulness Evaluation & Judge Validation Caveats**: The Think Python 2e faithfulness score (mean 0.535) is directional and conservative (DEV reference accept rate 75.0%), and must not be interpreted as a hallucination rate.
+
+For complete benchmark breakdowns and analysis, see [docs/evaluation.md](docs/evaluation.md).
+
 ## Documentation
 
 - [Setup Guide](docs/setup.md): Complete installation, multi-format ingestion, SSRF protection, commands, and troubleshooting.
-- [Technical Report](docs/technical-report.md): In-depth benchmarks, retrieval metrics, faithfulness evaluation, and ablation results.
+- [Architecture Guide](docs/architecture.md): Deep-dive into document ingestion, retrieval pipeline, vector stores, and orchestration.
+- [Evaluation Report](docs/evaluation.md): In-depth benchmarks, retrieval metrics, faithfulness evaluation, and ablation results.
+- [Technical Report](docs/technical-report.md): Formal engineering report with mathematical formulations and comprehensive benchmark methodology.

@@ -1,9 +1,10 @@
 {
-  "_comment_retrieval_similarity_threshold": "Retrieval similarity threshold is unified across run_eval.py and run_grounding_gate.py via config.similarity_threshold (or --similarity-threshold CLI flag). Retrieval evaluation uses top_k=5/20 with RRF fusion, while grounding gate queries top_k=2 with the same abstention cutoff.",
+  "_comment_retrieval_similarity_threshold": "Retrieval similarity threshold is defined here (similarity_threshold: 0.3) and used by default across run_eval.py and run_grounding_gate.py, overridable only by explicit --similarity-threshold CLI flag. Neither script reads .env or SIMILARITY_THRESHOLD from the environment.",
+  "similarity_threshold": 0.3,
   "min_hit_at_5": 0.85,
-  "min_mrr": 0.70,
-  "min_abstention_easy": 0.90,
+  "min_mrr": 0.7,
+  "min_abstention_easy": 0.9,
   "min_grounding_mean_coverage": 0.85,
-  "max_grounding_negative_control_coverage": 0.40,
+  "max_grounding_negative_control_coverage": 0.4,
   "description": "Quality gate thresholds for CI synthetic evaluation (eval/golden_ci.json and eval/fixtures/ci_answers.json)"
 }

@@ -20,13 +20,36 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from eval.run_eval import extract_chunks_with_pages
-from src.config import get_config
 from src.rag.embeddings import EmbeddingGenerator
 from src.rag.grounding import grounding_report
 from src.rag.retriever import DocumentRetriever
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def resolve_similarity_threshold(
+    similarity_threshold: float | None = None,
+    thresholds: dict[str, Any] | None = None,
+    thresholds_path: str | None = "eval/thresholds.json",
+) -> float:
+    """Resolve similarity threshold strictly from explicit flag, thresholds JSON, or 0.3 fallback.
+
+    Does NOT read .env or SIMILARITY_THRESHOLD from the environment.
+    """
+    if similarity_threshold is not None:
+        return float(similarity_threshold)
+    if thresholds and "similarity_threshold" in thresholds:
+        return float(thresholds["similarity_threshold"])
+    if thresholds_path and os.path.exists(thresholds_path):
+        try:
+            with open(thresholds_path, encoding="utf-8") as f:
+                th = json.load(f)
+            if "similarity_threshold" in th:
+                return float(th["similarity_threshold"])
+        except Exception as e:
+            logger.warning("Failed to load similarity_threshold from %s: %s", thresholds_path, e)
+    return 0.3
 
 
 def run_grounding_gate(
@@ -41,46 +64,34 @@ def run_grounding_gate(
     Returns:
         True if all threshold assertions pass, False otherwise.
     """
-    try:
-        config = get_config(require_telegram=False)
-    except Exception:
-        from src.config import Config
-
-        config = Config(
-            telegram_bot_token="",
-            embedding_model="all-MiniLM-L6-v2",
-            top_k_results=int(os.getenv("TOP_K_RESULTS", "2")),
-            similarity_threshold=float(os.getenv("SIMILARITY_THRESHOLD", "0.3")),
-            retrieval_mode=os.getenv("RETRIEVAL_MODE", "hybrid"),
-        )
-
     # 1. Load thresholds
     with open(thresholds_path, encoding="utf-8") as f:
         thresholds = json.load(f)
 
     min_mean_coverage = thresholds.get("min_grounding_mean_coverage", 0.85)
     max_neg_coverage = thresholds.get("max_grounding_negative_control_coverage", 0.40)
+    sim_threshold = resolve_similarity_threshold(
+        similarity_threshold=similarity_threshold,
+        thresholds=thresholds,
+        thresholds_path=thresholds_path,
+    )
 
     # 2. Ingest fixture
     logger.info("Extracting and chunking fixture: %s", pdf_path)
     chunks = extract_chunks_with_pages(pdf_path)
 
     # 3. Embed chunks in batch
-    embedder = EmbeddingGenerator(model_name=config.embedding_model)
+    embedder = EmbeddingGenerator(model_name="all-MiniLM-L6-v2")
     logger.info("Generating embeddings for %d chunks...", len(chunks))
     contents = [c.get("content", "") for c in chunks]
     embeddings = embedder.generate_embeddings(contents)
     for chunk, emb in zip(chunks, embeddings, strict=False):
         chunk["embedding"] = emb
 
-    sim_threshold = (
-        similarity_threshold if similarity_threshold is not None else config.similarity_threshold
-    )
-
     retriever = DocumentRetriever(
-        top_k=config.top_k_results,
+        top_k=2,
         similarity_threshold=sim_threshold,
-        retrieval_mode=getattr(config, "retrieval_mode", "hybrid"),
+        retrieval_mode="hybrid",
     )
 
     # 4. Load answers

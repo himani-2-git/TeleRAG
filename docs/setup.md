@@ -51,10 +51,10 @@ Isolate dependencies by creating a dedicated virtual environment:
   ```
 
 ### 2.3 Install Core & Dev Dependencies
-Install the pinned dependencies from `requirements.txt` (and optionally `requirements-dev.txt` for evaluation tooling):
+Install the pinned dependencies from `requirements/base.txt` (and optionally `requirements/dev.txt` for evaluation tooling):
 
 ```bash
-pip install -r requirements.txt -r requirements-dev.txt
+pip install -r requirements/base.txt -r requirements/dev.txt
 ```
 
 > [!NOTE]
@@ -137,7 +137,9 @@ CHUNK_OVERLAP=200
 EMBEDDING_MODEL=all-MiniLM-L6-v2
 TOP_K_RESULTS=2
 SIMILARITY_THRESHOLD=0.3
-LLM_MAX_TOKENS=300
+MAX_CHUNKS_PER_DOCUMENT=5000
+LLM_MAX_TOKENS=1024
+LLM_TIMEOUT_SECONDS=120
 PROMPT_VERSION=v1
 GROUNDING_THRESHOLD=0.45
 GROUNDING_ENFORCE=false
@@ -148,6 +150,9 @@ GROUNDING_MIN_COVERAGE=0.5
 # ===================================================================
 DATABASE_PATH=data/documents.db
 EMBEDDINGS_PATH=data/embeddings
+VECTOR_BACKEND=numpy
+CHROMA_PATH=data/chroma
+ORCHESTRATOR=plain
 LOG_LEVEL=INFO
 LOG_FILE=logs/bot.log
 ```
@@ -187,7 +192,7 @@ Verifies that mean reference answer citation coverage meets the threshold ($\ge 
 ### 4.3 Running Local Faithfulness Evaluation (Optional)
 To run claim-level entailment evaluation with an LLM judge:
 ```bash
-pip install -r requirements-eval.txt
+pip install -r requirements/eval.txt
 python -m eval.run_faithfulness --n 20 --judge-model qwen2.5:3b --gen-model qwen2.5:3b --output eval/results/faithfulness.json
 ```
 *(Note: A local 3B judge is noisy and intended for directional trend-checking, not a strict CI gate).*
@@ -233,7 +238,7 @@ Once the bot is running, open Telegram and search for your bot's username.
 | `/help` | Detailed Help | Explains document upload options and question syntax. |
 | `/list` | Show Documents | Lists all active documents in your library with file sizes and chunk counts. |
 | `/addurl <url>` | Ingest Web Page | Ingests a public web page with SSRF protection and extracts article content. |
-| `/delete <filename>` | Delete Specific File | Deletes a document, its database chunks, and its vector embeddings. |
+| `/delete 2` or `/delete part-of-name` | Delete Specific File | Deletes a document, its database chunks, and its vector embeddings (precedence: exact name, list number, substring). |
 | `/clear` | Wipe Library | Removes all uploaded documents and embeddings for your user account. |
 
 ### 6.2 Uploading Documents and Ingesting Content
@@ -283,7 +288,7 @@ TeleRAG supports modular vector store backends configured via `VECTOR_BACKEND` i
 - **Enabling Chroma**:
   1. Install the optional dependency:
      ```bash
-     pip install -r requirements-chroma.txt
+     pip install -r requirements/chroma.txt
      ```
   2. Set environment variables in `.env`:
      ```bash
@@ -314,7 +319,7 @@ TeleRAG supports modular RAG orchestration configured via `ORCHESTRATOR` in `.en
 - **Enabling LangGraph**:
   1. Install the optional dependency:
      ```bash
-     pip install -r requirements-graph.txt
+     pip install -r requirements/graph.txt
      ```
   2. Set environment variable in `.env`:
      ```bash

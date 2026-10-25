@@ -7,8 +7,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 from telegram.error import BadRequest
 
+from src.bot.errors import UserFacingError
 from src.bot.handlers import BotHandlers
-from src.bot.handlers.questions import format_telegram_html
+from src.bot.handlers.questions import format_telegram_html, split_telegram_message, utf16_len
 from src.config import Config
 from src.rag.pipeline import count_substantive_words, is_insufficient_context, is_summary_query
 
@@ -324,7 +325,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             side_effect=[TimedOut("Connection timed out"), None]
         )
 
-        await self.handlers._send_typing_action(context, 12345)
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._send_typing_action(context, 12345)
 
         self.assertEqual(context.bot.send_chat_action.call_count, 2)
 
@@ -336,7 +338,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         # First attempt fails with NetworkError, retry succeeds
         update.message.reply_text = AsyncMock(side_effect=[NetworkError("Connection reset"), None])
 
-        await self.handlers._reply_with_retry(update, "Hello world")
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._reply_with_retry(update, "Hello world")
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         update.message.reply_text.assert_called_with("Hello world")
@@ -1122,6 +1125,59 @@ class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Please specify the exact name or document number from /list.", msg)
         self.doc_store.delete_document.assert_not_called()
 
+    async def test_delete_precedence_numeric_filename_vs_list_index(self):
+        """Test /delete precedence: exact name match first, then list number, then unique substring."""
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+
+        # Documents: 1 -> alpha.pdf, 2 -> 2.pdf, 3 -> gamma.pdf
+        docs = [
+            {"filename": "alpha.pdf"},
+            {"filename": "2.pdf"},
+            {"filename": "gamma.pdf"},
+        ]
+        self.doc_store.list_documents.return_value = docs
+        self.doc_store.delete_document.return_value = True
+
+        # Case 1: argument '2.pdf' matches exact filename '2.pdf'
+        context.args = ["2.pdf"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "2.pdf")
+        update.message.reply_text.assert_called_with("✅ Deleted document: 2.pdf")
+
+        # Case 2: argument '2' has no exact match for '2', so it resolves by list number 2 -> '2.pdf'
+        self.doc_store.delete_document.reset_mock()
+        update.message.reply_text.reset_mock()
+        context.args = ["2"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "2.pdf")
+        update.message.reply_text.assert_called_with("✅ Deleted document: 2.pdf")
+
+        # Case 3: when a document is named literally '2' and doc 2 is 'second.pdf',
+        # '/delete 2' MUST match exact name '2' first, not list item 2 ('second.pdf')
+        docs_with_literal_2 = [
+            {"filename": "first.pdf"},
+            {"filename": "second.pdf"},
+            {"filename": "2"},
+        ]
+        self.doc_store.list_documents.return_value = docs_with_literal_2
+        self.doc_store.delete_document.reset_mock()
+        update.message.reply_text.reset_mock()
+        context.args = ["2"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "2")
+        update.message.reply_text.assert_called_with("✅ Deleted document: 2")
+
+        # Case 4: argument '1' resolves to list number 1 -> 'first.pdf'
+        self.doc_store.delete_document.reset_mock()
+        update.message.reply_text.reset_mock()
+        context.args = ["1"]
+        await self.handlers.delete_command(update, context)
+        self.doc_store.delete_document.assert_called_with(123, "first.pdf")
+        update.message.reply_text.assert_called_with("✅ Deleted document: first.pdf")
+
     async def test_list_command_empty(self):
         update = Mock()
         update.effective_user.id = 123
@@ -1322,7 +1378,8 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         thinking_msg.delete = AsyncMock()
 
         raw_answer = "Hello ```python\nprint(1 < 2)\n```\n\nSources:\n• <doc.pdf>"
-        await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._deliver_answer(update, thinking_msg, raw_answer)
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         # First attempt: HTML
@@ -1332,6 +1389,146 @@ class TestTelegramFormatting(unittest.IsolatedAsyncioTestCase):
         second_call = update.message.reply_text.call_args_list[1]
         self.assertNotIn("parse_mode", second_call[1])
         self.assertEqual(second_call[0][0], raw_answer)
+        thinking_msg.delete.assert_called_once()
+
+    def test_split_telegram_message_lengths(self):
+        # 4096-character answer
+        ans_4096 = ("This is a paragraph of text explaining details.\n\n") * 100
+        self.assertGreaterEqual(len(ans_4096), 4096)
+        chunks_4096 = split_telegram_message(ans_4096, limit=4000)
+        self.assertGreaterEqual(len(chunks_4096), 2)
+        for c in chunks_4096:
+            self.assertLessEqual(utf16_len(c), 4000)
+
+        # 5000-character answer
+        ans_5000 = ("Key section in the document describes distributed consensus.\n\n") * 85
+        self.assertGreaterEqual(len(ans_5000), 5000)
+        chunks_5000 = split_telegram_message(ans_5000, limit=4000)
+        self.assertGreaterEqual(len(chunks_5000), 2)
+        for c in chunks_5000:
+            self.assertLessEqual(utf16_len(c), 4000)
+
+        # 9000-character answer
+        ans_9000 = ("Sentence explaining system architecture in complete detail. ") * 160
+        self.assertGreaterEqual(len(ans_9000), 9000)
+        chunks_9000 = split_telegram_message(ans_9000, limit=4000)
+        self.assertGreaterEqual(len(chunks_9000), 3)
+        for c in chunks_9000:
+            self.assertLessEqual(utf16_len(c), 4000)
+
+    def test_split_telegram_message_code_blocks(self):
+        # Answer with code block spanning split point
+        code_lines = "\n".join(f"    item_{i} = calculate_value({i})" for i in range(250))
+        code_body = f"<pre><code>def process_items():\n{code_lines}\n    return True</code></pre>"
+        self.assertGreater(len(code_body), 6000)
+
+        # When splitting code directly, chunk 0 must close with </code></pre> and chunk 1 re-open with <pre><code>
+        code_chunks = split_telegram_message(code_body, limit=4000)
+        self.assertGreaterEqual(len(code_chunks), 2)
+        self.assertTrue(code_chunks[0].endswith("</code></pre>"))
+        self.assertTrue(code_chunks[1].startswith("<pre><code>"))
+
+        # When surrounded with headers and footers
+        raw = (
+            f"Header explanation before code block.\n\n{code_body}\n\nTrailing remarks after code."
+        )
+        chunks = split_telegram_message(raw, limit=4000)
+        self.assertGreaterEqual(len(chunks), 3)
+        for i, chunk in enumerate(chunks):
+            self.assertLessEqual(utf16_len(chunk), 4000)
+            self.assertEqual(
+                chunk.count("<pre><code>"),
+                chunk.count("</code></pre>"),
+                f"Chunk {i} tags unbalanced: {chunk[:30]}...{chunk[-30:]}",
+            )
+
+    def test_split_telegram_message_emoji_near_limit(self):
+        # 3999 ASCII characters + 2-unit emoji + trailing text
+        text = ("a" * 3999) + "😀" + ("b" * 100)
+        chunks = split_telegram_message(text, limit=4000)
+        self.assertEqual(len(chunks), 2)
+        self.assertEqual(utf16_len(chunks[0]), 3999)
+        self.assertEqual(chunks[0], "a" * 3999)
+        self.assertTrue(chunks[1].startswith("😀"))
+        self.assertLessEqual(utf16_len(chunks[1]), 4000)
+
+    async def test_deliver_answer_multichunk_ordering_and_footer(self):
+        update = Mock()
+        update.message.reply_text = AsyncMock()
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        answer_part = ("Detailed explanation of distributed systems.\n\n") * 100
+        sources_part = "Sources:\n• consensus.pdf (p. 1-5)"
+        timing_part = "Answered in 3 s with test-model"
+        full_text = f"{answer_part}\n{sources_part}\n\n{timing_part}"
+
+        await self.handlers._deliver_answer(update, thinking_msg, full_text)
+
+        # Delivered in order across multiple messages
+        self.assertGreaterEqual(update.message.reply_text.call_count, 2)
+        calls = update.message.reply_text.call_args_list
+
+        # First chunk does NOT have Sources footer or timing line
+        first_chunk_text = calls[0][0][0]
+        self.assertNotIn("Sources:", first_chunk_text)
+        self.assertNotIn("Answered in", first_chunk_text)
+
+        # Last chunk has Sources footer and timing line
+        last_chunk_text = calls[-1][0][0]
+        self.assertIn("Sources:", last_chunk_text)
+        self.assertIn("Answered in 3 s with test-model", last_chunk_text)
+
+        thinking_msg.delete.assert_called_once()
+
+    async def test_deliver_answer_multichunk_mocked_bad_request_on_one_chunk(self):
+        update = Mock()
+        # 2 chunks expected:
+        # Chunk 1: HTML fails with BadRequest, plain text fallback succeeds
+        # Chunk 2: HTML succeeds
+        update.message.reply_text = AsyncMock(
+            side_effect=[
+                BadRequest("Can't parse entities: can't find end tag"),
+                Mock(),  # Plain text fallback for chunk 1 succeeds
+                Mock(),  # Chunk 2 HTML succeeds
+            ]
+        )
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        answer_text = ("Part of long response.\n\n") * 200
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._deliver_answer(update, thinking_msg, answer_text)
+
+        self.assertEqual(update.message.reply_text.call_count, 3)
+        # Call 1: HTML for chunk 1
+        self.assertEqual(update.message.reply_text.call_args_list[0][1].get("parse_mode"), "HTML")
+        # Call 2: plain text for chunk 1
+        self.assertNotIn("parse_mode", update.message.reply_text.call_args_list[1][1])
+        # Call 3: HTML for chunk 2
+        self.assertEqual(update.message.reply_text.call_args_list[2][1].get("parse_mode"), "HTML")
+        thinking_msg.delete.assert_called_once()
+
+    async def test_deliver_answer_failure_replies_with_plain_text_error(self):
+        update = Mock()
+        # When _reply_with_retry returns None (both HTML and fallback fail)
+        update.message.reply_text = AsyncMock(
+            side_effect=[
+                BadRequest("Failed HTML"),
+                BadRequest("Failed fallback"),
+                Mock(),  # Error notice succeeds
+            ]
+        )
+        thinking_msg = Mock()
+        thinking_msg.delete = AsyncMock()
+
+        with self.assertLogs("src.bot.handlers.questions", level="WARNING"):
+            await self.handlers._deliver_answer(update, thinking_msg, "Short test answer")
+
+        # 3 calls: HTML attempt -> plain text fallback attempt -> error notice
+        self.assertEqual(update.message.reply_text.call_count, 3)
+        error_notice_call = update.message.reply_text.call_args_list[2]
+        self.assertIn("❌ Failed to send response", error_notice_call[0][0])
         thinking_msg.delete.assert_called_once()
 
 
@@ -1409,6 +1606,125 @@ class TestIngestionProgressAndLimits(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("10%" in t for t in edit_texts))
         self.assertTrue(any("50%" in t for t in edit_texts))
         self.assertTrue(any("100%" in t for t in edit_texts))
+
+
+class TestUserFacingErrors(unittest.IsolatedAsyncioTestCase):
+    """Tests verifying that only UserFacingError messages are shown to users and unexpected errors are hidden."""
+
+    def setUp(self):
+        self.config = Config(telegram_bot_token="test")
+        self.handlers = BotHandlers(
+            pdf_processor=Mock(),
+            text_chunker=Mock(),
+            document_store=Mock(),
+            embedding_generator=Mock(),
+            retriever=Mock(),
+            llm_client=Mock(),
+            config=self.config,
+        )
+
+    async def test_handle_document_user_facing_error_displayed(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.document.file_name = "test.txt"
+        update.message.document.file_size = 500
+        update.message.reply_text = AsyncMock()
+
+        def fake_download(path):
+            with open(path, "wb") as f:
+                f.write(b"sample file content")
+
+        file_mock = Mock()
+        file_mock.download_to_drive = AsyncMock(side_effect=fake_download)
+        update.message.document.get_file = AsyncMock(return_value=file_mock)
+
+        # 1. Text chunker raises ValueError (which is converted to UserFacingError)
+        self.handlers.text_chunker.create_chunks.side_effect = ValueError("Document is empty")
+
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_document(update, context)
+        update.message.reply_text.assert_any_call("❌ Document is empty")
+
+        # 2. Text chunker directly raises UserFacingError
+        update.message.reply_text.reset_mock()
+        self.handlers.text_chunker.create_chunks.side_effect = UserFacingError(
+            "Custom user facing error"
+        )
+        await self.handlers.handle_document(update, context)
+        update.message.reply_text.assert_any_call("❌ Custom user facing error")
+
+    async def test_handle_document_unexpected_error_shows_generic_message(self):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.document.file_name = "test.txt"
+        update.message.document.file_size = 500
+        update.message.reply_text = AsyncMock()
+
+        def fake_download(path):
+            with open(path, "wb") as f:
+                f.write(b"sample file content")
+
+        file_mock = Mock()
+        file_mock.download_to_drive = AsyncMock(side_effect=fake_download)
+        update.message.document.get_file = AsyncMock(return_value=file_mock)
+
+        # Unexpected internal runtime error
+        self.handlers.text_chunker.create_chunks.side_effect = RuntimeError(
+            "database disk corrupted: 0xdeadbeef"
+        )
+
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        with self.assertLogs("src.bot.handlers.documents", level="ERROR") as cm:
+            await self.handlers.handle_document(update, context)
+
+        # Verify logger.exception recorded the error
+        self.assertTrue(any("database disk corrupted" in log for log in cm.output))
+
+        # Verify raw exception is NOT sent to user, generic message is sent instead
+        reply_calls = [call[0][0] for call in update.message.reply_text.call_args_list]
+        self.assertNotIn("database disk corrupted: 0xdeadbeef", reply_calls)
+        self.assertTrue(
+            any(
+                "❌ An unexpected error occurred while processing your document" in call
+                for call in reply_calls
+            )
+        )
+
+    @patch("src.processors.web_processor.validate_url_ssrf", return_value=(True, ""))
+    @patch("src.processors.web_processor.WebProcessor.process_url")
+    async def test_handle_web_url_user_facing_error_vs_unexpected_error(
+        self, mock_process, mock_ssrf
+    ):
+        update = Mock()
+        update.effective_user.id = 123
+        update.message.reply_text = AsyncMock()
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        # Path 1: UserFacingError / ValueError from validator
+        mock_process.side_effect = ValueError("Unsupported page encoding")
+        await self.handlers._handle_web_url_ingest(update, context, "https://example.com/page")
+        update.message.reply_text.assert_any_call("❌ Unsupported page encoding")
+
+        # Path 2: Unexpected exception
+        update.message.reply_text.reset_mock()
+        mock_process.side_effect = OSError("Connection reset by peer: Errno 104")
+        with self.assertLogs("src.bot.handlers.documents", level="ERROR") as cm:
+            await self.handlers._handle_web_url_ingest(update, context, "https://example.com/page")
+
+        self.assertTrue(any("Failed to ingest web page" in log for log in cm.output))
+        reply_calls = [call[0][0] for call in update.message.reply_text.call_args_list]
+        self.assertNotIn("Connection reset by peer: Errno 104", reply_calls)
+        self.assertTrue(
+            any(
+                "❌ An unexpected error occurred while processing the web page" in call
+                for call in reply_calls
+            )
+        )
 
 
 if __name__ == "__main__":

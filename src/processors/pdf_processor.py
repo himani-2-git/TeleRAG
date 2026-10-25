@@ -38,7 +38,9 @@ class PDFProcessor:
         # Check if it's a valid PDF
         try:
             with open(file_path, "rb") as f:
-                PdfReader(f)
+                reader = PdfReader(f)
+                if reader.is_encrypted:
+                    return False, "Encrypted PDF files are not supported"
             return True, None
         except (OSError, PyPdfError, ValueError) as e:
             logger.error(f"PDF validation failed: {e}")
@@ -61,6 +63,8 @@ class PDFProcessor:
 
             with open(file_path, "rb") as f:
                 pdf_reader = PdfReader(f)
+                if pdf_reader.is_encrypted:
+                    raise ValueError("Encrypted PDF files are not supported")
 
                 for page_num, page in enumerate(pdf_reader.pages, 1):
                     try:

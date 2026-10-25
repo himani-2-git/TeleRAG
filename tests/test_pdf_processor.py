@@ -1,6 +1,9 @@
 """Tests for PDF processing functionality."""
 
+import tempfile
 import unittest
+
+from pypdf import PdfWriter
 
 from src.processors.pdf_processor import PDFProcessor
 from src.processors.text_chunker import TextChunker
@@ -27,6 +30,43 @@ class TestPDFProcessor(unittest.TestCase):
         self.assertFalse(is_valid)
         self.assertIn("exceeds", error)
 
+    def test_encrypted_pdf_handling(self):
+        """Test that encrypted PDFs are rejected cleanly."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+            pdf_path = f"{tmp_dir}/encrypted.pdf"
+            writer = PdfWriter()
+            writer.add_blank_page(width=100, height=100)
+            writer.encrypt("test_password")
+            with open(pdf_path, "wb") as f:
+                writer.write(f)
+
+            is_valid, error = self.processor.validate_pdf(pdf_path, 1024)
+            self.assertFalse(is_valid)
+            self.assertIn("Encrypted PDF", error)
+
+            with self.assertLogs("src.processors.pdf_processor", level="ERROR"):
+                with self.assertRaises(ValueError) as ctx:
+                    self.processor.extract_text_with_pages(pdf_path)
+            self.assertIn("Encrypted PDF", str(ctx.exception))
+
+    def test_pdf_with_no_extractable_text(self):
+        """Test that PDFs without extractable text raise a descriptive ValueError."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+            pdf_path = f"{tmp_dir}/blank.pdf"
+            writer = PdfWriter()
+            writer.add_blank_page(width=100, height=100)
+            with open(pdf_path, "wb") as f:
+                writer.write(f)
+
+            is_valid, error = self.processor.validate_pdf(pdf_path, 1024)
+            self.assertTrue(is_valid)
+            self.assertIsNone(error)
+
+            with self.assertLogs("src.processors.pdf_processor", level="ERROR"):
+                with self.assertRaises(ValueError) as ctx:
+                    self.processor.extract_text_with_pages(pdf_path)
+            self.assertIn("No text content could be extracted", str(ctx.exception))
+
 
 class TestTextChunker(unittest.TestCase):
     """Test text chunker."""
@@ -45,7 +85,8 @@ class TestTextChunker(unittest.TestCase):
 
     def test_empty_text(self):
         """Test empty text handling."""
-        chunks = self.chunker.create_chunks("")
+        with self.assertLogs("src.processors.text_chunker", level="WARNING"):
+            chunks = self.chunker.create_chunks("")
         self.assertEqual(len(chunks), 0)
 
     def test_validate_chunks(self):

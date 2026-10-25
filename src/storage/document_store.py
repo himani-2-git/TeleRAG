@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from typing import Any
 
 import numpy as np
@@ -12,6 +13,65 @@ from .database import Database
 from .vector_store import ChromaVectorStore, NumPyVectorStore, VectorStore, get_vector_store
 
 logger = logging.getLogger(__name__)
+
+WINDOWS_RESERVED = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
+}
+
+
+def sanitize_filename(filename: str, max_length: int = 120) -> str:
+    """Sanitize filename to prevent directory traversal, invalid characters, and reserved Windows device names."""
+    if not filename:
+        return "document"
+
+    clean = filename.replace("\\", "/").rstrip("/")
+    clean = os.path.basename(clean)
+
+    # Remove control characters
+    clean = re.sub(r"[\x00-\x1f\x7f]", "", clean)
+    # Replace invalid path characters with underscore
+    clean = re.sub(r'[<>:"/\\|?*]', "_", clean).strip()
+
+    if clean in ("", ".", ".."):
+        return "document"
+
+    base, ext = os.path.splitext(clean)
+    if not base and ext:
+        base = "document"
+
+    base = base.rstrip(". ")
+
+    # Windows reserved device names
+    if base.upper() in WINDOWS_RESERVED:
+        base = f"_{base}"
+
+    if len(base) + len(ext) > max_length:
+        keep = max(1, max_length - len(ext))
+        base = base[:keep].rstrip(". ")
+
+    result = f"{base}{ext}" if base else f"document{ext}"
+    return result or "document"
 
 
 class DocumentStore:
@@ -100,6 +160,7 @@ class DocumentStore:
         Returns:
             Document ID
         """
+        filename = sanitize_filename(filename)
         file_hash = self._calculate_file_hash(file_content)
         file_size = len(file_content)
 

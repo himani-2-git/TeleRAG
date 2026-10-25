@@ -14,6 +14,62 @@ from .text_chunker import TextChunk, TextChunker
 logger = logging.getLogger(__name__)
 
 
+def _parse_numeric_ipv4(host: str) -> ipaddress.IPv4Address | None:
+    """Parse numeric, hex, or octal IPv4 string representations."""
+    try:
+        if host.startswith(("0x", "0X")):
+            val = int(host, 16)
+        elif host.startswith("0") and len(host) > 1 and all(c in "01234567" for c in host):
+            val = int(host, 8)
+        elif host.isdigit():
+            val = int(host, 10)
+        else:
+            val = None
+        if val is not None and 0 <= val <= 0xFFFFFFFF:
+            return ipaddress.IPv4Address(val)
+    except (ValueError, TypeError):
+        pass
+
+    parts = host.split(".")
+    if len(parts) == 4:
+        try:
+            byte_vals = []
+            for p in parts:
+                if p.startswith(("0x", "0X")):
+                    b = int(p, 16)
+                elif p.startswith("0") and len(p) > 1 and all(c in "01234567" for c in p):
+                    b = int(p, 8)
+                elif p.isdigit():
+                    b = int(p, 10)
+                else:
+                    return None
+                if not (0 <= b <= 255):
+                    return None
+                byte_vals.append(b)
+            return ipaddress.IPv4Address(bytes(byte_vals))
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _is_restricted_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Check if an IP address is private, loopback, link-local, multicast, or reserved."""
+    if getattr(ip, "ipv4_mapped", None):
+        mapped = ip.ipv4_mapped
+        if _is_restricted_ip(mapped):
+            return True
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+        or str(ip) == "169.254.169.254"
+        or str(ip).startswith("169.254.")
+    )
+
+
 def validate_url_ssrf(url: str) -> tuple[bool, str]:
     """Validate URL against SSRF threats, non-HTTP schemes, and private IP ranges.
 
@@ -29,6 +85,9 @@ def validate_url_ssrf(url: str) -> tuple[bool, str]:
         if scheme not in ("http", "https"):
             return False, "Only HTTP and HTTPS URLs are supported."
 
+        if parsed.username or parsed.password:
+            return False, "URLs with embedded credentials (user:pass@host) are forbidden."
+
         hostname = parsed.hostname
         if not hostname:
             return False, "Invalid URL: missing hostname."
@@ -37,19 +96,20 @@ def validate_url_ssrf(url: str) -> tuple[bool, str]:
         if lower_host in ("localhost", "localhost.localdomain"):
             return False, "Access to localhost or loopback addresses is forbidden."
 
-        # Check if the hostname itself is a literal IP address
+        # Check if hostname is a numeric or dotted hex/octal IPv4 literal
+        num_ip = _parse_numeric_ipv4(lower_host)
+        if num_ip and _is_restricted_ip(num_ip):
+            return (
+                False,
+                f"Access to private, loopback, or restricted network address ({lower_host}) is forbidden.",
+            )
+
+        # Check if the hostname itself is a standard literal IP address
         try:
             direct_ip = ipaddress.ip_address(lower_host)
             if str(direct_ip) == "169.254.169.254":
                 return False, "Access to cloud metadata service (169.254.169.254) is forbidden."
-            if (
-                direct_ip.is_private
-                or direct_ip.is_loopback
-                or direct_ip.is_link_local
-                or direct_ip.is_multicast
-                or direct_ip.is_reserved
-                or direct_ip.is_unspecified
-            ):
+            if _is_restricted_ip(direct_ip):
                 return (
                     False,
                     f"Access to private, loopback, or restricted network address ({lower_host}) is forbidden.",
@@ -77,14 +137,7 @@ def validate_url_ssrf(url: str) -> tuple[bool, str]:
             if str(ip) == "169.254.169.254":
                 return False, "Access to cloud metadata service (169.254.169.254) is forbidden."
 
-            if (
-                ip.is_private
-                or ip.is_loopback
-                or ip.is_link_local
-                or ip.is_multicast
-                or ip.is_reserved
-                or ip.is_unspecified
-            ):
+            if _is_restricted_ip(ip):
                 return (
                     False,
                     f"Access to private, loopback, or restricted network address ({ip_str}) is forbidden.",

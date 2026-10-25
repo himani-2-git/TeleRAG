@@ -1,5 +1,7 @@
 # TeleRAG
 
+![CI](https://github.com/himani-2-git/TeleRAG/actions/workflows/ci.yml/badge.svg)
+
 A lightweight Telegram bot for grounded question answering over PDFs, markdown, text files and static web pages, running on local embeddings with no external vector database required by default (Chroma is optional).
 
 **Project status**: v1.1.0: versioned prompts, grounding gate, faithfulness evaluation (experimental, unvalidated judge), markdown/text/web ingestion, optional Chroma and LangGraph.
@@ -79,14 +81,32 @@ python main.py
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `TELEGRAM_BOT_TOKEN` | - | Telegram Bot API token from @BotFather |
+| `LLM_API_KEY` | - | Optional API key for remote LLM providers |
 | `LLM_BASE_URL` | `http://localhost:11434/v1` | OpenAI-compatible endpoint URL |
 | `LLM_MODEL` | `qwen2.5:3b` | Target LLM model name |
+| `LLM_MAX_TOKENS` | `1024` | Maximum tokens for generated answers |
+| `LLM_TIMEOUT_SECONDS` | `120` | Read timeout for LLM generation requests |
+| `MAX_RETRIES` | `3` | Maximum retry attempts for LLM calls |
+| `RETRY_DELAY` | `1.0` | Base retry delay in seconds |
+| `MAX_FILE_SIZE_MB` | `20` | Maximum upload file size in megabytes |
+| `MAX_CHUNKS_PER_DOCUMENT` | `5000` | Maximum chunk limit per document |
+| `CHUNK_SIZE` | `1000` | Target character length per text chunk |
+| `CHUNK_OVERLAP` | `200` | Character overlap between consecutive chunks |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model name for dense retrieval |
+| `TOP_K_RESULTS` | `2` | Number of context chunks retrieved for answer generation |
+| `SIMILARITY_THRESHOLD` | `0.3` | Minimum cosine similarity to attempt retrieval |
 | `RETRIEVAL_MODE` | `hybrid` | Retrieval mode (`dense`, `hybrid`, `hybrid_rerank`) |
 | `VECTOR_BACKEND` | `numpy` | Vector store backend (`numpy`, `chroma`) |
+| `CHROMA_PATH` | `data/chroma` | Directory path for ChromaDB storage |
 | `ORCHESTRATOR` | `plain` | Pipeline orchestrator (`plain`, `langgraph`) |
 | `PROMPT_VERSION` | `v1` | Prompt version loaded from `prompts/<version>.yaml` |
-| `SIMILARITY_THRESHOLD` | `0.3` | Minimum cosine similarity to attempt retrieval |
+| `GROUNDING_THRESHOLD` | `0.45` | NLI entailment threshold for grounding verification |
 | `GROUNDING_ENFORCE` | `false` | When true, rejects generations failing grounding coverage |
+| `GROUNDING_MIN_COVERAGE` | `0.5` | Ratio of supported sentences required to pass grounding |
+| `DATABASE_PATH` | `data/documents.db` | SQLite database file path |
+| `EMBEDDINGS_PATH` | `data/embeddings` | Directory path for cached NumPy embeddings |
+| `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `LOG_FILE` | `logs/bot.log` | Log file path |
 
 For full deployment and configuration options, see [docs/setup.md](docs/setup.md).
 

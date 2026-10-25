@@ -115,12 +115,13 @@ class TestBenchLLM(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             out_json = os.path.join(tmp_dir, "llm_bench_robust.json")
-            results = run_llm_benchmark(
-                models=["robust-test-model"],
-                pdf_path="eval/fixtures/ci_fixture.pdf",
-                golden_path="eval/golden_ci.json",
-                output_path=out_json,
-            )
+            with self.assertLogs("eval.bench_llm", level="ERROR"):
+                results = run_llm_benchmark(
+                    models=["robust-test-model"],
+                    pdf_path="eval/fixtures/ci_fixture.pdf",
+                    golden_path="eval/golden_ci.json",
+                    output_path=out_json,
+                )
 
             m = results["robust-test-model"]
             # 1 failure was recorded, but the run completed

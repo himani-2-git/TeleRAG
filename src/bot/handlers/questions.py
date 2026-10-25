@@ -43,6 +43,112 @@ def format_telegram_html(text: str) -> str:
     return "".join(parts)
 
 
+def utf16_len(s: str) -> int:
+    """Calculate length in UTF-16 code units (Telegram's message length metric)."""
+    return len(s.encode("utf-16-le")) // 2
+
+
+def split_telegram_message(text: str, limit: int = 4000) -> list[str]:
+    """Split a Telegram message (plain text or HTML) into chunks within the UTF-16 code unit limit.
+
+    Splits on paragraph, then line, then sentence boundaries, then hard-splits as a last resort.
+    Never splits inside an HTML tag or entity. If a split falls inside <pre><code>...</code></pre>,
+    closes the tags at the end of the chunk and reopens them at the start of the next.
+    """
+    if utf16_len(text) <= limit:
+        return [text]
+
+    chunks = []
+    remaining = text
+    tag_pattern = re.compile(r"<pre><code>|</code></pre>|<[^>]+>|&[a-zA-Z0-9#]+;")
+
+    while remaining:
+        if utf16_len(remaining) <= limit:
+            chunks.append(remaining)
+            break
+
+        tags = [(m.start(), m.end(), m.group(0)) for m in tag_pattern.finditer(remaining)]
+
+        inside_token = [False] * (len(remaining) + 1)
+        in_code_at = [False] * (len(remaining) + 1)
+
+        depth = 0
+        tag_idx = 0
+        n_tags = len(tags)
+
+        for start, end, _tag in tags:
+            for p in range(start + 1, end):
+                inside_token[p] = True
+
+        for p in range(len(remaining) + 1):
+            while tag_idx < n_tags and tags[tag_idx][1] <= p:
+                tag = tags[tag_idx][2]
+                if tag in ("<pre><code>", "<pre>", "<code>"):
+                    depth += 1
+                elif tag in ("</code></pre>", "</pre>", "</code>"):
+                    depth = max(0, depth - 1)
+                tag_idx += 1
+            in_code_at[p] = depth > 0
+
+        best_para = -1
+        best_line = -1
+        best_sent = -1
+        best_word = -1
+        best_hard = -1
+
+        current_utf16 = 0
+        for pos in range(1, len(remaining) + 1):
+            char = remaining[pos - 1]
+            current_utf16 += 2 if ord(char) > 0xFFFF else 1
+
+            in_code = in_code_at[pos]
+            extra = 13 if in_code else 0  # utf16_len("</code></pre>") == 13
+            if current_utf16 + extra > limit:
+                break
+
+            if inside_token[pos]:
+                continue
+
+            best_hard = pos
+            if char == "\n":
+                if pos >= 2 and remaining[pos - 2] == "\n":
+                    best_para = pos
+                else:
+                    best_line = pos
+            elif char in (".", "!", "?") and pos < len(remaining) and remaining[pos] in (" ", "\n"):
+                best_sent = pos
+            elif char == " ":
+                best_word = pos
+
+        chosen = (
+            best_para
+            if best_para != -1
+            else (
+                best_line
+                if best_line != -1
+                else (
+                    best_sent if best_sent != -1 else (best_word if best_word != -1 else best_hard)
+                )
+            )
+        )
+
+        if chosen == -1 or chosen == 0:
+            chosen = min(limit, len(remaining))
+
+        in_code = in_code_at[chosen]
+        chunk = remaining[:chosen]
+        if in_code:
+            chunk = chunk + "</code></pre>"
+            remaining = "<pre><code>" + remaining[chosen:]
+        else:
+            chunk = chunk.rstrip("\n")
+            remaining = remaining[chosen:].lstrip("\n")
+
+        chunks.append(chunk)
+
+    return chunks
+
+
 class QuestionHandlersMixin:
     """Mixin providing question processing and typing management for BotHandlers."""
 
@@ -58,7 +164,7 @@ class QuestionHandlersMixin:
             return
 
         question = message_text
-        documents = self.document_store.list_documents(user_id)
+        documents = await asyncio.to_thread(self.document_store.list_documents, user_id)
         if not documents:
             await update.message.reply_text(
                 "📭 You haven't uploaded any documents yet.\n"
@@ -125,9 +231,28 @@ class QuestionHandlersMixin:
         )
 
     async def _deliver_answer(self, update: Update, thinking_msg: Any, text: str):
-        """Deliver final response formatted as HTML with fallback to plain text, then delete thinking message."""
+        """Deliver final response formatted as HTML with fallback to plain text, chunked if necessary."""
         formatted_html = format_telegram_html(text)
-        await self._reply_with_retry(update, formatted_html, parse_mode="HTML", fallback_text=text)
+        chunks = split_telegram_message(formatted_html, limit=4000)
+
+        def _to_plain_text(chunk_html: str) -> str:
+            cleaned = chunk_html.replace("<pre><code>", "```\n").replace("</code></pre>", "\n```")
+            cleaned = re.sub(r"<[^>]+>", "", cleaned)
+            return html.unescape(cleaned)
+
+        for chunk in chunks:
+            fb_text = text if len(chunks) == 1 else _to_plain_text(chunk)
+            sent = await self._reply_with_retry(
+                update, chunk, parse_mode="HTML", fallback_text=fb_text
+            )
+            if sent is None:
+                logger.error("Failed to send chunk of response to user.")
+                try:
+                    await update.message.reply_text("❌ Failed to send response. Please try again.")
+                except Exception as send_err:
+                    logger.warning("Could not send failure notice: %s", send_err)
+                break
+
         if thinking_msg:
             try:
                 await thinking_msg.delete()

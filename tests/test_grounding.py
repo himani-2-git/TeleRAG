@@ -120,6 +120,35 @@ class TestGrounding(unittest.TestCase):
         self.assertFalse(report_empty.applicable)
         self.assertEqual(report_empty.citation_coverage, 1.0)
 
+    def test_grounding_supporting_chunk_indices_and_order(self):
+        """Verify supporting_chunk_indices and chunk_support_counts order chunks by support."""
+        embedder = FakeEmbedder(
+            mapping={
+                "both": [0.707, 0.707, 0.0, 0.0],
+                "alpha": [1.0, 0.0, 0.0, 0.0],
+                "beta": [0.0, 1.0, 0.0, 0.0],
+                "gamma": [0.0, 0.0, 1.0, 0.0],
+            }
+        )
+        chunks = [
+            {"content": "Alpha contains data."},
+            {"content": "Both contains details."},
+            {"content": "Gamma is completely unrelated to the answer."},
+        ]
+        # Answer has 2 sentences: one matching alpha, one matching beta
+        answer = "Alpha is primary data. Beta is secondary data."
+        report = grounding_report(answer, chunks, embedder, threshold=0.45)
+
+        self.assertTrue(report.applicable)
+        # Chunk 1 (both) matches both alpha and beta -> support count 2
+        # Chunk 0 (alpha) matches alpha -> support count 1
+        # Chunk 2 (gamma) matches neither -> support count 0
+        self.assertEqual(report.chunk_support_counts[1], 2)
+        self.assertEqual(report.chunk_support_counts[0], 1)
+        self.assertEqual(report.chunk_support_counts[2], 0)
+        # supporting_chunk_indices should contain chunk 1, then chunk 0, and exclude chunk 2
+        self.assertEqual(report.supporting_chunk_indices, [1, 0])
+
     def test_grounding_footers_ignored(self):
         """Verify footers in the answer string do not count as sentences."""
         embedder = FakeEmbedder(mapping={"alpha": [1.0, 0.0, 0.0, 0.0]})

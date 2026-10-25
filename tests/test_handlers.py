@@ -10,7 +10,7 @@ from telegram.error import BadRequest
 from src.bot.handlers import BotHandlers
 from src.bot.handlers.questions import format_telegram_html
 from src.config import Config
-from src.rag.pipeline import is_insufficient_context, is_summary_query
+from src.rag.pipeline import count_substantive_words, is_insufficient_context, is_summary_query
 
 
 class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
@@ -358,8 +358,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
         self.mock_retriever.retrieve.return_value = chunks
         self.mock_retriever.format_context.return_value = "Test content"
-        self.mock_llm.generate_answer.return_value = "Test answer"
-        self.mock_llm.validate_response.return_value = "Test answer"
+        self.mock_llm.generate_answer.return_value = "Test answer here"
+        self.mock_llm.validate_response.return_value = "Test answer here"
 
         mock_thinking_msg = Mock()
         mock_thinking_msg.delete = AsyncMock()
@@ -382,7 +382,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
 
         # Second reply is final answer with Sources and Answered in footer
         final_call = update.message.reply_text.call_args_list[1][0][0]
-        self.assertIn("Test answer", final_call)
+        self.assertIn("Test answer here", final_call)
         self.assertIn("Sources:", final_call)
         self.assertIn("Answered in", final_call)
         self.assertIn("with qwen2.5:3b", final_call)
@@ -407,8 +407,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
         self.mock_retriever.retrieve.return_value = chunks
         self.mock_retriever.format_context.return_value = "Context text"
-        self.mock_llm.generate_answer.return_value = "Grounded response"
-        self.mock_llm.validate_response.return_value = "Grounded response"
+        self.mock_llm.generate_answer.return_value = "Grounded response here"
+        self.mock_llm.validate_response.return_value = "Grounded response here"
 
         mock_queued_msg = Mock()
         mock_queued_msg.delete = AsyncMock()
@@ -447,7 +447,7 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         # 2. Verify answer delivered as a new reply
         self.assertEqual(update.message.reply_text.call_count, 2)
         final_reply = update.message.reply_text.call_args_list[1][0][0]
-        self.assertIn("Grounded response", final_reply)
+        self.assertIn("Grounded response here", final_reply)
         self.assertIn("Sources:", final_reply)
         self.assertIn("Answered in", final_reply)
 
@@ -498,6 +498,54 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Answered in", reply)
         self.assertNotIn("guide.pdf", reply)
         mock_thinking_msg.delete.assert_called_once()
+
+    async def test_insufficient_context_in_sentence_or_paragraph_suppresses_sources_footer(self):
+        """When the LLM contains INSUFFICIENT_CONTEXT anywhere, reply with refusal and suppress Sources."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{"id": 1, "filename": "guide.pdf"}]
+        chunks = [
+            {
+                "content": "Some programming context.",
+                "filename": "guide.pdf",
+                "page_start": 5,
+                "page_end": 5,
+                "chunk_index": 0,
+            }
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+
+        # Model returns marker inside a sentence
+        self.mock_llm.generate_answer.return_value = (
+            "...for these values, INSUFFICIENT_CONTEXT would apply as..."
+        )
+        self.mock_llm.validate_response.return_value = (
+            "...for these values, INSUFFICIENT_CONTEXT would apply as..."
+        )
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "How do I calculate X?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        with self.assertNoLogs("src.rag.pipeline", level="WARNING"):
+            await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn(
+            "I couldn't find relevant information in your documents to answer this question.", reply
+        )
+        self.assertNotIn("Sources:", reply)
+        self.assertNotIn("guide.pdf", reply)
+        self.assertNotIn("Answered in", reply)
 
     async def test_normal_answer_includes_sources_footer(self):
         """A normal grounded LLM answer must still retain its verified Sources footer."""
@@ -580,13 +628,128 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             user_chunks=chunks,
         )
 
+    def test_count_substantive_words(self):
+        """Verify substantive word counting removes citations, sources lines, and whitespace."""
+        self.assertEqual(count_substantive_words("[aipython.pdf, p. 11]"), 0)
+        self.assertEqual(
+            count_substantive_words("[aipython.pdf, p. 11]\nSources:\n• aipython.pdf (p. 11)"), 0
+        )
+        self.assertEqual(count_substantive_words("Sources: none"), 0)
+        self.assertEqual(count_substantive_words("Yes [aipython.pdf, p. 11]"), 1)
+        self.assertEqual(count_substantive_words("Yes, absolutely. [aipython.pdf, p. 11]"), 2)
+        self.assertEqual(count_substantive_words("Python is dynamic. [aipython.pdf, p. 11]"), 3)
+        self.assertEqual(count_substantive_words(""), 0)
+
+    async def test_unusable_short_answer_retried_and_fallback_with_no_sources(self):
+        """When answer has fewer than 3 words (e.g. '[aipython.pdf, p. 11]'), retry once; if still empty fallback."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{"id": 1, "filename": "aipython.pdf"}]
+        chunks = [
+            {
+                "content": "AI Python chapter 1 content.",
+                "filename": "aipython.pdf",
+                "page_start": 11,
+                "page_end": 11,
+                "chunk_index": 0,
+            }
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+
+        # Model returns citation only on both generation attempts
+        self.mock_llm.generate_answer.side_effect = [
+            "[aipython.pdf, p. 11]",
+            "[aipython.pdf, p. 11]",
+        ]
+        self.mock_llm.validate_response.side_effect = lambda s: s
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "What is reinforcement learning?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(self.mock_llm.generate_answer.call_count, 2)
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("I couldn't produce a usable answer; try rephrasing the question.", reply)
+        self.assertNotIn("Sources:", reply)
+        self.assertNotIn("aipython.pdf", reply)
+        self.assertNotIn("Answered in", reply)
+
+    async def test_unusable_short_answer_retried_and_succeeds_on_retry(self):
+        """When initial answer has fewer than 3 words, retry succeeds if second attempt has substantive content."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [{"id": 1, "filename": "aipython.pdf"}]
+        chunks = [
+            {
+                "content": "AI Python chapter 1 content.",
+                "filename": "aipython.pdf",
+                "page_start": 11,
+                "page_end": 11,
+                "chunk_index": 0,
+            }
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_embedder.generate_query_embedding.return_value = [0.1, 0.2]
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+
+        # First attempt is citation-only, second attempt is substantive
+        self.mock_llm.generate_answer.side_effect = [
+            "[aipython.pdf, p. 11]",
+            "Reinforcement learning is learning through interaction with an environment. [aipython.pdf, p. 11]",
+        ]
+        self.mock_llm.validate_response.side_effect = lambda s: s
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "What is reinforcement learning?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(self.mock_llm.generate_answer.call_count, 2)
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("Reinforcement learning is learning through interaction", reply)
+        self.assertIn("Sources:", reply)
+        self.assertIn("aipython.pdf (p. 11)", reply)
+
     def test_marker_only_insufficient_context(self):
-        """Verify marker-only check strips whitespace/quotes/backticks and checks prefix."""
+        """Verify marker check detects INSUFFICIENT_CONTEXT anywhere case-insensitively."""
+        # Marker at start
         self.assertTrue(is_insufficient_context("INSUFFICIENT_CONTEXT"))
         self.assertTrue(is_insufficient_context("`INSUFFICIENT_CONTEXT`"))
         self.assertTrue(is_insufficient_context(" 'INSUFFICIENT_CONTEXT' "))
         self.assertTrue(is_insufficient_context('"INSUFFICIENT_CONTEXT"'))
         self.assertTrue(is_insufficient_context("insufficient_context: cannot find it"))
+        # Marker in middle of paragraph
+        self.assertTrue(
+            is_insufficient_context(
+                "Here is introductory text.\n\nINSUFFICIENT_CONTEXT\n\nMore details."
+            )
+        )
+        # Marker in a sentence
+        self.assertTrue(
+            is_insufficient_context("...for these values, INSUFFICIENT_CONTEXT would apply as...")
+        )
+        self.assertTrue(
+            is_insufficient_context("...for these values, insufficient_context would apply as...")
+        )
         # Non-marker phrases should not be caught
         self.assertFalse(is_insufficient_context("I don't have enough information."))
         self.assertFalse(is_insufficient_context("The context does not mention this."))
@@ -599,6 +762,12 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.mock_doc_store.get_user_chunks_with_embeddings.return_value = [
             {"content": "content", "filename": "doc.pdf", "page": 1, "chunk_index": 0}
         ]
+        self.mock_llm.generate_answer.return_value = "Valid queue response here."
+        self.mock_llm.validate_response.return_value = "Valid queue response here."
+        self.mock_retriever.retrieve.return_value = [
+            {"content": "content", "filename": "doc.pdf", "page": 1, "chunk_index": 0}
+        ]
+        self.mock_retriever.format_context.return_value = "content"
 
         await self.handlers.llm_semaphore.acquire()
         self.handlers.active_requests = 1
@@ -623,6 +792,203 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             await self.handlers.handle_message(update, context)
 
         self.assertEqual(self.handlers.active_requests, 1)
+
+    async def test_sources_footer_excludes_unrelated_chunk_with_mocked_embedder(self):
+        """When the second chunk is unrelated, it must not appear in Sources footer."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [
+            {"id": 1, "filename": "python.pdf"},
+            {"id": 2, "filename": "baking.pdf"},
+        ]
+        chunks = [
+            {
+                "content": "Python is an interpreted programming language.",
+                "filename": "python.pdf",
+                "page_start": 1,
+                "page_end": 1,
+                "chunk_index": 0,
+            },
+            {
+                "content": "Baking sourdough bread requires flour, water, salt, and yeast.",
+                "filename": "baking.pdf",
+                "page_start": 4,
+                "page_end": 4,
+                "chunk_index": 1,
+            },
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+        self.mock_llm.generate_answer.return_value = (
+            "Python is an interpreted language for general-purpose programming."
+        )
+        self.mock_llm.validate_response.return_value = (
+            "Python is an interpreted language for general-purpose programming."
+        )
+
+        def mock_embed(t):
+            if isinstance(t, list):
+                return [mock_embed(item) for item in t]
+            if (
+                "baking" in t.lower()
+                or "sourdough" in t.lower()
+                or "flour" in t.lower()
+                or "yeast" in t.lower()
+            ):
+                return [0.0, 1.0]
+            return [1.0, 0.0]
+
+        self.mock_embedder.generate_query_embedding.side_effect = mock_embed
+        self.mock_embedder.generate_embeddings.side_effect = mock_embed
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "What is Python?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("Python is an interpreted language", reply)
+        self.assertIn("Sources:", reply)
+        self.assertIn("python.pdf (p. 1)", reply)
+        # Unrelated second chunk must not appear in Sources!
+        self.assertNotIn("baking.pdf", reply)
+
+    async def test_sources_footer_unverified_answer_adds_could_not_verify_line(self):
+        """When an answer is not grounded in any retrieved chunk, add unverified notice and no Sources."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [
+            {"id": 1, "filename": "doc1.pdf"},
+            {"id": 2, "filename": "doc2.pdf"},
+        ]
+        chunks = [
+            {
+                "content": "Cooking pasta in boiling salted water.",
+                "filename": "doc1.pdf",
+                "page_start": 1,
+                "page_end": 1,
+                "chunk_index": 0,
+            },
+            {
+                "content": "Baking cookies on a baking sheet.",
+                "filename": "doc2.pdf",
+                "page_start": 2,
+                "page_end": 2,
+                "chunk_index": 1,
+            },
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+        self.mock_llm.generate_answer.return_value = (
+            "Quantum computers manipulate qubits using quantum entanglement and superposition."
+        )
+        self.mock_llm.validate_response.return_value = (
+            "Quantum computers manipulate qubits using quantum entanglement and superposition."
+        )
+
+        def mock_embed(t):
+            if isinstance(t, list):
+                return [mock_embed(item) for item in t]
+            if "quantum" in t.lower() or "qubit" in t.lower():
+                return [1.0, 0.0]
+            return [0.0, 1.0]
+
+        self.mock_embedder.generate_query_embedding.side_effect = mock_embed
+        self.mock_embedder.generate_embeddings.side_effect = mock_embed
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "How do quantum computers work?"
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("Quantum computers manipulate qubits", reply)
+        self.assertIn("(Could not verify this answer against the cited pages.)", reply)
+        self.assertNotIn("Sources:", reply)
+        self.assertNotIn("doc1.pdf", reply)
+        self.assertNotIn("doc2.pdf", reply)
+
+    async def test_sources_footer_ordered_by_support_count(self):
+        """Sources footer is ordered by number of sentences each chunk supports."""
+        user_id = 123
+        self.mock_doc_store.list_documents.return_value = [
+            {"id": 1, "filename": "rare.pdf"},
+            {"id": 2, "filename": "dominant.pdf"},
+        ]
+        # Chunk 0 supports only Alpha; Chunk 1 supports both Alpha and Beta
+        chunks = [
+            {
+                "content": "Alpha concept details.",
+                "filename": "rare.pdf",
+                "page_start": 1,
+                "page_end": 1,
+                "chunk_index": 0,
+            },
+            {
+                "content": "Alpha concept details. Beta concept details.",
+                "filename": "dominant.pdf",
+                "page_start": 2,
+                "page_end": 2,
+                "chunk_index": 1,
+            },
+        ]
+        self.mock_doc_store.get_user_chunks_with_embeddings.return_value = chunks
+        self.mock_retriever.retrieve.return_value = chunks
+        self.mock_retriever.format_context.return_value = "Formatted context"
+        self.mock_llm.generate_answer.return_value = "Alpha is verified. Beta is also verified."
+        self.mock_llm.validate_response.return_value = "Alpha is verified. Beta is also verified."
+
+        def mock_embed(t):
+            if isinstance(t, list):
+                return [mock_embed(item) for item in t]
+            # 3D embeddings: [alpha, beta, other]
+            if "alpha" in t.lower() and "beta" in t.lower():
+                return [0.707, 0.707, 0.0]
+            if "alpha" in t.lower():
+                return [1.0, 0.0, 0.0]
+            if "beta" in t.lower():
+                return [0.0, 1.0, 0.0]
+            return [0.0, 0.0, 1.0]
+
+        self.mock_embedder.generate_query_embedding.side_effect = mock_embed
+        self.mock_embedder.generate_embeddings.side_effect = mock_embed
+
+        mock_thinking_msg = Mock()
+        mock_thinking_msg.delete = AsyncMock()
+        update = Mock()
+        update.effective_user.id = user_id
+        update.effective_chat.id = 456
+        update.message.text = "Explain Alpha and Beta."
+        update.message.reply_text = AsyncMock(return_value=mock_thinking_msg)
+        context = Mock()
+        context.bot.send_chat_action = AsyncMock()
+
+        await self.handlers.handle_message(update, context)
+
+        self.assertEqual(update.message.reply_text.call_count, 2)
+        reply = update.message.reply_text.call_args_list[1][0][0]
+        self.assertIn("Sources:", reply)
+        # dominant.pdf supports 2 sentences, rare.pdf supports 1 sentence
+        # dominant.pdf should appear before rare.pdf
+        idx_dom = reply.index("dominant.pdf")
+        idx_rare = reply.index("rare.pdf")
+        self.assertLess(idx_dom, idx_rare)
 
 
 class TestCommandHandlers(unittest.IsolatedAsyncioTestCase):

@@ -55,19 +55,18 @@ Measured results using Ollama on a **Dell Inspiron i5 with 16 GB RAM (CPU only)*
 ## Prompts and Grounding
 
 To prevent ungrounded assertions from reaching users and track prompt evolutions systematically:
-* **Versioned Prompt Configurations**: Prompt templates and system instructions are decoupled into prompts/<PROMPT_VERSION>.yaml (default 1.yaml). The loader validates required schema keys (ersion, system_prompt, user_template, 
-efusal_message, insufficient_context_marker) at startup.
-* **Post-Generation Grounding Check**: Before delivering an answer, src/rag/grounding.py strips citation and timing footers, splits the answer into constituent sentences, and calculates maximum cosine similarity against retrieved chunk embeddings (GROUNDING_THRESHOLD = 0.45).
-* **Enforcement Gate**: In production, grounding operates in log-only mode (GROUNDING_ENFORCE = false). When enabled (GROUNDING_ENFORCE = true), any answer with citation coverage below GROUNDING_MIN_COVERAGE = 0.5 is cleanly refused with the standardized refusal notice.
-* **Attribution and Timing Footers**: Responses append verified physical page sources (Sources:\n• <doc> (p. X)) followed by measured end-to-end latency and model identifier (Answered in <N> s with <model>).
+* **Versioned Prompt Configurations**: Prompt templates and system instructions are decoupled into `prompts/<PROMPT_VERSION>.yaml` (default `v1.yaml`). The loader validates required schema keys (`version`, `system_prompt`, `user_template`, `refusal_message`, `insufficient_context_marker`) at startup.
+* **Post-Generation Grounding Check**: Before delivering an answer, `src/rag/grounding.py` strips citation and timing footers, splits the answer into constituent sentences, and calculates maximum cosine similarity against retrieved chunk embeddings (`GROUNDING_THRESHOLD=0.45`).
+* **Enforcement Gate**: In production, grounding operates in log-only mode (`GROUNDING_ENFORCE=false`). When enabled (`GROUNDING_ENFORCE=true`), any answer with citation coverage below `GROUNDING_MIN_COVERAGE=0.5` is cleanly refused with the standardized refusal notice.
+* **Attribution and Timing Footers**: Responses append verified physical page sources (`Sources:\n• <doc> (p. X)`) followed by measured end-to-end latency and model identifier (`Answered in <N> s with <model>`).
 * **CI Grounding Quality Gate**: Evaluates factual citation coverage and rejects ungrounded hallucinations on synthetic regression documents:
-  `ash
-  python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
-  `
+```bash
+python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers eval/fixtures/ci_answers.json --thresholds eval/thresholds.json
+```
 
 ## Evaluation Harness
 
-`ash
+```bash
 # Evaluate baseline dense retrieval on Think Python 2e (70 questions)
 python eval/run_eval.py --mode dense --pdf eval/fixtures/book.pdf --golden eval/golden.json --out eval/results/baseline.json
 
@@ -92,7 +91,7 @@ python -m eval.run_faithfulness --validate-judge --judge-type llm --judge-model 
 # Run local faithfulness evaluation on Think Python 2e (NLI judge, 20 answerable questions)
 # Note: Install optional evaluation dependencies via pip install -r requirements/eval.txt
 python -m eval.run_faithfulness --judge-type nli --n 20 --output eval/results/faithfulness.json
-`
+```
 
 > [!NOTE]
 > **Faithfulness Evaluation & Judge Architectures**:
@@ -198,7 +197,7 @@ Validation scores reference answers against **retrieved context** (not raw groun
 To evaluate passage granularity, a chunk-size ablation study was run using `eval/run_chunk_ablation.py` over `eval/fixtures/ci_fixture.pdf` across candidate character chunk sizes with fixed 20% overlap (saved in `eval/results/chunk_ablation.json`):
 
 | Chunk Size | Overlap | Chunks | Mean Chars | Mean Toks | % > 256 Toks | Hit@2 (Span) | MRR (Span) | Hit@2 (Strict) | MRR (Strict) |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **500** | 100 | 19 | 433.4 | 89.9 | 0.0% | 1.0000 | 1.0000 | 1.0000 | 0.9583 |
 | **1000 (Default)** | 200 | 10 | 824.4 | 173.1 | 0.0% | 1.0000 | 1.0000 | 0.7500 | 0.4861 |
 | **1500** | 300 | 7 | 1178.3 | 243.7 | 71.43% | 1.0000 | 1.0000 | 0.6667 | 0.6042 |
@@ -212,6 +211,38 @@ The test fixture is small (8 pages, 12 answerable test questions) and both 500 a
 
 1. **Hallucination Reduction, Not Elimination**: The relevance threshold ($\tau = 0.3$) and prompt instructions reduce unsupported answers, but an LLM can still misinterpret retrieved context or hallucinate nuances.
 2. **Hard Negative Abstention**: While bi-encoder cosine gating stops 100% of off-topic queries, it does not stop in-domain unanswerable queries (e.g., asking about `asyncio` on a basic Python textbook), where chunks score 0.35–0.48. The cross-encoder threshold experiment rejected 2/5 on test, but was tuned on a small sample.
-3. **Hardware-Dependent Generation Latency & Host Uptime**: Reranking improves Hit@1 by +10.0 pp but adds ~2s on CPU. Answer generation time depends heavily on model choice and available hardware; on a laptop CPU without GPU acceleration, generation with a 7B parameter model is measured in minutes. TeleRAG caps completion tokens (default `LLM_MAX_TOKENS=300`), prompts for concise answers, limits context chunks (`TOP_K_RESULTS=2`), serializes requests via an `asyncio.Semaphore(1)` with queue notifications, and streams typing heartbeats. Furthermore, because it runs locally, the bot is only active and reachable while the host machine is awake and running `python main.py`.
+3. **Hardware-Dependent Generation Latency & Host Uptime**: Reranking improves Hit@1 by +10.0 pp but adds ~2s on CPU. Answer generation time depends heavily on model choice and available hardware; on a laptop CPU without GPU acceleration, generation with a 7B parameter model is measured in minutes. TeleRAG caps completion tokens (default `LLM_MAX_TOKENS=1024`), prompts for concise answers, limits context chunks (`TOP_K_RESULTS=2`), serializes requests via an `asyncio.Semaphore(1)` with queue notifications, and streams typing heartbeats. Furthermore, because it runs locally, the bot is only active and reachable while the host machine is awake and running `python main.py`.
+4. **Free Hosted Model Lifecycle Volatility**: Third-party free endpoints on hosted providers frequently rotate, become rate-limited, or transition to paid slugs (e.g. returning HTTP 404/429), or can be retired entirely. The startup diagnostic catches unavailable models early.
+5. **Document-Level Summaries**: For general summary/overview queries, the bot samples the first ~8 chunks in document page order rather than performing hierarchical map-reduce summarization across very long books.
+6. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection, leaving a theoretical window for DNS rebinding attacks.
+7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `PyPDF2`.
+8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use rather than untrusted multi-tenant host environments.
 9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias. For example, on `heldout_neg_02` (*Which database systems favor availability and low latency according to the PACELC classification?*), the subtly inverted answer `Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.` was assigned entailment `0.7545` (scored 1.000) against the PACELC premise window because all mentioned entities (Spanner, Bigtable, PA/EL, availability, low latency) co-occur in the same sentence window even though the passage assigns PA/EL to Dynamo/Cassandra and PC/EC to Bigtable/Spanner. Testing the larger `cross-encoder/nli-deberta-v3-base` resolved this specific entity-swap error (rejecting `heldout_neg_02` with score 0.00 and 0.0% false-accept rate on held-out), but under-scored certain dev references (`ci_04`, `ci_12`), leaving both NLI models marked as unvalidated judges.
 10. **Faithfulness Evaluation & Judge Validation Caveats**: The Think Python 2e faithfulness score (mean 0.535) is directional and conservative. It conflates strict NLI judge rejections (DEV reference accept rate 75.0%), 3B generator unsupported phrasing, and top-2 retrieval context misses, and must not be interpreted as a hallucination rate. Furthermore, the judge's 0.0% negative-control false-accept rate is whole-answer level (> 0.50), half of the held-out negative controls scored right at the boundary (0.500), and the base judge was selected post-hoc.
+
+## Manual stress test (informal)
+
+16 questions asked through the Telegram bot on one document (a 1023-chunk Python textbook PDF), using `qwen2.5:3b` on CPU (23 to 116 s per answer). Run on the build before the answer-quality changes (PR #10), and checked by hand against the PDF. This is a small informal sample, not an accuracy measure.
+
+Summary: 8 correct, 3 partly correct, 4 wrong or empty, 1 not checked.
+
+| Round | Question | Result |
+|---|---|---|
+| 1 | Python version and plotting library | Correct |
+| 1 | Readability vs efficiency, engine analogy | Not checked against the PDF |
+| 1 | Dictionary mapping elements to indexes, duplicates | Rule correct; the invented example was wrong |
+| 1 | `list(ga(10))` | Correct result; explanation skipped 0 |
+| 1 | Late vs early binding | Mostly correct; explanation muddled |
+| 1 | GPT-4 temperature (not in document) | Correct refusal |
+| 1 | Injected instruction plus `perf_counter` | Correct; injection ignored |
+| 1 | `max_display_level` values 0 to 3 | Wrong: said the document does not define them, and the raw refusal marker leaked into the reply |
+| 2 | Display levels 0 to 3 | Partly wrong: said level 0 is the default (the document says 1) |
+| 2 | Dictionary for `['x','y','x','z','y']` | Wrong: gave `{'x': 0, 'y': 1, 'z': 3}`; correct is `{'x': 2, 'y': 4, 'z': 3}` |
+| 2 | `list(ga(0))` | Correct |
+| 2 | Early-binding example with lambdas | Wrong: swapped early and late binding |
+| 2 | Exact Python version, quote only the shortest phrase | No answer: returned only a citation |
+| 2 | Embedding model, vector DB, top-k (not in document) | Correct refusal |
+| 2 | Injected instruction plus `perf_counter` | Correct; injection ignored |
+| 2 | Does readability imply faster than optimized libraries? | Correct |
+
+Findings: the refusals and the injection handling worked in all four cases. Most errors are reasoning and instruction-following limits of the 3B model. Three pipeline problems were found and addressed in PR #10: the refusal marker leaking into answers, citation-only answers counted as answers, and a Sources footer that listed unrelated pages.

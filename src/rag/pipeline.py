@@ -5,79 +5,112 @@ import logging
 import re
 from typing import Any, TypedDict
 
-from .grounding import grounding_report
+from .grounding import (
+    grounding_report,
+    is_refusal_sentence,
+    split_sentences,
+)
 from .llm_client import LLMClient, LLMUnavailableError
 from .prompts import PromptConfig, load_prompt_config
 from .retriever import DocumentRetriever
 
 logger = logging.getLogger(__name__)
 
-SUMMARY_CUES = (
-    "summarize",
-    "summary",
-    "overview",
-    "main points",
-    "key takeaways",
-    "what is this document about",
-    "what is this book about",
-    "what is the document about",
-    "what is the book about",
-    "what is this pdf about",
-    "what is the pdf about",
-    "tell me about this document",
-    "tell me about this pdf",
-    "explain this document",
-    "brief overview",
+# Only a few words can follow a summary request. If the question names a topic ("summary of
+# chapter 3", "summarize the Raft algorithm") it is a normal question and goes through retrieval.
+_DOCUMENT_WORDS = r"(?:document|doc|pdf|book|file|paper|article|page|report|text)"
+_THIS_DOCUMENT = rf"(?:this|the|my|that)\s+(?:(?:whole|entire|full)\s+)?{_DOCUMENT_WORDS}"
+_WHOLE_THING = (
+    rf"(?:it|everything|(?:the\s+)?(?:topics|contents?|chapters|sections)|{_THIS_DOCUMENT})"
 )
+_POLITE = r"(?:(?:please|kindly|can you|could you|would you|can i get|could i get|can i have)\s+)*"
+# Harmless words that may end the request: "summarize this document for me, please"
+_END = r"(?:\s+(?:for me|please|briefly|in brief))*$"
+
+SUMMARY_REQUEST_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        # "summarize", "summarise this document", "please summarize the entire book"
+        rf"^{_POLITE}(?:summari[sz]e|sum up)(?:\s+{_WHOLE_THING})?{_END}",
+        # "give me a summary", "an overview of the book", "what is the overview of this paper"
+        rf"^{_POLITE}(?:(?:give me|provide|write|show me|i need|i want|what is|what's)\s+)?"
+        rf"(?:(?:a|an|the)\s+)?(?:(?:brief|short|quick|full)\s+)?"
+        rf"(?:summary|overview|tl;?dr)(?:\s+of\s+{_WHOLE_THING})?{_END}",
+        # "what is this book about"
+        rf"^(?:what is|what's)\s+{_THIS_DOCUMENT}\s+(?:about|on){_END}",
+        # "tell me about this document", "explain this document"
+        rf"^(?:tell me about|explain|describe)\s+{_THIS_DOCUMENT}{_END}",
+        # "what are the main points", "key takeaways of this document"
+        rf"^(?:(?:what are|list|give me)\s+)?(?:the\s+)?"
+        rf"(?:main points|key points|key takeaways|main ideas)"
+        rf"(?:\s+(?:of|in|from)\s+{_WHOLE_THING})?{_END}",
+    )
+)
+
+# A summary is built from this many chunks, spread evenly over the whole document.
+SUMMARY_MAX_CHUNKS = 8
 
 
 def is_summary_query(query: str) -> bool:
-    """Return True if query is asking for a document summary or overview."""
-    q = query.lower().strip()
-    return any(cue in q for cue in SUMMARY_CUES)
+    """Return True only if the whole question is a request to summarise the document."""
+    normalized = query.lower().replace("\u2019", "'").replace(",", "")
+    normalized = " ".join(normalized.split()).strip(" .!?")
+    return any(pattern.match(normalized) for pattern in SUMMARY_REQUEST_PATTERNS)
 
 
-INSUFFICIENT_CONTEXT_PATTERNS: tuple[str, ...] = (
-    "insufficient_context",
-    "context does not contain",
-    "context doesn't contain",
-    "context does not provide",
-    "context doesn't provide",
-    "context does not mention",
-    "context doesn't mention",
-    "not mentioned in the context",
-    "not mentioned in the provided context",
-    "not mentioned in the provided documents",
-    "not mentioned in the documents",
-    "not mentioned in the document",
-    "not provided in the context",
-    "not found in the context",
-    "not contain relevant information",
-    "no information in the context",
-    "no information in the provided context",
-    "provided context does not contain",
-    "provided context doesn't contain",
-    "provided context does not provide",
-    "provided context doesn't provide",
-    "provided context does not mention",
-    "provided context doesn't mention",
-    "does not contain the answer",
-    "doesn't contain the answer",
-    "cannot find the answer in the context",
-    "can't find the answer in the context",
-    "no relevant information in the context",
-    "no relevant information in the provided context",
-)
+def _reading_order(chunk: dict[str, Any]) -> tuple[int, int, int]:
+    """Sort key that puts chunks in document order: upload order, then page, then position."""
+    document_id = chunk.get("document_id")
+    if not isinstance(document_id, int):
+        document_id = 0
+    page = chunk.get("page_start")
+    if page is None:
+        page = chunk.get("page") or 0
+    return (document_id, page, chunk.get("chunk_index", 0))
+
+
+def select_summary_chunks(
+    chunks: list[dict[str, Any]], max_chunks: int = SUMMARY_MAX_CHUNKS
+) -> list[dict[str, Any]]:
+    """Pick up to max_chunks chunks spread evenly over the whole document, in reading order."""
+    ordered = sorted(chunks, key=_reading_order)
+    if len(ordered) <= max_chunks:
+        return ordered
+    if max_chunks == 1:
+        return ordered[:1]
+
+    # Integer maths: the first pick is chunk 0, the last is the final chunk, and because the
+    # step is larger than 1 no chunk is picked twice.
+    last = len(ordered) - 1
+    return [ordered[i * last // (max_chunks - 1)] for i in range(max_chunks)]
 
 
 def is_insufficient_context(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
-    """Check if the answer indicates insufficient context via marker or refusal phrases."""
+    """Return True if the answer is ONLY a refusal.
+
+    An answer that mixes a useful sentence with "the context does not mention X" is a partial
+    answer, not a refusal. Whether its useful sentences are grounded is decided later, by the
+    grounding check.
+    """
     if not answer or not marker:
         return False
-    lower = answer.lower()
-    if marker.lower() in lower:
-        return True
-    return any(pattern in lower for pattern in INSUFFICIENT_CONTEXT_PATTERNS)
+    sentences = split_sentences(answer)
+    if not sentences:
+        return False
+    return all(is_refusal_sentence(sentence, marker) for sentence in sentences)
+
+
+def contains_refusal_sentence(answer: str, marker: str = "INSUFFICIENT_CONTEXT") -> bool:
+    """Return True if at least one sentence of the answer is a refusal."""
+    return any(is_refusal_sentence(sentence, marker) for sentence in split_sentences(answer))
+
+
+def remove_marker_sentences(answer: str, marker: str) -> str:
+    """Remove sentences that contain the raw refusal marker so users never see it."""
+    pattern = rf"[^.!?\n]*{re.escape(marker)}[^.!?\n]*[.!?]?"
+    cleaned = re.sub(pattern, "", answer, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 def format_source_footer(chunks: list[dict[str, Any]]) -> str:
@@ -152,6 +185,7 @@ class RAGState(TypedDict, total=False):
     answer: str
     refused: bool
     refusal_reason: str | None
+    partial_answer: bool
     grounding_report: Any
     final_response: str
 
@@ -182,7 +216,7 @@ class RAGPipeline:
         return is_insufficient_context(answer, marker)
 
     def node_retrieve(self, state: RAGState) -> RAGState:
-        """Retrieve relevant chunks or first chunks for summary queries."""
+        """Retrieve relevant chunks, or sample the whole document for summary requests."""
         question = state["question"]
         user_chunks = state.get("user_chunks", [])
 
@@ -196,16 +230,7 @@ class RAGPipeline:
             }
 
         if is_summary_query(question):
-            sorted_chunks = sorted(
-                user_chunks,
-                key=lambda c: (
-                    c.get("page_start")
-                    if c.get("page_start") is not None
-                    else (c.get("page") or 0),
-                    c.get("chunk_index", 0),
-                ),
-            )
-            return {**state, "retrieved_chunks": sorted_chunks[:8]}
+            return {**state, "retrieved_chunks": select_summary_chunks(user_chunks)}
 
         query_embedding = state.get("query_embedding")
         if query_embedding is None and self.embedding_generator is not None:
@@ -288,7 +313,20 @@ class RAGPipeline:
                     "refusal_reason": "UNUSABLE_ANSWER",
                 }
 
-        return {**state, "raw_answer": raw_ans, "answer": answer, "refused": False}
+        # Keep a partial answer, but remember it contained a refusal sentence: the grounding
+        # step must confirm that the remaining sentences are really supported by the context.
+        marker = self.prompt_config.insufficient_context_marker
+        is_partial = contains_refusal_sentence(answer, marker)
+        if is_partial:
+            answer = remove_marker_sentences(answer, marker)
+
+        return {
+            **state,
+            "raw_answer": raw_ans,
+            "answer": answer,
+            "refused": False,
+            "partial_answer": is_partial,
+        }
 
     def node_grounding(self, state: RAGState) -> RAGState:
         """Evaluate semantic grounding against retrieved passages."""
@@ -297,6 +335,8 @@ class RAGPipeline:
 
         answer = state.get("answer", "")
         retrieved = state.get("retrieved_chunks", [])
+        is_partial = state.get("partial_answer", False)
+        refusal_msg = self.prompt_config.refusal_message
 
         try:
             report = grounding_report(
@@ -304,31 +344,37 @@ class RAGPipeline:
                 chunks=retrieved,
                 embedder=self.embedding_generator,
                 threshold=self.grounding_threshold,
+                marker=self.prompt_config.insufficient_context_marker,
             )
-            state_update: RAGState = {**state, "grounding_report": report}
-
-            if (
-                self.grounding_enforce
-                and report.applicable
-                and report.citation_coverage < self.grounding_min_coverage
-            ):
-                refusal_msg = self.prompt_config.refusal_message
-                state_update["answer"] = refusal_msg
-                state_update["refused"] = True
-                state_update["refusal_reason"] = "GROUNDING_UNSUPPORTED"
-
-            return state_update
         except Exception as e:
-            if self.grounding_enforce:
-                refusal_msg = self.prompt_config.refusal_message
+            # Always log first, whatever we decide to do next.
+            logger.exception("Grounding check failed: %s", e)
+            if self.grounding_enforce or is_partial:
                 return {
                     **state,
                     "answer": refusal_msg,
                     "refused": True,
                     "refusal_reason": "GROUNDING_ERROR",
                 }
-            logger.exception("Grounding check failed: %s", e)
             return state
+
+        state_update: RAGState = {**state, "grounding_report": report}
+
+        if is_partial and report.supported_sentences == 0:
+            # The answer had a refusal sentence and nothing else in it is backed by the context.
+            state_update["answer"] = refusal_msg
+            state_update["refused"] = True
+            state_update["refusal_reason"] = "INSUFFICIENT_CONTEXT"
+        elif (
+            self.grounding_enforce
+            and report.applicable
+            and report.citation_coverage < self.grounding_min_coverage
+        ):
+            state_update["answer"] = refusal_msg
+            state_update["refused"] = True
+            state_update["refusal_reason"] = "GROUNDING_UNSUPPORTED"
+
+        return state_update
 
     def node_format_reply(self, state: RAGState) -> RAGState:
         """Format final reply, appending Sources footer if applicable."""

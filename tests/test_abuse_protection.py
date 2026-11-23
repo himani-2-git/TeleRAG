@@ -8,9 +8,9 @@ from telegram import Bot, Update
 from telegram.error import TelegramError
 from telegram.ext import Application, ApplicationHandlerStop
 
-from src.bot.handlers import BotHandlers
 from src.bot.rate_limiter import SlidingWindowRateLimiter
-from src.config import Config, get_config
+from src.config import get_config
+from tests.bot_helpers import make_context, make_handlers, make_update, reply_texts
 
 
 class FakeClock:
@@ -144,46 +144,6 @@ class TestAbuseProtectionConfig(unittest.TestCase):
         self.assertEqual(config.upload_rate_limit, 2)
         self.assertEqual(config.rate_limit_window_seconds, 30)
         self.assertEqual(config.max_documents_per_user, 7)
-
-
-def make_handlers(**config_values):
-    """Build BotHandlers with mocked dependencies and a real Config."""
-    document_store = Mock()
-    document_store.list_documents.return_value = [{"id": 1, "filename": "a.txt"}]
-    handlers = BotHandlers(
-        pdf_processor=Mock(),
-        text_chunker=Mock(),
-        document_store=document_store,
-        embedding_generator=Mock(),
-        retriever=Mock(),
-        llm_client=Mock(),
-        config=Config(telegram_bot_token="test", **config_values),
-    )
-    return handlers
-
-
-def make_update(user_id=1, text="hello"):
-    """Build a fake Telegram update whose reply_text records every reply."""
-    reply = AsyncMock()
-    reply.return_value.delete = AsyncMock()
-    update = Mock()
-    update.effective_user.id = user_id
-    update.effective_chat.id = 99
-    update.message.text = text
-    update.message.reply_text = reply
-    update.effective_message.reply_text = reply
-    return update
-
-
-def make_context():
-    context = Mock()
-    context.bot.send_chat_action = AsyncMock()
-    context.args = []
-    return context
-
-
-def reply_texts(update):
-    return [call.args[0] for call in update.message.reply_text.call_args_list]
 
 
 class TestAccessGate(unittest.IsolatedAsyncioTestCase):

@@ -12,6 +12,7 @@ from telegram import Update
 from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
+from ...logging_setup import redact_url, with_request_id
 from ...processors.pdf_fetcher import fetch_pdf_bytes
 from ...storage.document_store import sanitize_filename
 from ..errors import UserFacingError
@@ -31,6 +32,16 @@ def _write_file_bytes(path: str, data: bytes) -> None:
 
 class DocumentHandlersMixin:
     """Mixin providing document and URL processing handlers for BotHandlers."""
+
+    async def _generate_embeddings(self, texts: list[str]) -> list[list[float]]:
+        """Embed texts in a worker thread. Model errors are logged but never shown to the user."""
+        try:
+            return await asyncio.to_thread(self.embedding_generator.generate_embeddings, texts)
+        except (ValueError, TypeError, RuntimeError) as e:
+            logger.exception("Embedding generation failed [%s]", type(e).__name__)
+            raise UserFacingError(
+                "I could not process the text of this document. Please try a different file."
+            ) from None
 
     async def _embed_chunks_with_progress(
         self,
@@ -55,9 +66,7 @@ class DocumentHandlersMixin:
             embeddings: list[list[float]] = []
             for i in range(0, total, step):
                 batch = chunk_texts[i : i + step]
-                batch_embs = await asyncio.to_thread(
-                    self.embedding_generator.generate_embeddings, batch
-                )
+                batch_embs = await self._generate_embeddings(batch)
                 embeddings.extend(batch_embs)
                 pct = min(100, int((len(embeddings) / total) * 100))
                 try:
@@ -69,7 +78,7 @@ class DocumentHandlersMixin:
                     logger.debug("Failed to edit progress message: %s", e)
             return embeddings
 
-        return await asyncio.to_thread(self.embedding_generator.generate_embeddings, chunk_texts)
+        return await self._generate_embeddings(chunk_texts)
 
     async def _handle_web_url_ingest(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE, url: str
@@ -83,7 +92,7 @@ class DocumentHandlersMixin:
 
         from ...processors.web_processor import WebProcessor, validate_url_ssrf
 
-        is_safe, error_msg = validate_url_ssrf(url)
+        is_safe, error_msg = await asyncio.to_thread(validate_url_ssrf, url)
         if not is_safe:
             await update.message.reply_text(f"❌ {error_msg}")
             return
@@ -151,11 +160,12 @@ class DocumentHandlersMixin:
         except UserFacingError as e:
             await update.message.reply_text(f"❌ {e}")
         except Exception:
-            logger.exception("Failed to ingest web page: %s", url)
+            logger.exception("Failed to ingest web page: %s", redact_url(url))
             await update.message.reply_text(
                 "❌ An unexpected error occurred while processing the web page. Please try again."
             )
 
+    @with_request_id
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle document uploads for PDF, Markdown, and text formats."""
         user_id = update.effective_user.id
@@ -341,7 +351,7 @@ class DocumentHandlersMixin:
             )
             return
 
-        is_safe, error_msg = self._is_safe_url(url)
+        is_safe, error_msg = await asyncio.to_thread(self._is_safe_url, url)
         if not is_safe:
             await update.message.reply_text(f"❌ {error_msg}")
             return
@@ -364,7 +374,7 @@ class DocumentHandlersMixin:
             await update.message.reply_text(f"❌ {e}")
             return
         except Exception:
-            logger.exception("Failed to download PDF from URL: %s", url)
+            logger.exception("Failed to download PDF from URL: %s", redact_url(url))
             await update.message.reply_text(
                 "❌ An unexpected error occurred while downloading the PDF. Please try again."
             )
@@ -435,7 +445,7 @@ class DocumentHandlersMixin:
         except UserFacingError as e:
             await update.message.reply_text(f"❌ {e}")
         except Exception:
-            logger.exception("Failed to process downloaded PDF from URL: %s", url)
+            logger.exception("Failed to process downloaded PDF from URL: %s", redact_url(url))
             await update.message.reply_text(
                 "❌ An unexpected error occurred while processing the PDF. Please try again."
             )

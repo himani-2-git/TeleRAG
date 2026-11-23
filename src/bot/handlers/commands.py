@@ -2,11 +2,15 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime
 from typing import Any
 
 from telegram import Update
 from telegram.ext import ContextTypes
+
+from ...logging_setup import with_request_id
+from ..health import format_health_report, run_health_checks
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +163,7 @@ class CommandHandlersMixin:
             logger.exception("Failed to clear documents: %s", e)
             await update.message.reply_text("❌ Failed to clear documents.")
 
+    @with_request_id
     async def addurl_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Ingest a web page specified by URL."""
         if not context.args:
@@ -167,3 +172,34 @@ class CommandHandlersMixin:
 
         url = context.args[0].strip()
         await self._handle_web_url_ingest(update, context, url)
+
+    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Show whether the database, embeddings and LLM server work. Admins only."""
+        admin_ids = self.config.admin_user_ids or self.config.allowed_user_ids
+        if not admin_ids:
+            await update.message.reply_text(
+                "ℹ️ /status is turned off. Set ADMIN_USER_IDS in the .env file to use it."
+            )
+            return
+        if update.effective_user.id not in admin_ids:
+            await update.message.reply_text("🔒 This command is only for the bot admin.")
+            return
+
+        try:
+            checks = await asyncio.wait_for(
+                asyncio.to_thread(
+                    run_health_checks,
+                    self.document_store,
+                    self.embedding_generator,
+                    self.llm_client,
+                ),
+                timeout=30,
+            )
+        except asyncio.TimeoutError:
+            await update.message.reply_text("⏳ The status check took too long. Try again later.")
+            return
+
+        uptime_seconds = time.monotonic() - self.started_at
+        await update.message.reply_text(
+            format_health_report(checks, uptime_seconds, self.active_requests)
+        )

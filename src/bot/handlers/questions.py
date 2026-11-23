@@ -12,9 +12,12 @@ from telegram.constants import ChatAction
 from telegram.error import BadRequest, NetworkError, TelegramError, TimedOut
 from telegram.ext import ContextTypes
 
+from ...logging_setup import with_request_id
 from ...rag.pipeline import format_source_footer
 
 logger = logging.getLogger(__name__)
+
+RESTARTING_MESSAGE = "🔄 The bot is restarting. Please send your question again in a minute."
 
 
 def format_telegram_html(text: str) -> str:
@@ -154,6 +157,13 @@ class QuestionHandlersMixin:
 
     _format_source_footer = staticmethod(format_source_footer)
 
+    @staticmethod
+    def _is_stopping(context: ContextTypes.DEFAULT_TYPE) -> bool:
+        """True once the bot has started shutting down (Ctrl+C or SIGTERM)."""
+        application = getattr(context, "application", None)
+        return application is not None and application.running is False
+
+    @with_request_id
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages as questions or URL uploads."""
         user_id = update.effective_user.id
@@ -167,6 +177,10 @@ class QuestionHandlersMixin:
             return
 
         question = message_text
+        # Only the length is logged: questions and documents are private and never go in logs.
+        logger.info(
+            "Question received", extra={"user_id": user_id, "question_chars": len(question)}
+        )
         documents = await asyncio.to_thread(self.document_store.list_documents, user_id)
         if not documents:
             await update.message.reply_text(
@@ -194,12 +208,26 @@ class QuestionHandlersMixin:
 
         try:
             async with self.llm_semaphore:
-                state = await asyncio.to_thread(self._run_pipeline, user_id, question)
+                if self._is_stopping(context):
+                    # The bot is shutting down: do not start a long answer that nobody can wait for.
+                    state = {"final_response": RESTARTING_MESSAGE, "refused": True}
+                else:
+                    state = await asyncio.to_thread(self._run_pipeline, user_id, question)
 
             stop_typing.set()
             await typing_task
 
             elapsed_s = round(time.time() - start_time)
+            logger.info(
+                "Question answered",
+                extra={
+                    "user_id": user_id,
+                    "elapsed_ms": round((time.time() - start_time) * 1000),
+                    "refused": bool(state.get("refused", False)),
+                    "refusal_reason": state.get("refusal_reason"),
+                    "chunks_used": len(state.get("retrieved_chunks") or []),
+                },
+            )
             final_response = state.get("final_response", "")
 
             if not state.get("refused", False):

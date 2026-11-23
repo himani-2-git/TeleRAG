@@ -1,0 +1,16 @@
+# Exact versions used by the Docker image. They are the versions the test suite was run with.
+# PyTorch is installed separately in the Dockerfile, from the CPU-only package index.
+beautifulsoup4==4.15.0
+huggingface_hub==0.36.2
+numpy==2.5.3
+pypdf==6.21.1
+python-dotenv==1.2.4
+python-telegram-bot==22.8
+PyYAML==6.0.3
+rank-bm25==0.2.2
+safetensors==0.8.0
+scikit-learn==1.4.2
+scipy==1.18.1
+sentence-transformers==2.7.0
+tokenizers==0.22.2
+transformers==4.57.6

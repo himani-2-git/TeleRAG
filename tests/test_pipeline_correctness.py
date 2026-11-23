@@ -193,6 +193,27 @@ class TestPartialAnswers(unittest.TestCase):
             )
         )
 
+    def test_refusals_that_say_document_instead_of_context_are_detected(self):
+        """The real model often says "the document does not ..." (seen in a live run)."""
+        for answer in (
+            "The document does not mention the refund policy.",
+            "The document does not provide information about the refund policy.",
+            "The provided document doesn't contain the answer.",
+            "The documents do not mention this topic.",
+            "The context does not specify the date.",
+        ):
+            with self.subTest(answer=answer):
+                self.assertTrue(is_insufficient_context(answer))
+
+    def test_partial_answer_that_says_document_is_kept(self):
+        result = self.run_pipeline(
+            "The registration fee is five dollars. "
+            "However, the document does not provide information about the refund policy."
+        )
+
+        self.assertFalse(result["refused"])
+        self.assertIn("five dollars", result["final_response"])
+
     def test_answer_with_real_content_is_not_a_pure_refusal(self):
         answer = "The fee is five dollars. The context does not mention refunds."
         self.assertFalse(is_insufficient_context(answer))

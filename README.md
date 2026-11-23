@@ -92,7 +92,8 @@ python main.py
 | `LLM_BASE_URL` | `http://localhost:11434/v1` | OpenAI-compatible endpoint URL |
 | `LLM_MODEL` | `qwen2.5:3b` | Target LLM model name |
 | `LLM_MAX_TOKENS` | `1024` | Maximum tokens for generated answers |
-| `LLM_TIMEOUT_SECONDS` | `120` | Read timeout for LLM generation requests |
+| `LLM_TIMEOUT_SECONDS` | `120` | Read timeout for one LLM request |
+| `LLM_MAX_TOTAL_SECONDS` | `180` | Upper limit for one question, counting all retries and pauses |
 | `MAX_RETRIES` | `3` | Maximum retry attempts for LLM calls |
 | `RETRY_DELAY` | `1.0` | Base retry delay in seconds |
 | `MAX_FILE_SIZE_MB` | `20` | Maximum upload file size in megabytes |
@@ -115,10 +116,14 @@ python main.py
 | `UPLOAD_RATE_LIMIT` | `3` | Uploads (files, PDF links, `/addurl`) allowed per user in one window (`0` = no limit) |
 | `RATE_LIMIT_WINDOW_SECONDS` | `60` | Length of the rate-limit window |
 | `MAX_DOCUMENTS_PER_USER` | `20` | Maximum stored documents per user (`0` = unlimited) |
+| `ADMIN_USER_IDS` | empty | Telegram IDs allowed to use `/status`. If empty, `ALLOWED_USER_IDS` are admins; if both are empty, `/status` is off |
+| `CONCURRENT_UPDATES` | `16` | How many messages may be processed at the same time |
 | `DATABASE_PATH` | `data/documents.db` | SQLite database file path |
 | `EMBEDDINGS_PATH` | `data/embeddings` | Directory path for cached NumPy embeddings |
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `LOG_FILE` | `logs/bot.log` | Log file path |
+| `LOG_FILE` | `logs/bot.log` | Log file path (JSON lines, one object per line, with a request id) |
+| `LOG_MAX_BYTES` | `5000000` | Size at which the log file is rotated |
+| `LOG_BACKUP_COUNT` | `3` | Number of rotated log files to keep |
 
 For full deployment and configuration options, see [docs/setup.md](docs/setup.md).
 

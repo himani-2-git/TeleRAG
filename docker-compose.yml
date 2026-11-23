@@ -1,0 +1,60 @@
+# Runs the TeleRAG bot together with its own Ollama server. CPU only.
+#
+# Before the first start:
+#   1. Copy .env.example to .env and set TELEGRAM_BOT_TOKEN.
+#   2. In Docker Desktop (Windows), allow about 6 GB of memory (Settings > Resources).
+#
+#   docker compose up -d --build     start (the first start downloads the model, about 2 GB)
+#   docker compose logs -f bot       watch the bot
+#   docker compose down              stop (your data stays in the volumes)
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      # Keep the model in memory between questions, so answers do not wait for a reload.
+      OLLAMA_KEEP_ALIVE: 30m
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
+
+  # Runs once: downloads the model into the ollama_models volume, then exits.
+  ollama-pull:
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${LLM_MODEL:-qwen2.5:3b}"]
+    restart: "no"
+
+  bot:
+    build: .
+    restart: unless-stopped
+    # Your settings. The two values under "environment" below replace the ones from this file.
+    env_file: .env
+    environment:
+      LLM_BASE_URL: http://ollama:11434/v1
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+    volumes:
+      - bot_data:/app/data
+      - bot_logs:/app/logs
+    # On "docker compose stop" the bot finishes the question it is answering. A slow answer on
+    # a CPU can take up to two minutes.
+    stop_grace_period: 130s
+
+volumes:
+  ollama_models:
+  bot_data:
+  bot_logs:

@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import math
+import time
 
 from telegram import Update
 from telegram.error import TelegramError
@@ -28,6 +29,8 @@ PRIVATE_BOT_MESSAGE = (
     "🔒 Sorry, this bot is private. "
     "If you think you should have access, please contact the person who runs it."
 )
+
+GENERIC_ERROR_MESSAGE = "❌ Sorry, something went wrong on my side. Please try again in a moment."
 
 # Handlers in a lower group number run first. Group 0 holds the normal handlers.
 ACCESS_GATE_GROUP = -1
@@ -73,6 +76,11 @@ class BotHandlers(CommandHandlersMixin, DocumentHandlersMixin, QuestionHandlersM
             self.orchestrator = get_orchestrator(pipeline, config.orchestrator)
         else:
             self.orchestrator = None
+        # Used by /status, which checks the LLM server directly.
+        self.llm_client = llm_client
+        self.started_at = time.monotonic()
+        # Only one question at a time uses the LLM (a CPU can run just one answer at a speed
+        # that is useful). Other updates, such as /list or uploads, are not blocked by it.
         self.llm_semaphore = asyncio.Semaphore(1)
         self.active_requests = 0
 
@@ -92,6 +100,7 @@ class BotHandlers(CommandHandlersMixin, DocumentHandlersMixin, QuestionHandlersM
         application.add_handler(CommandHandler("delete", self.delete_command))
         application.add_handler(CommandHandler("clear", self.clear_command))
         application.add_handler(CommandHandler("addurl", self.addurl_command))
+        application.add_handler(CommandHandler(["status", "health"], self.status_command))
         application.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
         application.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
@@ -151,10 +160,26 @@ class BotHandlers(CommandHandlersMixin, DocumentHandlersMixin, QuestionHandlersM
         return True
 
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Log unhandled errors from Telegram update processing."""
+        """Log unhandled errors (with the traceback) and give the user a friendly message.
+
+        The traceback goes to the log file only. The user never sees exception details.
+        """
         err = context.error
         err_type = type(err).__name__ if err else "UnknownError"
-        logger.error(f"Update caused error [{err_type}]: {err}")
+        logger.error(
+            "Update caused error [%s]: %s",
+            err_type,
+            err,
+            exc_info=err if isinstance(err, BaseException) else None,
+        )
+
+        message = getattr(update, "effective_message", None)
+        if message is None:
+            return
+        try:
+            await message.reply_text(GENERIC_ERROR_MESSAGE)
+        except TelegramError as e:
+            logger.warning("Could not send the error notice [%s]: %s", type(e).__name__, e)
 
 
 __all__ = ["BotHandlers"]

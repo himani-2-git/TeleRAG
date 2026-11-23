@@ -4,6 +4,7 @@ import ipaddress
 import logging
 import re
 import socket
+import time
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -232,11 +233,15 @@ class WebProcessor:
         overlap: int = 200,
         timeout: int = 15,
         max_bytes: int = 2 * 1024 * 1024,
+        max_total_seconds: float = 45.0,
     ):
         self.chunk_size = chunk_size
         self.overlap = overlap
+        # timeout limits each wait on the network. max_total_seconds limits the whole download,
+        # so a server that sends one byte at a time cannot keep us busy for ever.
         self.timeout = timeout
         self.max_bytes = max_bytes
+        self.max_total_seconds = max_total_seconds
         self.chunker = TextChunker(chunk_size=chunk_size, overlap=overlap)
 
     def fetch_url(self, url: str, max_redirects: int = 3) -> tuple[str, str, str, bytes]:
@@ -263,8 +268,11 @@ class WebProcessor:
 
         current_url = url
         redirect_count = 0
+        deadline = time.monotonic() + self.max_total_seconds
 
         while True:
+            if time.monotonic() > deadline:
+                raise ValueError("The page took too long to download.")
             response = requests.get(
                 current_url,
                 headers=headers,
@@ -328,6 +336,8 @@ class WebProcessor:
                         raise ValueError(
                             f"Downloaded content exceeds {self.max_bytes // (1024 * 1024)} MB limit."
                         )
+                    if time.monotonic() > deadline:
+                        raise ValueError("The page took too long to download.")
         finally:
             response.close()
 

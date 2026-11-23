@@ -29,6 +29,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
             llm_client=Mock(),
             config=self.config,
         )
+        self.handlers.document_store.list_documents.return_value = []
 
     def test_non_http_scheme_rejected(self):
         """Test that non-http/https schemes (ftp, file, gopher, etc.) are rejected."""
@@ -1639,6 +1640,7 @@ class TestUserFacingErrors(unittest.IsolatedAsyncioTestCase):
             llm_client=Mock(),
             config=self.config,
         )
+        self.handlers.document_store.list_documents.return_value = []
 
     async def test_handle_document_user_facing_error_displayed(self):
         update = Mock()

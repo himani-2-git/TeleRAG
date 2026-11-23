@@ -163,6 +163,9 @@ class QuestionHandlersMixin:
             await self._handle_url_upload(update, context, message_text)
             return
 
+        if await self._is_rate_limited(update, self.question_limiter, "questions"):
+            return
+
         question = message_text
         documents = await asyncio.to_thread(self.document_store.list_documents, user_id)
         if not documents:

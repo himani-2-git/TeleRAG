@@ -4,7 +4,7 @@ import logging
 import os
 import sys
 
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application
 
 from src.bot.handlers import BotHandlers
 from src.config import get_config
@@ -136,17 +136,7 @@ def main():
             .build()
         )
 
-        application.add_handler(CommandHandler("start", bot_handlers.start_command))
-        application.add_handler(CommandHandler("help", bot_handlers.help_command))
-        application.add_handler(CommandHandler("list", bot_handlers.list_command))
-        application.add_handler(CommandHandler("delete", bot_handlers.delete_command))
-        application.add_handler(CommandHandler("clear", bot_handlers.clear_command))
-        application.add_handler(CommandHandler("addurl", bot_handlers.addurl_command))
-        application.add_handler(MessageHandler(filters.Document.ALL, bot_handlers.handle_document))
-        application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, bot_handlers.handle_message)
-        )
-        application.add_error_handler(bot_handlers.error_handler)
+        bot_handlers.register_handlers(application)
 
         logger.info("Bot is ready! Starting polling...")
         application.run_polling(allowed_updates=["message"])

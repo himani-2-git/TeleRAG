@@ -73,6 +73,13 @@ def _is_restricted_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool
 def validate_url_ssrf(url: str) -> tuple[bool, str]:
     """Validate URL against SSRF threats, non-HTTP schemes, and private IP ranges.
 
+    KNOWN LIMITATION (DNS rebinding): this function resolves the hostname and checks the
+    resulting IPs, but requests.get() resolves the hostname AGAIN when it connects. A malicious
+    DNS server could answer with a public IP now and a private IP (such as 127.0.0.1) a moment
+    later. Closing this gap means connecting to the IP that was validated (IP pinning), which is
+    not done here. Redirects are re-validated hop by hop, and the checks above still stop direct
+    attacks with private addresses.
+
     Args:
         url: URL string to check.
 

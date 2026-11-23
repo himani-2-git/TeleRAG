@@ -50,9 +50,34 @@ class Config:
     vector_backend: str = "numpy"
     chroma_path: str = "data/chroma"
 
+    # Abuse protection. An empty allowlist means everyone may use the bot. For the limits,
+    # 0 means "no limit".
+    allowed_user_ids: frozenset[int] = frozenset()
+    question_rate_limit: int = 5
+    upload_rate_limit: int = 3
+    rate_limit_window_seconds: int = 60
+    max_documents_per_user: int = 20
+
     # Logging
     log_level: str = "INFO"
     log_file: str = "logs/bot.log"
+
+
+def parse_user_ids(raw: str) -> frozenset[int]:
+    """Parse a comma-separated list of Telegram user ids such as '123, 456'."""
+    user_ids = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            user_ids.add(int(part))
+        except ValueError:
+            raise ValueError(
+                f"ALLOWED_USER_IDS must be a comma-separated list of numeric Telegram user "
+                f"ids, but '{part}' is not a number"
+            ) from None
+    return frozenset(user_ids)
 
 
 def get_config(require_telegram: bool = True) -> Config:
@@ -99,6 +124,11 @@ def get_config(require_telegram: bool = True) -> Config:
         embeddings_path=os.getenv("EMBEDDINGS_PATH", "data/embeddings"),
         vector_backend=os.getenv("VECTOR_BACKEND", "numpy").lower(),
         chroma_path=os.getenv("CHROMA_PATH", "data/chroma"),
+        allowed_user_ids=parse_user_ids(os.getenv("ALLOWED_USER_IDS", "")),
+        question_rate_limit=int(os.getenv("QUESTION_RATE_LIMIT", "5")),
+        upload_rate_limit=int(os.getenv("UPLOAD_RATE_LIMIT", "3")),
+        rate_limit_window_seconds=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
+        max_documents_per_user=int(os.getenv("MAX_DOCUMENTS_PER_USER", "20")),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         log_file=os.getenv("LOG_FILE", "logs/bot.log"),
     )

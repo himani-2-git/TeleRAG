@@ -76,6 +76,11 @@ class DocumentHandlersMixin:
     ):
         """Fetch and ingest a web page for the user."""
         user_id = update.effective_user.id
+        if await self._is_rate_limited(update, self.upload_limiter, "uploads"):
+            return
+        if await self._document_limit_reached(update, user_id):
+            return
+
         from ...processors.web_processor import WebProcessor, validate_url_ssrf
 
         is_safe, error_msg = validate_url_ssrf(url)
@@ -154,6 +159,9 @@ class DocumentHandlersMixin:
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle document uploads for PDF, Markdown, and text formats."""
         user_id = update.effective_user.id
+        if await self._is_rate_limited(update, self.upload_limiter, "uploads"):
+            return
+
         document = update.message.document
         fn = sanitize_filename(document.file_name or "document")
         fn_lower = fn.lower()
@@ -172,6 +180,9 @@ class DocumentHandlersMixin:
             await update.message.reply_text(
                 f"❌ File too large. Maximum size is {self.config.max_file_size_mb}MB."
             )
+            return
+
+        if await self._document_limit_reached(update, user_id):
             return
 
         doc_type_label = "PDF" if is_pdf else ("Markdown" if is_md else "text")
@@ -316,6 +327,9 @@ class DocumentHandlersMixin:
     ):
         """Handle PDF upload from URL safely with async thread download."""
         user_id = update.effective_user.id
+        if await self._is_rate_limited(update, self.upload_limiter, "uploads"):
+            return
+
         url_match = re.search(r"https?://[^\s]+", url)
         if url_match:
             url = url_match.group(0)
@@ -330,6 +344,9 @@ class DocumentHandlersMixin:
         is_safe, error_msg = self._is_safe_url(url)
         if not is_safe:
             await update.message.reply_text(f"❌ {error_msg}")
+            return
+
+        if await self._document_limit_reached(update, user_id):
             return
 
         await update.message.reply_text("🔗 Downloading PDF from URL...")

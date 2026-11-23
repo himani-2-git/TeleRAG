@@ -110,6 +110,11 @@ python main.py
 | `GROUNDING_THRESHOLD` | `0.45` | NLI entailment threshold for grounding verification |
 | `GROUNDING_ENFORCE` | `false` | When true, rejects generations failing grounding coverage |
 | `GROUNDING_MIN_COVERAGE` | `0.5` | Ratio of supported sentences required to pass grounding |
+| `ALLOWED_USER_IDS` | empty | Comma-separated Telegram user IDs allowed to use the bot. Empty means everyone; otherwise other users get a "this bot is private" reply |
+| `QUESTION_RATE_LIMIT` | `5` | Questions allowed per user in one rate-limit window (`0` = no limit) |
+| `UPLOAD_RATE_LIMIT` | `3` | Uploads (files, PDF links, `/addurl`) allowed per user in one window (`0` = no limit) |
+| `RATE_LIMIT_WINDOW_SECONDS` | `60` | Length of the rate-limit window |
+| `MAX_DOCUMENTS_PER_USER` | `20` | Maximum stored documents per user (`0` = unlimited) |
 | `DATABASE_PATH` | `data/documents.db` | SQLite database file path |
 | `EMBEDDINGS_PATH` | `data/embeddings` | Directory path for cached NumPy embeddings |
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
@@ -165,7 +170,7 @@ python eval/run_grounding_gate.py --pdf eval/fixtures/ci_fixture.pdf --answers e
 3. **Hardware-Dependent Generation Latency & Host Uptime**: Reranking improves Hit@1 by +10.0 pp but adds ~2s on CPU. Answer generation time depends heavily on model choice and available hardware.
 4. **Free Hosted Model Lifecycle Volatility**: Third-party free endpoints on hosted providers frequently rotate, become rate-limited, or transition to paid slugs, or can be retired entirely.
 5. **Document-Level Summaries**: For general summary/overview queries, the bot samples the first ~8 chunks in document page order rather than performing hierarchical map-reduce summarization across very long books.
-6. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection.
+6. **SSRF DNS Rebinding**: URL validation resolves the hostname and rejects private, loopback and link-local addresses, and every redirect is checked again. But `requests.get()` resolves the hostname a second time when it connects, so a malicious DNS server could answer with a public address during validation and a private one during the download. Preventing this needs connecting to the validated IP address (IP pinning), which this project does not do. Because of this gap, keep `ALLOWED_USER_IDS` set if the bot runs on a machine with internal services.
 7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `pypdf`.
 8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use.
 9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias.

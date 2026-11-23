@@ -40,11 +40,11 @@ Measured results using Ollama on a **Dell Inspiron i5 with 16 GB RAM (CPU only)*
 
 | Model | Median Latency (Answered) | P95 Latency | Answerable Answered % | Unanswerable Refused % |
 | :--- | :--- | :--- | :--- | :--- |
-| `qwen2.5:3b` *(default)* | ~18 s | ~21 s | 100% | 100% |
-| `llama3.2:3b` | ~18 s | ~21 s | 100% | 100% |
+| `qwen2.5:3b` *(default)* | 13.8 s | 21.1 s | 100% | 100% |
+| `llama3.2:3b` | 14.5 s | 20.9 s | 100% | 100% |
 
 * **Refusals**: Take under 3 s because no LLM call is made when queries fail the similarity threshold.
-* **Full-Document Scale**: On a full book (~600 chunks) in the Telegram bot, real answers took about 20 to 40 s with `qwen2.5:3b`.
+* **Full-Document Scale**: In the informal 16-question test at the end of this page (a 1,023-chunk textbook through the Telegram bot), answers took 23 to 116 s with `qwen2.5:3b`.
 * **Earlier 7B Baseline**: The earlier default `qwen2:7b` yielded ~3 tokens/s generation, taking 10 to 20 minutes per answer on this laptop CPU, and answered "RAG" wrongly.
 
 > [!NOTE]
@@ -58,6 +58,7 @@ To prevent ungrounded assertions from reaching users and track prompt evolutions
 * **Versioned Prompt Configurations**: Prompt templates and system instructions are decoupled into `prompts/<PROMPT_VERSION>.yaml` (default `v1.yaml`). The loader validates required schema keys (`version`, `system_prompt`, `user_template`, `refusal_message`, `insufficient_context_marker`) at startup.
 * **Post-Generation Grounding Check**: Before delivering an answer, `src/rag/grounding.py` strips citation and timing footers, splits the answer into constituent sentences, and calculates maximum cosine similarity against retrieved chunk embeddings (`GROUNDING_THRESHOLD=0.45`).
 * **Enforcement Gate**: In production, grounding operates in log-only mode (`GROUNDING_ENFORCE=false`). When enabled (`GROUNDING_ENFORCE=true`), any answer with citation coverage below `GROUNDING_MIN_COVERAGE=0.5` is cleanly refused with the standardized refusal notice.
+* **Partial Answers**: An answer that mixes real sentences with a refusal sentence (for example "The fee is five dollars. The document does not mention refunds.") is kept if at least one real sentence is supported by the retrieved chunks; otherwise it is refused. Only the real sentences are scored by the grounding check.
 * **Attribution and Timing Footers**: Responses append verified physical page sources (`Sources:\n• <doc> (p. X)`) followed by measured end-to-end latency and model identifier (`Answered in <N> s with <model>`).
 * **CI Grounding Quality Gate**: Evaluates factual citation coverage and rejects ungrounded hallucinations on synthetic regression documents:
 ```bash
@@ -212,10 +213,10 @@ The test fixture is small (8 pages, 12 answerable test questions) and both 500 a
 1. **Hallucination Reduction, Not Elimination**: The relevance threshold ($\tau = 0.3$) and prompt instructions reduce unsupported answers, but an LLM can still misinterpret retrieved context or hallucinate nuances.
 2. **Hard Negative Abstention**: While bi-encoder cosine gating stops 100% of off-topic queries, it does not stop in-domain unanswerable queries (e.g., asking about `asyncio` on a basic Python textbook), where chunks score 0.35–0.48. The cross-encoder threshold experiment rejected 2/5 on test, but was tuned on a small sample.
 3. **Hardware-Dependent Generation Latency & Host Uptime**: Reranking improves Hit@1 by +10.0 pp but adds ~2s on CPU. Answer generation time depends heavily on model choice and available hardware; on a laptop CPU without GPU acceleration, generation with a 7B parameter model is measured in minutes. TeleRAG caps completion tokens (default `LLM_MAX_TOKENS=1024`), prompts for concise answers, limits context chunks (`TOP_K_RESULTS=2`), serializes requests via an `asyncio.Semaphore(1)` with queue notifications, and streams typing heartbeats. Furthermore, because it runs locally, the bot is only active and reachable while the host machine is awake and running `python main.py`.
-4. **Free Hosted Model Lifecycle Volatility**: Third-party free endpoints on hosted providers frequently rotate, become rate-limited, or transition to paid slugs (e.g. returning HTTP 404/429), or can be retired entirely. The startup diagnostic catches unavailable models early.
-5. **Document-Level Summaries**: For general summary/overview queries, the bot samples the first ~8 chunks in document page order rather than performing hierarchical map-reduce summarization across very long books.
+4. **Free Hosted Model Lifecycle Volatility**: Third-party free endpoints on hosted providers frequently rotate, become rate-limited, or transition to paid slugs (e.g. returning HTTP 404/429), or can be retired entirely. At startup the bot checks the model and stops with a clear message if it is unavailable.
+5. **Document-Level Summaries**: For a request to summarize the whole document, the bot uses 8 chunks spread evenly from the start to the end of the document, rather than a step-by-step (map-reduce) summary. A long book gets a coarse summary.
 6. **SSRF DNS Rebinding**: URL validation checks resolved IPs before request dispatch, but standard `requests.get()` does not pin resolved IP addresses to the socket connection, leaving a theoretical window for DNS rebinding attacks.
-7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `PyPDF2`.
+7. **Text-Only PDF Extraction**: Scanned documents or image-only PDFs without an embedded OCR text stream cannot be extracted by `pypdf`.
 8. **Local Single-Host Storage**: SQLite and JSON embedding files reside unencrypted on the local filesystem, suitable for personal or small-team use rather than untrusted multi-tenant host environments.
 9. **NLI Entity-Swap Blind Spot**: Smaller cross-encoder NLI models (e.g. `cross-encoder/nli-deberta-v3-small`) can suffer from bag-of-words / entity co-occurrence bias. For example, on `heldout_neg_02` (*Which database systems favor availability and low latency according to the PACELC classification?*), the subtly inverted answer `Spanner and Bigtable prioritize PA/EL, choosing availability and low latency over consistency.` was assigned entailment `0.7545` (scored 1.000) against the PACELC premise window because all mentioned entities (Spanner, Bigtable, PA/EL, availability, low latency) co-occur in the same sentence window even though the passage assigns PA/EL to Dynamo/Cassandra and PC/EC to Bigtable/Spanner. Testing the larger `cross-encoder/nli-deberta-v3-base` resolved this specific entity-swap error (rejecting `heldout_neg_02` with score 0.00 and 0.0% false-accept rate on held-out), but under-scored certain dev references (`ci_04`, `ci_12`), leaving both NLI models marked as unvalidated judges.
 10. **Faithfulness Evaluation & Judge Validation Caveats**: The Think Python 2e faithfulness score (mean 0.535) is directional and conservative. It conflates strict NLI judge rejections (DEV reference accept rate 75.0%), 3B generator unsupported phrasing, and top-2 retrieval context misses, and must not be interpreted as a hallucination rate. Furthermore, the judge's 0.0% negative-control false-accept rate is whole-answer level (> 0.50), half of the held-out negative controls scored right at the boundary (0.500), and the base judge was selected post-hoc.

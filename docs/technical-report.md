@@ -144,10 +144,10 @@ The table below reports measured figures saved in `eval/results/*.json`:
 
 ### 4.4 End-to-End Generation Latency on Host CPU
 While retrieval execution is sub-60 ms (hybrid) to 2.0 s (reranked), end-to-end generation latency is dominated by local LLM inference on host CPU. On a Dell Inspiron i5 laptop (16 GB RAM, CPU only) using Ollama with `eval/bench_llm.py` on `ci_fixture.pdf`:
-* `qwen2.5:3b` (default): ~18 s median per answered question, p95 ~21 s; 100% answerable answered, 100% unanswerable refused.
-* `llama3.2:3b`: ~18 s median per answered question, p95 ~21 s; 100% answerable answered, 100% unanswerable refused.
+* `qwen2.5:3b` (default): 13.8 s median per answered question, p95 21.1 s; 100% answerable answered, 100% unanswerable refused.
+* `llama3.2:3b`: 14.5 s median per answered question, p95 20.9 s; 100% answerable answered, 100% unanswerable refused.
 * Unanswerable queries fail similarity gating and refuse in < 3 s without calling the LLM.
-* Full-document book queries (~600 chunks in Telegram) average 20–40 s with `qwen2.5:3b`.
+* In an informal 16-question test through the Telegram bot on a 1,023-chunk textbook, answers took 23 to 116 s with `qwen2.5:3b` (see the evaluation report).
 * Earlier 7B baseline (`qwen2:7b`): generated at 3 tokens/s, requiring 10–20 minutes per answer on laptop CPU.
 
 
@@ -184,7 +184,7 @@ To explore gating without data leakage:
 | **SSRF via URL Ingestion** | Pre-flight DNS & Scheme Validation | Restricts schemes to `http`/`https`. Resolves domain names to IP addresses prior to socket connection. Blocks private IPv4/IPv6 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), loopback (`127.0.0.1`), and cloud metadata (`169.254.169.254`). |
 | **SSRF via HTTP Redirects** | Hop-by-Hop Interception | Disables automatic redirect following (`allow_redirects=False`). Manually inspects up to 3 redirect hops, re-verifying scheme and resolved IP addresses on every hop. |
 | **Streaming Denial-of-Service** | Chunk-by-Chunk Byte Metering | Streams responses in 8 KB chunks. Tracks total transferred bytes against `MAX_FILE_SIZE_MB * 1024 * 1024`, immediately aborting sockets that exceed limits regardless of spoofed `Content-Length`. |
-| **Cross-Tenant Data Leakage** | Database User Scoping | Every database query filters by `WHERE documents.user_id = ?`. Users have zero access to or visibility of other users' documents. |
+| **Cross-Tenant Data Leakage** | User scoping in queries and caches | The database queries the bot uses to read documents and chunks filter by `user_id`, and the BM25 search cache is keyed by user and corpus. An earlier version of the cache could return another user's chunks (user 1, then user 2, then user 1 again); it was fixed and is covered by regression tests, including a threaded one. See `docs/INTERVIEW_NOTES.md`. |
 | **Orphaned Vector Records** | Relational Foreign Key Cascades | Database enforces `PRAGMA foreign_keys = ON` with `ON DELETE CASCADE`. Removing a document cleanly removes all associated chunk metadata and vectors. |
 
 > **Note on direct-IP connection vs. hostname requests and DNS rebinding window:** Direct-IP connection with `Host` headers breaks TLS Server Name Indication (SNI) and certificate validation on modern HTTPS endpoints, causing severe connection failures with CDNs and reverse proxies. TeleRAG instead validates all resolved IP addresses across the complete DNS response (rejecting any response containing private, loopback, link-local, multicast, or reserved IPs) and re-verifies on every redirect hop. However, because standard `requests.get()` performs its own subsequent resolution rather than pinning the pre-flight IP to the TCP connection, a time-of-check-to-time-of-use (TOCTOU) DNS-rebinding window remains if an attacker-controlled authoritative nameserver returns a public IP during pre-flight validation and flips to a private IP during the subsequent fetch.
@@ -194,7 +194,7 @@ To explore gating without data leakage:
 ## 7. Verification Matrix & CI Quality Gates
 
 ### 7.1 Automated Unit Test Suite
-The repository maintains comprehensive automated unit tests across 16 test modules:
+The repository has an automated test suite in `tests/` (more than 350 tests). Examples of what the modules cover:
 * `tests/test_citations.py`: Page citation formatting and programmatic source footer deduplication.
 * `tests/test_handlers.py`: SSRF scheme checks, loopback/private IP blocking, multi-hop redirect defense, queueing, and new-reply delivery.
 * `tests/test_hybrid.py`: BM25 tokenization, RRF rank aggregation, empty corpus handling, and strict abstention invariant.
@@ -208,8 +208,8 @@ The repository maintains comprehensive automated unit tests across 16 test modul
 * `tests/test_faithfulness.py`: LLM-as-judge claim extraction, structured Pydantic validation, and entailment calculation.
 
 ### 7.2 Continuous Integration Quality Gates
-A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push and pull request to `main` across Python 3.10, 3.11, and 3.12:
-1. **Unit Test Suite**: Executes all 199 unit tests across the 16 modules.
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every push (any branch) and on pull requests into `main`, across Python 3.10, 3.11, and 3.12:
+1. **Test Suite**: Runs the whole suite in `tests/`, after `ruff check` and `ruff format --check`.
 2. **Retrieval Evaluation Quality Gate**: Evaluates retrieval on the synthetic 8-page document (`eval/fixtures/ci_fixture.pdf`) and 15-question golden set (`eval/golden_ci.json`), enforcing `min_hit_at_5 >= 0.85`, `min_mrr >= 0.70`, and `min_abstention_easy >= 0.90`.
 3. **Grounding Quality Gate**: Evaluates citation coverage across reference answers and verifies rejection of negative controls (`eval/run_grounding_gate.py`), asserting mean reference coverage $\ge 0.85$ and negative control score $\le 0.40$.
 
@@ -220,4 +220,4 @@ For offline experimentation, `eval/run_faithfulness.py` provides an LLM-as-a-jud
 
 ## 8. Conclusion
 
-TeleRAG demonstrates that a production-style, verifiable RAG application can be engineered with zero external vector database infrastructure while outperforming basic semantic search through page-aware chunking, hybrid BM25 + dense fusion, and cross-encoder reranking. By grounding citations in physical page boundaries, enforcing strict abstention invariants, and verifying all quality metrics through automated CI regression testing, TeleRAG provides an honest, measurable, and highly capable document assistant.
+TeleRAG shows that a document question-answering bot can run on a laptop CPU without an external vector database. On the test book, adding a cross-encoder reranker improved Hit@1 from 66% to 76%, while hybrid search and dense search were within noise of each other. Page-aware chunking gives page citations, and CI checks retrieval and grounding on a small fixture. The main weaknesses are measured too: questions that are on topic but not in the document are not refused, a 3B model gives wrong answers in a noticeable share of cases, and the faithfulness judge could not be validated.

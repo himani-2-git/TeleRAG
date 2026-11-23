@@ -3,13 +3,17 @@
 import hashlib
 import logging
 import re
-from collections import defaultdict
+import threading
+from collections import OrderedDict, defaultdict
 from typing import Any
 
 import numpy as np
 from rank_bm25 import BM25Okapi
 
 logger = logging.getLogger(__name__)
+
+# Number of per-user BM25 indexes kept in memory (least recently used are dropped first).
+DEFAULT_MAX_CACHE_ENTRIES = 8
 
 
 def tokenize_text(text: str) -> list[str]:
@@ -18,90 +22,101 @@ def tokenize_text(text: str) -> list[str]:
 
 
 class HybridRetriever:
-    """Combines dense semantic retrieval and sparse BM25 via Reciprocal Rank Fusion (RRF)."""
+    """Combines dense semantic retrieval and sparse BM25 via Reciprocal Rank Fusion (RRF).
 
-    def __init__(self, top_k: int = 5, similarity_threshold: float = 0.3, rrf_k: int = 60):
+    The retriever keeps no "current user" state. Every call to search() receives the chunks to
+    search, so two users can never see each other's data. The only thing kept between calls is a
+    small cache of BM25 indexes, keyed by (user id, corpus fingerprint), so that one user's index
+    is never used for another user's chunks.
+    """
+
+    def __init__(
+        self,
+        top_k: int = 5,
+        similarity_threshold: float = 0.3,
+        rrf_k: int = 60,
+        max_cache_entries: int = DEFAULT_MAX_CACHE_ENTRIES,
+    ):
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.rrf_k = rrf_k
-        self.bm25: BM25Okapi | None = None
-        self.chunks: list[dict[str, Any]] = []
-        self._corpus_tokenized: list[list[str]] = []
-        self._bm25_cache: dict[
-            tuple[Any, str], tuple[BM25Okapi, list[dict[str, Any]], list[list[str]]]
-        ] = {}
+        self.max_cache_entries = max(1, max_cache_entries)
+        # Least recently used entries are at the front, most recently used at the back.
+        self._bm25_cache: OrderedDict[tuple[Any, str], BM25Okapi] = OrderedDict()
+        self._cache_lock = threading.Lock()
 
     def _compute_corpus_fingerprint(self, chunks: list[dict[str, Any]]) -> str:
-        """Compute deterministic hash of chunks corpus."""
-        parts = [
-            f"{c.get('document_id', c.get('doc_id', ''))}:{c.get('chunk_index', '')}:{len(c.get('content', ''))}"
-            for c in chunks
-        ]
-        return hashlib.sha256("|".join(parts).encode()).hexdigest()
+        """Compute a deterministic hash of the chunk ids and text."""
+        digest = hashlib.sha256()
+        for chunk in chunks:
+            doc_id = chunk.get("document_id", chunk.get("doc_id", ""))
+            header = f"{doc_id}:{chunk.get('chunk_index', '')}:"
+            digest.update(header.encode("utf-8"))
+            digest.update(chunk.get("content", "").encode("utf-8"))
+            digest.update(b"|")
+        return digest.hexdigest()
+
+    def _cache_get(self, cache_key: tuple[Any, str]) -> BM25Okapi | None:
+        """Return a cached index and mark it as recently used."""
+        with self._cache_lock:
+            bm25 = self._bm25_cache.get(cache_key)
+            if bm25 is not None:
+                self._bm25_cache.move_to_end(cache_key)
+            return bm25
+
+    def _cache_put(self, cache_key: tuple[Any, str], bm25: BM25Okapi) -> None:
+        """Store an index and evict the least recently used entries if the cache is full."""
+        with self._cache_lock:
+            self._bm25_cache[cache_key] = bm25
+            self._bm25_cache.move_to_end(cache_key)
+            while len(self._bm25_cache) > self.max_cache_entries:
+                self._bm25_cache.popitem(last=False)
 
     def invalidate_cache(self, user_id: int | None = None) -> None:
-        """Invalidate cached BM25 index for a specific user or globally."""
-        if user_id is None:
-            self._bm25_cache.clear()
-            self.bm25 = None
-            self.chunks = []
-            self._corpus_tokenized = []
-        else:
-            to_del = [k for k in self._bm25_cache if k[0] == user_id]
-            for k in to_del:
-                del self._bm25_cache[k]
-            if self.chunks and self.chunks[0].get("user_id") == user_id:
-                self.bm25 = None
-                self.chunks = []
-                self._corpus_tokenized = []
+        """Forget cached BM25 indexes for one user, or for everyone when user_id is None."""
+        with self._cache_lock:
+            if user_id is None:
+                self._bm25_cache.clear()
+                return
+            stale_keys = [key for key in self._bm25_cache if key[0] == user_id]
+            for key in stale_keys:
+                del self._bm25_cache[key]
 
-    def index_corpus(self, chunks: list[dict[str, Any]], user_id: int | None = None) -> None:
-        """Build BM25 index over the chunk collection, using cache when available."""
-        self.chunks = list(chunks)
-        if not self.chunks:
-            self.bm25 = None
-            self._corpus_tokenized = []
-            return
+    def index_corpus(
+        self, chunks: list[dict[str, Any]], user_id: int | None = None
+    ) -> BM25Okapi | None:
+        """Return the BM25 index for these chunks, building and caching it on a cache miss."""
+        if not chunks:
+            return None
 
-        uid = user_id if user_id is not None else self.chunks[0].get("user_id")
-        fingerprint = self._compute_corpus_fingerprint(self.chunks)
-        cache_key = (uid, fingerprint)
+        uid = user_id if user_id is not None else chunks[0].get("user_id")
+        cache_key = (uid, self._compute_corpus_fingerprint(chunks))
 
-        if cache_key in self._bm25_cache:
-            cached_bm25, cached_chunks, cached_tokenized = self._bm25_cache[cache_key]
-            self.bm25 = cached_bm25
-            self.chunks = cached_chunks
-            self._corpus_tokenized = cached_tokenized
+        cached = self._cache_get(cache_key)
+        if cached is not None:
             logger.debug("Reused cached BM25 index for user %s", uid)
-            return
+            return cached
 
-        self._corpus_tokenized = [tokenize_text(c.get("content", "")) for c in self.chunks]
-        if self._corpus_tokenized:
-            self.bm25 = BM25Okapi(self._corpus_tokenized)
-            self._bm25_cache[cache_key] = (self.bm25, self.chunks, self._corpus_tokenized)
-            logger.info("Indexed %d chunks into BM25 corpus", len(self.chunks))
-        else:
-            self.bm25 = None
+        tokenized = [tokenize_text(chunk.get("content", "")) for chunk in chunks]
+        bm25 = BM25Okapi(tokenized)
+        self._cache_put(cache_key, bm25)
+        logger.info("Indexed %d chunks into BM25 corpus", len(chunks))
+        return bm25
 
     def search(
         self,
         query: str,
         query_embedding: list[float],
-        chunks: list[dict[str, Any]] | None = None,
+        chunks: list[dict[str, Any]],
         user_id: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Perform hybrid retrieval using dense similarity and BM25 fused via RRF."""
-        if chunks is not None:
-            uid = user_id if user_id is not None else (chunks[0].get("user_id") if chunks else None)
-            fp = self._compute_corpus_fingerprint(chunks)
-            cache_key = (uid, fp)
-            if self.bm25 is None or cache_key not in self._bm25_cache:
-                self.index_corpus(chunks, user_id=uid)
-
-        target_chunks = self.chunks
-        if not target_chunks:
+        """Perform hybrid retrieval over the given chunks using dense similarity and BM25."""
+        if not chunks:
             logger.warning("No chunks available for hybrid search")
             return []
+
+        bm25 = self.index_corpus(chunks, user_id=user_id)
+        target_chunks = chunks
 
         # 1. Compute Dense Cosine Similarities
         valid_indices = [i for i, c in enumerate(target_chunks) if c.get("embedding") is not None]
@@ -144,8 +159,8 @@ class HybridRetriever:
         # 2. Compute BM25 Scores
         query_tokens = tokenize_text(query)
         bm25_candidates = []
-        if self.bm25 is not None and query_tokens:
-            bm25_scores = self.bm25.get_scores(query_tokens)
+        if bm25 is not None and query_tokens:
+            bm25_scores = bm25.get_scores(query_tokens)
             for orig_idx, b_score in enumerate(bm25_scores):
                 if b_score > 0.0:
                     bm25_candidates.append((orig_idx, float(b_score)))

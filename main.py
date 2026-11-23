@@ -70,6 +70,7 @@ def main():
             similarity_threshold=config.similarity_threshold,
             retrieval_mode=config.retrieval_mode,
         )
+        document_store.add_change_listener(retriever.invalidate_cache)
         llm_client = LLMClient(
             api_key=config.llm_api_key or "",
             model=config.llm_model,

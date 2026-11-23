@@ -84,6 +84,31 @@ class TestDocumentStore(unittest.TestCase):
         """Clean up test fixtures."""
         self._temp_dir_obj.cleanup()
 
+    def test_listener_notified_on_add_delete_and_clear(self):
+        """Caches built from a user's documents must be told when those documents change."""
+        notified: list[int] = []
+        self.store.add_change_listener(notified.append)
+        chunks = [{"chunk_index": 0, "content": "Test", "char_count": 4}]
+
+        self.store.store_document(7, "a.pdf", b"a", chunks, [[0.1, 0.2]])
+        self.assertEqual(notified, [7])
+
+        self.store.delete_document(7, "a.pdf")
+        self.assertEqual(notified, [7, 7])
+
+        self.store.store_document(7, "b.pdf", b"b", chunks, [[0.1, 0.2]])
+        self.store.clear_user_documents(7)
+        self.assertEqual(notified, [7, 7, 7, 7])
+
+    def test_listener_not_notified_when_nothing_was_deleted(self):
+        notified: list[int] = []
+        self.store.add_change_listener(notified.append)
+
+        self.assertFalse(self.store.delete_document(7, "missing.pdf"))
+        self.assertEqual(self.store.clear_user_documents(7), 0)
+
+        self.assertEqual(notified, [])
+
     def test_store_with_embeddings(self):
         """Test storing document with embeddings."""
         chunks = [{"chunk_index": 0, "content": "Test chunk", "char_count": 10}]
@@ -302,13 +327,12 @@ class TestNumPyVectorStoreAndMigration(unittest.TestCase):
             {"document_id": 1, "chunk_index": 0, "content": "alpha beta gamma", "user_id": 99},
             {"document_id": 1, "chunk_index": 1, "content": "delta epsilon zeta", "user_id": 99},
         ]
-        retriever.index_corpus(chunks, user_id=99)
-        self.assertIsNotNone(retriever.bm25)
-        first_bm25 = retriever.bm25
+        first_bm25 = retriever.index_corpus(chunks, user_id=99)
+        self.assertIsNotNone(first_bm25)
 
         # Re-index same corpus -> cache hit, same instance
-        retriever.index_corpus(chunks, user_id=99)
-        self.assertIs(retriever.bm25, first_bm25)
+        second_bm25 = retriever.index_corpus(chunks, user_id=99)
+        self.assertIs(second_bm25, first_bm25)
 
         # Invalidate cache for user
         retriever.invalidate_cache(user_id=99)

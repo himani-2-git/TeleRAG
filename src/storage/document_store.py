@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -98,6 +99,7 @@ class DocumentStore:
         self.embeddings_path = embeddings_path
         self.vector_backend = vector_backend
         self.chroma_path = chroma_path
+        self._change_listeners: list[Callable[[int], None]] = []
         self._ensure_embeddings_directory()
         if vector_store is not None:
             self.vector_store = vector_store
@@ -109,6 +111,21 @@ class DocumentStore:
                 chroma_path=chroma_path,
                 db=self.db,
             )
+
+    def add_change_listener(self, listener: Callable[[int], None]) -> None:
+        """Register a function that is called with the user id whenever that user's documents change.
+
+        The bot uses this to drop cached search indexes that were built from the old documents.
+        """
+        self._change_listeners.append(listener)
+
+    def _notify_documents_changed(self, user_id: int) -> None:
+        """Tell every listener that this user's documents changed. A failing listener is logged."""
+        for listener in self._change_listeners:
+            try:
+                listener(user_id)
+            except Exception:
+                logger.exception("Document change listener failed for user %s", user_id)
 
     def _ensure_embeddings_directory(self):
         """Ensure embeddings directory exists."""
@@ -214,6 +231,7 @@ class DocumentStore:
             except (OSError, ValueError, RuntimeError) as e:
                 logger.warning(f"Failed to sync to vector_store: {e}")
 
+        self._notify_documents_changed(user_id)
         logger.info(f"Stored document {document_id} with {len(embeddings)} embeddings")
         return document_id
 
@@ -281,6 +299,7 @@ class DocumentStore:
 
         # Delete from database
         db_deleted = self.db.delete_document(user_id, filename)
+        self._notify_documents_changed(user_id)
         return vs_deleted or db_deleted
 
     def clear_user_documents(self, user_id: int) -> int:
@@ -327,6 +346,7 @@ class DocumentStore:
 
         # Delete from database
         db_count = self.db.clear_user_documents(user_id)
+        self._notify_documents_changed(user_id)
         return max(len(documents), db_count)
 
     def get_user_chunks_with_embeddings(self, user_id: int) -> list[dict[str, Any]]:

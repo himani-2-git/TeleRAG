@@ -212,7 +212,10 @@ class RAGPipeline:
             query_embedding = self.embedding_generator.generate_query_embedding(question)
 
         retrieved = self.retriever.retrieve(
-            query=question, query_embedding=query_embedding or [], chunks=user_chunks
+            query=question,
+            query_embedding=query_embedding or [],
+            chunks=user_chunks,
+            user_id=state.get("user_id"),
         )
         return {**state, "query_embedding": query_embedding, "retrieved_chunks": retrieved}
 

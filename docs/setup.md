@@ -103,59 +103,10 @@ Copy the template configuration file:
   Copy-Item .env.example .env
   ```
 
-Open `.env` in an editor and enter your credentials:
-
-```ini
-# ===================================================================
-# Required Credentials
-# ===================================================================
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-
-# ===================================================================
-# LLM Endpoint Configuration
-# Default: Local Ollama (no key needed)
-# ===================================================================
-LLM_BASE_URL=http://localhost:11434/v1
-LLM_MODEL=qwen2.5:3b
-
-# Optional: Hosted LLM endpoint (requires API key)
-# LLM_BASE_URL=https://api.example.com/v1
-# LLM_API_KEY=your_api_key_here
-# LLM_MODEL=your_chosen_model_name
-LLM_API_KEY=
-
-MAX_RETRIES=3
-RETRY_DELAY=1.0
-
-# ===================================================================
-# RAG Retrieval, Prompts & Grounding Settings
-# ===================================================================
-RETRIEVAL_MODE=hybrid
-MAX_FILE_SIZE_MB=20
-CHUNK_SIZE=1000
-CHUNK_OVERLAP=200
-EMBEDDING_MODEL=all-MiniLM-L6-v2
-TOP_K_RESULTS=2
-SIMILARITY_THRESHOLD=0.3
-MAX_CHUNKS_PER_DOCUMENT=5000
-LLM_MAX_TOKENS=1024
-LLM_TIMEOUT_SECONDS=120
-PROMPT_VERSION=v1
-GROUNDING_THRESHOLD=0.45
-GROUNDING_ENFORCE=false
-GROUNDING_MIN_COVERAGE=0.5
-
-# ===================================================================
-# Storage & Logging Paths
-# ===================================================================
-DATABASE_PATH=data/documents.db
-EMBEDDINGS_PATH=data/embeddings
-VECTOR_BACKEND=numpy
-CHROMA_PATH=data/chroma
-ORCHESTRATOR=plain
-LOG_LEVEL=INFO
-LOG_FILE=logs/bot.log
-```
+Open `.env` in an editor and set at least `TELEGRAM_BOT_TOKEN`. Every setting, with its default and a
+description, is listed in the [README](../README.md#configuration), and `.env.example` explains the
+access settings (`ALLOWED_USER_IDS`, `ADMIN_USER_IDS`). The bot checks all settings at startup and
+prints one list of every problem it finds.
 
 ---
 
@@ -167,9 +118,9 @@ Before launching the bot, verify your environment by running the unit test suite
 python -m unittest discover tests
 ```
 
-Expected output:
+Expected output (the number of tests grows over time):
 ```text
-Ran unit tests in ~20s
+Ran N tests in S seconds
 
 OK
 ```
@@ -208,21 +159,17 @@ Run the main script from your activated virtual environment:
 python main.py
 ```
 
-Console logs will confirm each initialization stage:
+At startup the bot checks the settings, then the LLM server and the model, then opens the database and
+loads the embedding model. If something is wrong it stops with a message that says what to fix. When all
+checks pass, the console shows a line like this:
 ```text
-YYYY-MM-DD HH:MM:SS - __main__ - INFO - Starting PDF RAG Chatbot...
-YYYY-MM-DD HH:MM:SS - __main__ - INFO - Initializing components...
-YYYY-MM-DD HH:MM:SS - src.storage.database - INFO - Database schema initialized successfully
-YYYY-MM-DD HH:MM:SS - src.rag.embeddings - INFO - Loading embedding model: all-MiniLM-L6-v2
-YYYY-MM-DD HH:MM:SS - src.rag.embeddings - INFO - Embedding model loaded successfully
-YYYY-MM-DD HH:MM:SS - __main__ - INFO - Bot is ready! Starting polling...
-YYYY-MM-DD HH:MM:SS - telegram.ext.Application - INFO - Application started
+Bot is ready! Starting polling...
 ```
 
 The application is now actively polling Telegram for incoming messages.
 
 ### 5.2 Stop the Bot
-To terminate execution, press `Ctrl + C` in the console window.
+To stop the bot, press `Ctrl + C` in the console window. The bot stops taking new messages and finishes the answer it is writing first, so stopping can take up to a few minutes. To run the bot in Docker instead, see the [README](../README.md#setup-with-docker).
 
 ---
 
@@ -240,6 +187,7 @@ Once the bot is running, open Telegram and search for your bot's username.
 | `/addurl <url>` | Ingest Web Page | Ingests a public web page with SSRF protection and extracts article content. |
 | `/delete 2` or `/delete part-of-name` | Delete Specific File | Deletes a document, its database chunks, and its vector embeddings (precedence: exact name, list number, substring). |
 | `/clear` | Wipe Library | Removes all uploaded documents and embeddings for your user account. |
+| `/status` (or `/health`) | Check Services | Admins only (`ADMIN_USER_IDS`): shows whether the database, the embedding model and the LLM server work. |
 
 ### 6.2 Uploading Documents and Ingesting Content
 
@@ -270,7 +218,8 @@ Once the bot is running, open Telegram and search for your bot's username.
 3. **SSRF Protection**:
    - Only `http` and `https` schemes are accepted; dangerous protocols (`file://`, `ftp://`, `gopher://`, etc.) are rejected immediately.
    - Resolves hostnames and strictly blocks private, loopback, link-local, multicast, and cloud metadata addresses (e.g. `127.0.0.1`, `10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`, `169.254.169.254`).
-   - Downloads stream with a hard 20 MB size ceiling and a 10-second timeout.
+   - Web pages are limited to 2 MB, 15 s per wait on the network and 45 s in total. PDF links are limited to `MAX_FILE_SIZE_MB`, 30 s per wait and 60 s in total.
+   - Known gap: the address is checked and then looked up again when connecting (DNS rebinding). See the README for details.
 
 ---
 
@@ -279,12 +228,12 @@ Once the bot is running, open Telegram and search for your bot's username.
 TeleRAG supports modular vector store backends configured via `VECTOR_BACKEND` in `.env`:
 
 ### 7.1 NumPy Vector Store (`VECTOR_BACKEND=numpy` — Default)
-- **Zero Extra Dependencies**: Backed by the built-in SQLite metadata store (`data/documents.db`) and JSON embedding files (`data/embeddings/`).
+- **Zero Extra Dependencies**: Backed by the built-in SQLite metadata store (`data/documents.db`) and one `.npy` embedding file per document (`data/embeddings/`).
 - **In-Process Similarity**: Uses standard NumPy cosine similarity with zero server overhead. Ideal for lightweight deployments, low-memory embedded machines, and standard CI environments.
 
 ### 7.2 ChromaDB Vector Store (`VECTOR_BACKEND=chroma` — Optional)
 - **Persistent Vector Store**: Backed by ChromaDB with cosine distance metric (`hnsw:space: cosine`).
-- **Strict Per-User Scoping**: Every query filters chunks using Chroma metadata (`{"user_id": user_id}`), guaranteeing strict cross-user data isolation.
+- **Per-User Scoping**: Every query filters chunks using Chroma metadata (`{"user_id": user_id}`), so a user only gets their own chunks.
 - **Enabling Chroma**:
   1. Install the optional dependency:
      ```bash
@@ -307,7 +256,7 @@ TeleRAG supports modular RAG orchestration configured via `ORCHESTRATOR` in `.en
 - Executes the 4 pipeline steps sequentially in pure Python:
   1. `retrieve`: Queries vector store and BM25 for candidate chunks.
   2. `abstain_or_generate`: Checks similarity threshold; either abstains with refusal or invokes LLM.
-  3. `grounding`: Evaluates semantic entailment coverage between answer and chunks.
+  3. `grounding`: Compares each answer sentence with the retrieved chunks by cosine similarity and records how many sentences are supported.
   4. `format_reply`: Formats citations and the Sources footer.
 
 ### 8.2 LangGraph Orchestrator (`ORCHESTRATOR=langgraph` — Optional)
@@ -315,7 +264,7 @@ TeleRAG supports modular RAG orchestration configured via `ORCHESTRATOR` in `.en
   ```
   [retrieve] ──> [abstain_or_generate] ──> [grounding] ──> [format_reply] ──> [END]
   ```
-- **Parity Guarantee**: Uses the same component methods, ensuring 100% identical answer text, refusal behavior, and citation footers.
+- **Parity**: Uses the same component methods as the plain orchestrator. Tests run both on the CI fixture and compare the answers, refusals and footers.
 - **Enabling LangGraph**:
   1. Install the optional dependency:
      ```bash
@@ -333,7 +282,7 @@ TeleRAG supports modular RAG orchestration configured via `ORCHESTRATOR` in `.en
 Once at least one document is uploaded, simply send natural language questions:
 * *"What is recursion?"*
 * *"Explain the difference between mutable and immutable types."*
-* *"Summarize chapter 3."*
+* *"Summarize this document."* (uses 8 chunks spread over the whole document)
 
 #### Grounding & Abstention Behavior
 * **In-Context Queries**: If relevant chunks meet the similarity threshold (`>= 0.3`), the bot constructs a context prompt for the LLM and returns an answer citing retrieved page ranges. This relevance cutoff reduces answers not supported by the document; does not eliminate hallucination.

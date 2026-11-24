@@ -120,6 +120,28 @@ class TestGrounding(unittest.TestCase):
         self.assertFalse(report_empty.applicable)
         self.assertEqual(report_empty.citation_coverage, 1.0)
 
+    def test_refusal_sentence_is_not_scored_as_unsupported(self):
+        """A partial answer is checked on its real sentences; the refusal sentence is skipped."""
+        embedder = FakeEmbedder(mapping={"alpha": [1.0, 0.0, 0.0, 0.0]})
+        chunks = [{"content": "Alpha contains important data."}]
+        answer = "Alpha is very important. The context does not mention Beta."
+
+        report = grounding_report(answer, chunks, embedder, threshold=0.45)
+
+        self.assertTrue(report.applicable)
+        self.assertEqual(report.total_sentences, 1)
+        self.assertEqual(report.citation_coverage, 1.0)
+        self.assertEqual(report.unsupported_sentences, [])
+
+    def test_answer_made_only_of_refusal_sentences_is_not_applicable(self):
+        embedder = FakeEmbedder({})
+        chunks = [{"content": "Alpha contains important data."}]
+        answer = "The context does not mention Beta. This is not mentioned in the context."
+
+        report = grounding_report(answer, chunks, embedder)
+
+        self.assertFalse(report.applicable)
+
     def test_grounding_supporting_chunk_indices_and_order(self):
         """Verify supporting_chunk_indices and chunk_support_counts order chunks by support."""
         embedder = FakeEmbedder(

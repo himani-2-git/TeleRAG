@@ -1,6 +1,7 @@
 """Document retrieval using similarity search."""
 
 import logging
+import threading
 from typing import Any
 
 import numpy as np
@@ -25,6 +26,18 @@ class DocumentRetriever:
         self.similarity_threshold = similarity_threshold
         self.retrieval_mode = retrieval_mode
         self._hybrid_retriever = None
+        self._hybrid_lock = threading.Lock()
+
+    def _get_hybrid_retriever(self, top_k: int):
+        """Create the shared HybridRetriever once, even if two threads ask at the same time."""
+        from .hybrid import HybridRetriever
+
+        with self._hybrid_lock:
+            if self._hybrid_retriever is None:
+                self._hybrid_retriever = HybridRetriever(
+                    top_k=top_k, similarity_threshold=self.similarity_threshold
+                )
+            return self._hybrid_retriever
 
     def invalidate_cache(self, user_id: int | None = None) -> None:
         """Invalidate cached retrieval structures."""
@@ -32,39 +45,35 @@ class DocumentRetriever:
             self._hybrid_retriever.invalidate_cache(user_id)
 
     def retrieve(
-        self, query: str, query_embedding: list[float], chunks: list[dict[str, Any]]
+        self,
+        query: str,
+        query_embedding: list[float],
+        chunks: list[dict[str, Any]],
+        user_id: int | None = None,
     ) -> list[dict[str, Any]]:
         """Retrieve relevant chunks according to configured retrieval_mode.
 
         Args:
             query: Natural language query string
             query_embedding: Query embedding vector
-            chunks: Document chunks
+            chunks: Document chunks belonging to ONE user
+            user_id: Owner of the chunks, used to keep cached indexes separate per user
 
         Returns:
             List of relevant chunks meeting threshold
         """
         if self.retrieval_mode == "hybrid":
-            from .hybrid import HybridRetriever
-
-            if self._hybrid_retriever is None:
-                self._hybrid_retriever = HybridRetriever(
-                    top_k=self.top_k, similarity_threshold=self.similarity_threshold
-                )
-            return self._hybrid_retriever.search(
-                query=query, query_embedding=query_embedding, chunks=chunks
+            hybrid = self._get_hybrid_retriever(top_k=self.top_k)
+            return hybrid.search(
+                query=query, query_embedding=query_embedding, chunks=chunks, user_id=user_id
             )
 
         elif self.retrieval_mode == "hybrid_rerank":
-            from .hybrid import HybridRetriever
             from .reranker import CrossEncoderReranker
 
-            if self._hybrid_retriever is None:
-                self._hybrid_retriever = HybridRetriever(
-                    top_k=20, similarity_threshold=self.similarity_threshold
-                )
-            candidates = self._hybrid_retriever.search(
-                query=query, query_embedding=query_embedding, chunks=chunks
+            hybrid = self._get_hybrid_retriever(top_k=20)
+            candidates = hybrid.search(
+                query=query, query_embedding=query_embedding, chunks=chunks, user_id=user_id
             )
             reranker = CrossEncoderReranker()
             return reranker.rerank(query=query, candidates=candidates, top_k=self.top_k)

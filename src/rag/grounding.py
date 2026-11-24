@@ -71,25 +71,67 @@ def split_sentences(text: str) -> list[str]:
     return sentences
 
 
-def _is_refusal_or_empty(text: str) -> bool:
-    """Check if the text is empty or an explicit refusal."""
-    if not text:
+DEFAULT_REFUSAL_MARKER = "INSUFFICIENT_CONTEXT"
+
+# Phrases that mean "the documents do not say this". They are matched against ONE sentence at a
+# time, so a refusal sentence can sit next to a useful sentence without hiding it.
+REFUSAL_PHRASES: tuple[str, ...] = (
+    "context does not contain",
+    "context doesn't contain",
+    "context does not provide",
+    "context doesn't provide",
+    "context does not mention",
+    "context doesn't mention",
+    "context does not specify",
+    "context doesn't specify",
+    # The model often says "document" instead of "context", in singular or plural.
+    "document does not contain",
+    "document doesn't contain",
+    "document does not provide",
+    "document doesn't provide",
+    "document does not mention",
+    "document doesn't mention",
+    "document does not specify",
+    "document doesn't specify",
+    "documents do not contain",
+    "documents don't contain",
+    "documents do not provide",
+    "documents don't provide",
+    "documents do not mention",
+    "documents don't mention",
+    "not mentioned in the context",
+    "not mentioned in the provided context",
+    "not mentioned in the provided documents",
+    "not mentioned in the documents",
+    "not mentioned in the document",
+    "not provided in the context",
+    "not found in the context",
+    "not contain relevant information",
+    "no information in the context",
+    "no information in the provided context",
+    "does not contain the answer",
+    "doesn't contain the answer",
+    "does not contain information",
+    "cannot find the answer in the context",
+    "can't find the answer in the context",
+    "no relevant information",
+    "couldn't find relevant information",
+    "could not find relevant information",
+    "no document content available",
+)
+
+
+def is_refusal_sentence(sentence: str, marker: str = DEFAULT_REFUSAL_MARKER) -> bool:
+    """Return True if this one sentence is a refusal (the marker or a refusal phrase)."""
+    lower = sentence.lower()
+    if marker and marker.lower() in lower:
         return True
-    trimmed = text.strip()
-    if not trimmed:
-        return True
-    lower = trimmed.lower()
-    if lower.startswith("insufficient_context") or "insufficient_context" in lower:
-        return True
-    refusal_cues = [
-        "couldn't find relevant information",
-        "could not find relevant information",
-        "no relevant information",
-        "no document content available",
-        "does not contain information",
-        "not mentioned in the context",
-    ]
-    return any(cue in lower for cue in refusal_cues)
+    return any(phrase in lower for phrase in REFUSAL_PHRASES)
+
+
+def content_sentences(text: str, marker: str = DEFAULT_REFUSAL_MARKER) -> list[str]:
+    """Split text into sentences and drop the refusal sentences, keeping the real claims."""
+    return [s for s in split_sentences(text) if not is_refusal_sentence(s, marker)]
 
 
 def _get_embedding(embedder: Any, text: str) -> np.ndarray:
@@ -145,6 +187,7 @@ def grounding_report(
     chunks: list[dict[str, Any]] | list[Any],
     embedder: Any,
     threshold: float = 0.45,
+    marker: str = DEFAULT_REFUSAL_MARKER,
 ) -> GroundingReport:
     """Compute sentence-level grounding report comparing answer against retrieved chunks.
 
@@ -153,6 +196,7 @@ def grounding_report(
         chunks: Retrieved chunks (dicts, Chunk objects, or strings).
         embedder: Embedding generator instance or function.
         threshold: Minimum cosine similarity required to consider a sentence supported.
+        marker: Refusal marker from the prompt. Sentences containing it are not scored.
 
     Returns:
         GroundingReport instance.
@@ -170,19 +214,9 @@ def grounding_report(
     # 1. Strip footers first
     clean_body = strip_footers(answer)
 
-    # 2. Check refusal / empty
-    if _is_refusal_or_empty(clean_body):
-        return GroundingReport(
-            applicable=False,
-            citation_coverage=1.0,
-            total_sentences=0,
-            supported_sentences=0,
-            unsupported_sentences=[],
-            max_scores=[],
-        )
-
-    # 3. Split into sentences
-    sentences = split_sentences(clean_body)
+    # 2. Keep only real claims. Refusal sentences such as "The context does not mention X" say
+    #    nothing about the document, so they are neither supported nor unsupported.
+    sentences = content_sentences(clean_body, marker)
     if not sentences:
         return GroundingReport(
             applicable=False,
@@ -193,7 +227,7 @@ def grounding_report(
             max_scores=[],
         )
 
-    # 4. Handle empty chunks
+    # 3. Handle empty chunks
     if not chunks:
         return GroundingReport(
             applicable=True,
@@ -204,7 +238,7 @@ def grounding_report(
             max_scores=[0.0] * len(sentences),
         )
 
-    # 5. Extract chunk embeddings
+    # 4. Extract chunk embeddings
     chunk_embeddings: list[np.ndarray] = []
     for c in chunks:
         _, emb = _get_chunk_text_and_embedding(c, embedder)

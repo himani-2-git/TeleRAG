@@ -1,8 +1,8 @@
 name: CI Quality Gate
 
 on:
+  # Every push to any branch, plus pull requests into main.
   push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 

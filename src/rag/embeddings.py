@@ -1,6 +1,7 @@
 """Embedding generation using sentence-transformers."""
 
 import logging
+import threading
 
 from sentence_transformers import SentenceTransformer
 
@@ -19,6 +20,10 @@ class EmbeddingGenerator:
         self.model_name = model_name
         logger.info(f"Loading embedding model: {model_name}")
         self.model = SentenceTransformer(model_name)
+        # Several users can be served at the same time, each in its own thread. The tokenizer
+        # inside the model is not safe to share between threads, so one thread encodes at a time.
+        # On a CPU this costs little, because encoding already uses all cores.
+        self._encode_lock = threading.Lock()
         logger.info("Embedding model loaded successfully")
 
     def generate_embeddings(self, texts: str | list[str]) -> list[float] | list[list[float]]:
@@ -33,13 +38,15 @@ class EmbeddingGenerator:
         try:
             # Handle single text
             if isinstance(texts, str):
-                embedding = self.model.encode(texts, convert_to_numpy=True)
+                with self._encode_lock:
+                    embedding = self.model.encode(texts, convert_to_numpy=True)
                 return embedding.tolist()
 
             # Handle list of texts
-            embeddings = self.model.encode(
-                texts, convert_to_numpy=True, show_progress_bar=len(texts) > 10
-            )
+            with self._encode_lock:
+                embeddings = self.model.encode(
+                    texts, convert_to_numpy=True, show_progress_bar=len(texts) > 10
+                )
             return [emb.tolist() for emb in embeddings]
 
         except (ValueError, TypeError, RuntimeError) as e:

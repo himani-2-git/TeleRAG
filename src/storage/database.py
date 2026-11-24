@@ -39,6 +39,15 @@ class Database:
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
+    def ping(self) -> bool:
+        """Check that the database can be opened and queried. Used by the /status command."""
+        conn = self._get_connection()
+        try:
+            conn.execute("SELECT 1").fetchone()
+            return True
+        finally:
+            conn.close()
+
     def _initialize_schema(self):
         """Create database tables if they don't exist."""
         conn = self._get_connection()

@@ -29,6 +29,7 @@ class LLMClient:
         timeout: tuple[float, float] | float = (5.0, 120.0),
         max_tokens: int = 1024,
         prompt_config: PromptConfig | None = None,
+        max_total_seconds: float = 180.0,
     ):
         self.api_key = api_key
         self.model = model
@@ -39,6 +40,8 @@ class LLMClient:
         else:
             self.timeout = (5.0, float(timeout))
         self.max_tokens = max_tokens
+        # Upper limit for ONE question, counting every attempt and every pause between them.
+        self.max_total_seconds = float(max_total_seconds)
         self.prompt_config = prompt_config or load_prompt_config()
 
         clean_url = base_url.rstrip("/")
@@ -73,13 +76,57 @@ class LLMClient:
             logger.warning("LLM availability check failed: %s", e)
             return False, None, "Service unavailable"
 
+    def check_server(self, timeout: tuple[float, float] = (3.0, 5.0)) -> tuple[bool, str]:
+        """Quickly ask the server which models it has. Does not generate any text.
+
+        Returns:
+            (ok, short description). ok is False if the server is unreachable, returns an
+            error, or does not list the configured model.
+        """
+        models_url = self.base_url.removesuffix("/chat/completions") + "/models"
+        try:
+            response = requests.get(models_url, headers=self._get_headers(), timeout=timeout)
+        except requests.RequestException:
+            return False, "server unreachable"
+
+        if response.status_code in (404, 405):
+            return True, "server reachable (it has no model list)"
+        if response.status_code != 200:
+            return False, f"server returned HTTP {response.status_code}"
+
+        try:
+            model_ids = [item.get("id") for item in response.json().get("data", [])]
+        except (ValueError, AttributeError):
+            return True, "server reachable"
+        if self.model in model_ids:
+            return True, f"model '{self.model}' is available"
+        return False, f"server reachable, but model '{self.model}' is not listed"
+
+    def _timeout_within(self, seconds_left: float) -> tuple[float, float]:
+        """Return the (connect, read) timeouts, shortened so they never pass the deadline."""
+        return (min(self.timeout[0], seconds_left), min(self.timeout[1], seconds_left))
+
+    def _wait_before_retry(self, delay: float, deadline: float) -> bool:
+        """Sleep before the next attempt. Return False if that would pass the deadline."""
+        if time.monotonic() + delay >= deadline:
+            logger.warning(
+                "Not retrying the LLM request: too little of the %.0f s time limit is left",
+                self.max_total_seconds,
+            )
+            return False
+        time.sleep(delay)
+        return True
+
     def send_request(
         self,
         messages: list[dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int | None = None,
     ) -> str | None:
-        """Send chat completion request with exponential backoff retry."""
+        """Send chat completion request with exponential backoff retry.
+
+        All attempts together never take longer than max_total_seconds.
+        """
         headers = self._get_headers()
         tokens_limit = max_tokens if max_tokens is not None else self.max_tokens
         payload = {
@@ -88,12 +135,24 @@ class LLMClient:
             "temperature": temperature,
             "max_tokens": tokens_limit,
         }
+        deadline = time.monotonic() + self.max_total_seconds
 
         for attempt in range(self.max_retries):
+            seconds_left = deadline - time.monotonic()
+            if seconds_left <= 0:
+                logger.error(
+                    "Giving up on the LLM request: the %.0f s time limit is used up",
+                    self.max_total_seconds,
+                )
+                return None
+
             delay = self.retry_delay * (2**attempt)
             try:
                 response = requests.post(
-                    self.base_url, headers=headers, json=payload, timeout=self.timeout
+                    self.base_url,
+                    headers=headers,
+                    json=payload,
+                    timeout=self._timeout_within(seconds_left),
                 )
 
                 if response.status_code == 200:
@@ -108,8 +167,11 @@ class LLMClient:
                         attempt + 1,
                         self.max_retries,
                     )
-                    if attempt == 0 and self.max_retries > 1:
-                        time.sleep(delay)
+                    if (
+                        attempt == 0
+                        and self.max_retries > 1
+                        and self._wait_before_retry(delay, deadline)
+                    ):
                         continue
                     return None
 
@@ -130,8 +192,7 @@ class LLMClient:
                     response.status_code,
                     short_msg,
                 )
-                if attempt < self.max_retries - 1:
-                    time.sleep(delay)
+                if attempt < self.max_retries - 1 and self._wait_before_retry(delay, deadline):
                     continue
                 return None
 
@@ -142,15 +203,13 @@ class LLMClient:
                     attempt + 1,
                     self.max_retries,
                 )
-                if attempt < self.max_retries - 1:
-                    time.sleep(delay)
+                if attempt < self.max_retries - 1 and self._wait_before_retry(delay, deadline):
                     continue
                 return None
 
             except (requests.RequestException, json.JSONDecodeError) as e:
                 logger.error("Request failed: %s", e)
-                if attempt < self.max_retries - 1:
-                    time.sleep(delay)
+                if attempt < self.max_retries - 1 and self._wait_before_retry(delay, deadline):
                     continue
                 return None
 

@@ -412,8 +412,12 @@ class TestIngestionSafety(unittest.IsolatedAsyncioTestCase):
             embedding_generator=Mock(),
             retriever=Mock(),
             llm_client=Mock(),
-            config=Config(telegram_bot_token="test", max_chunks_per_document=5),
+            # Rate limiting is switched off here: some tests upload many files as one user.
+            config=Config(
+                telegram_bot_token="test", max_chunks_per_document=5, upload_rate_limit=0
+            ),
         )
+        self.handlers.document_store.list_documents.return_value = []
 
     async def test_handle_encrypted_pdf_rejected(self):
         """Encrypted PDF upload is cleanly rejected with user-facing message."""

@@ -29,6 +29,7 @@ class TestBotHandlersSSRF(unittest.IsolatedAsyncioTestCase):
             llm_client=Mock(),
             config=self.config,
         )
+        self.handlers.document_store.list_documents.return_value = []
 
     def test_non_http_scheme_rejected(self):
         """Test that non-http/https schemes (ftp, file, gopher, etc.) are rejected."""
@@ -239,8 +240,8 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Answered in", reply)
         mock_thinking_msg.delete.assert_called_once()
 
-    async def test_summary_query_skips_cutoff_and_uses_first_chunks(self):
-        """Summary/overview queries should bypass retriever cutoff and take first ~8 chunks in page order."""
+    async def test_summary_query_skips_cutoff_and_samples_whole_document(self):
+        """Summary requests bypass the retriever cutoff and sample 8 chunks across the document."""
         user_id = 123
         self.mock_doc_store.list_documents.return_value = [{"id": 1, "filename": "book.pdf"}]
 
@@ -277,12 +278,12 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.mock_retriever.retrieve.assert_not_called()
         self.mock_embedder.generate_query_embedding.assert_not_called()
 
-        # format_context should receive 8 chunks sorted by page_start
+        # format_context should receive 8 chunks spread over all 10 pages, in page order
         self.mock_retriever.format_context.assert_called_once()
         passed_chunks = self.mock_retriever.format_context.call_args[0][0]
         self.assertEqual(len(passed_chunks), 8)
         self.assertEqual(passed_chunks[0]["page_start"], 1)
-        self.assertEqual(passed_chunks[-1]["page_start"], 8)
+        self.assertEqual(passed_chunks[-1]["page_start"], 10)
 
         self.assertEqual(update.message.reply_text.call_count, 2)
         self.assertEqual("Thinking...", update.message.reply_text.call_args_list[0][0][0])
@@ -311,6 +312,9 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
             "What is a variable?",
             "How do for loops work in Python?",
             "Explain recursion on page 42",
+            "What is the summary of chapter 3?",
+            "Give me an overview of recursion",
+            "Summarize the Raft algorithm",
         ]
         for q in non_summary_queries:
             self.assertFalse(is_summary_query(q), f"Incorrectly flagged non-summary query: {q}")
@@ -740,8 +744,9 @@ class TestBotHandlersQuestionAnswering(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(is_insufficient_context(" 'INSUFFICIENT_CONTEXT' "))
         self.assertTrue(is_insufficient_context('"INSUFFICIENT_CONTEXT"'))
         self.assertTrue(is_insufficient_context("insufficient_context: cannot find it"))
-        # Marker in middle of paragraph
-        self.assertTrue(
+        # Marker next to other sentences is not a pure refusal. The pipeline decides later,
+        # using the grounding check, whether the remaining sentences are supported.
+        self.assertFalse(
             is_insufficient_context(
                 "Here is introductory text.\n\nINSUFFICIENT_CONTEXT\n\nMore details."
             )
@@ -1635,6 +1640,7 @@ class TestUserFacingErrors(unittest.IsolatedAsyncioTestCase):
             llm_client=Mock(),
             config=self.config,
         )
+        self.handlers.document_store.list_documents.return_value = []
 
     async def test_handle_document_user_facing_error_displayed(self):
         update = Mock()

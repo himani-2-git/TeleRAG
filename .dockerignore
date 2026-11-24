@@ -1,0 +1,28 @@
+# Keep secrets, data and development files out of the image.
+.env
+.env.*
+!.env.example
+
+.git
+.github
+.vscode
+.venv
+.venv-1
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+
+data
+data_backup
+logs
+output
+tmp
+
+# Not needed to run the bot
+tests
+eval
+docs
+scripts
+*.md

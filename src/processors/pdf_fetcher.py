@@ -1,20 +1,26 @@
 """PDF fetcher with SSRF validation, redirect handling, and streaming size limits."""
 
 import io
+import time
 from urllib.parse import urljoin
 
 import requests
 
 from .web_processor import validate_url_ssrf
 
+TOO_SLOW_MESSAGE = "The download took too long. Please try again or use a smaller file."
 
-def fetch_pdf_bytes(url: str, max_bytes: int, timeout: int = 30) -> bytes:
+
+def fetch_pdf_bytes(
+    url: str, max_bytes: int, timeout: int = 30, total_timeout: float = 60.0
+) -> bytes:
     """Download PDF bytes safely with SSRF validation and streaming size cap.
 
     Args:
         url: URL of the PDF to download.
         max_bytes: Maximum allowed file size in bytes.
-        timeout: Network request timeout in seconds.
+        timeout: Limit for each single wait on the network, in seconds.
+        total_timeout: Limit for the whole download, in seconds. Stops very slow servers.
 
     Returns:
         Downloaded PDF bytes.
@@ -34,8 +40,11 @@ def fetch_pdf_bytes(url: str, max_bytes: int, timeout: int = 30) -> bytes:
     current_url = url
     max_redirects = 3
     redirect_count = 0
+    deadline = time.monotonic() + total_timeout
 
     while True:
+        if time.monotonic() > deadline:
+            raise ValueError(TOO_SLOW_MESSAGE)
         try:
             response = requests.get(
                 current_url,
@@ -104,6 +113,8 @@ def fetch_pdf_bytes(url: str, max_bytes: int, timeout: int = 30) -> bytes:
                         max_mb = max_bytes // (1024 * 1024)
                         raise ValueError(f"File too large. Maximum size is {max_mb}MB.")
                     buf.write(chunk)
+                    if time.monotonic() > deadline:
+                        raise ValueError(TOO_SLOW_MESSAGE)
         finally:
             response.close()
 
